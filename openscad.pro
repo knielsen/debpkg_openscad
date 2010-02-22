@@ -137,5 +137,5 @@ macx {
   SOURCES += src/AppleEvents.cc
 }
 
-target.path = /usr/local/bin/
+target.path = /usr/bin/
 INSTALLS += target
