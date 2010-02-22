@@ -61,8 +61,7 @@ else {
   INCLUDEPATH += /usr/include/eigen2
 }
 
-!macx:QMAKE_CXXFLAGS_RELEASE = -O3 -march=pentium
-QMAKE_CXXFLAGS_RELEASE = -O3 -march=athlon64
+QMAKE_CXXFLAGS_RELEASE = -O3
 
 # QMAKE_CFLAGS   += -pg
 # QMAKE_CXXFLAGS += -pg
