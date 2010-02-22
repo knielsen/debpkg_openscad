@@ -1,0 +1,104 @@
+Format-Specification: http://dep.debian.net/deps/dep5/
+Name: opencsg
+Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
+Source: http://opencsg.org/
+
+Copyright: © 2009-2010 Clifford Wolf <clifford@clifford.at>
+License: GPL-2+ with CGAL exception
+    This program is free software; you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the Free
+    Software Foundation; either version 2 of the License, or (at your option)
+    any later version.
+
+    As a special exception, you have permission to link this program
+    with the CGAL library and distribute executables, as long as you
+    follow the requirements of the GNU GPL in regard to all of the
+    software in the executable aside from CGAL.
+
+    This program is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+    more details.
+
+    A copy of the GNU General Public License can be found in
+    /usr/share/common-licenses/GPL-2.
+
+Files: libraries/rounder.scad
+Copyright: © 2010 Marius Kintel
+License: BSD
+
+Files: libraries/shapes.scad
+Copyright: © 2009 Catarina Mota
+License: GPL-2+
+
+Files: src/CGAL_renderer.h
+Copyright: © 1997-2002 Max-Planck-Institute Saarbruecken (Germany)
+License: QPL
+FIXME: as this is in the source tarball, i should make a dfsg-free package or ask upstream not to ship it
+
+Files: src/qtcolorbutton/*
+Copyright: © 2009 Nokia Corporation and/or its subsidiary(-ies)
+License: Qt Commercial or LGPL-2.1+ or GPL-3+
+    Commercial Usage
+    Licensees holding valid Qt Commercial licenses may use this file in
+    accordance with the Qt Commercial License Agreement provided with the
+    Software or, alternatively, in accordance with the terms contained in
+    a written agreement between you and Nokia.
+    
+    GNU Lesser General Public License Usage
+    Alternatively, this file may be used under the terms of the GNU Lesser
+    General Public License version 2.1 as published by the Free Software
+    Foundation and appearing in the file LICENSE.LGPL included in the
+    packaging of this file.  Please review the following information to
+    ensure the GNU Lesser General Public License version 2.1 requirements
+    will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+    
+    In addition, as a special exception, Nokia gives you certain
+    additional rights. These rights are described in the Nokia Qt LGPL
+    Exception version 1.0, included in the file LGPL_EXCEPTION.txt in this
+    package.
+    
+    GNU General Public License Usage
+    Alternatively, this file may be used under the terms of the GNU
+    General Public License version 3.0 as published by the Free Software
+    Foundation and appearing in the file LICENSE.GPL included in the
+    packaging of this file.  Please review the following information to
+    ensure the GNU General Public License version 3.0 requirements will be
+    met: http://www.gnu.org/copyleft/gpl.html.
+    
+    If you are unsure which license is appropriate for your use, please
+    contact the sales department at qt-sales@nokia.com.
+FIXME: technically this looks like a gpl violation (no CGAL exception here)
+
+Files: parser_yacc.*
+Copyright: © 1984-2006 Free Software Foundation, Inc.
+License: GPL-3+ with Bison exception
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+    
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    
+    As a special exception, you may create a larger work that contains
+    part or all of the Bison parser skeleton and distribute that work
+    under terms of your choice, so long as that work isn't itself a
+    parser generator using the skeleton or a modified version thereof
+    as a parser skeleton.  Alternatively, if you modify or redistribute
+    the parser skeleton itself, you may (at your option) remove this
+    special exception, which will cause the skeleton and the resulting
+    Bison output files to be licensed under the GNU General Public
+    License without this special exception.
+    
+    This special exception was added by the Free Software Foundation in
+    version 2.2 of Bison.
+
+Files: debian/*
+Copyright: © 2010 Christian M. Amsüss <chrysn@fsfe.org>
+License: GPL-2+ with CGAL exception

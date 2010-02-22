@@ -1,0 +1,13 @@
+Source: openscad
+Priority: optional
+Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.8.4
+Section: graphics
+Homepage: http://opencsg.org/
+
+Package: openscad
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: FIXME
+ FIXME

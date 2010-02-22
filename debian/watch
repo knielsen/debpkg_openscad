@@ -1,0 +1,3 @@
+version=3
+
+http://openscad.org/download/openscad-(.*).src.tar.gz
