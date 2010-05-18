@@ -13,3 +13,8 @@ QMAKEARGS=-makefile -nocache "QMAKE_CFLAGS_RELEASE=-g -O2" "QMAKE_CFLAGS_DEBUG=-
 
 override_dh_auto_configure:
 	qmake-qt4 ${QMAKEARGS}
+
+override_dh_compress:
+	# i consider these files image files, which, according to dh_compress
+	# man page, should not be compressed.
+	dh_compress -X examples

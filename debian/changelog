@@ -1,8 +1,9 @@
 openscad (2010.03~svn20100516-2) UNRELEASED; urgency=low
 
   * Ship RELEASE_NOTES file
+  * Don't compress example files
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 18 May 2010 15:47:14 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 18 May 2010 15:47:49 +0200
 
 openscad (2010.03~svn20100516-1) unstable; urgency=low
 
