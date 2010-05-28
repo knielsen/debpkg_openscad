@@ -3,8 +3,9 @@ openscad (2010.05-2) unstable; urgency=low
   * New openscad.desktop
   * Create openscad.png with aspect ratio appropriate for icons
     - new build dependency on imagemagick
+  * Install TODO.txt
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 29 May 2010 00:53:43 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 29 May 2010 00:54:19 +0200
 
 openscad (2010.05-1) unstable; urgency=low
 
