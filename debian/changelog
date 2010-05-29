@@ -1,20 +1,15 @@
-openscad (2010.03~svn20100516-2) UNRELEASED; urgency=low
+openscad (2010.05-1) unstable; urgency=low
 
+  * New upstream release:
+    - more math functions
+    - support for minkowski sums
+    - new include syntax
+    - bugfixes
   * Ship RELEASE_NOTES file
   * Don't compress example files
   * Patch openscad.cc to look for examples at the right place
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 18 May 2010 22:34:25 +0200
-
-openscad (2010.03~svn20100516-1) unstable; urgency=low
-
-  * New upstream release pending:
-    - more math functions
-    - support for minkowski sums
-    - new include syntax
-    - bugfixes
-
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 16 May 2010 14:40:10 +0200
 
 openscad (2010.02-2) unstable; urgency=low
 
