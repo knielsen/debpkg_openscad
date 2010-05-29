@@ -14,7 +14,6 @@ class MainWindow : public QMainWindow, public Ui::MainWindow
 	Q_OBJECT
 
 public:
-	static QPointer<MainWindow> current_win;
 	static void requestOpenFile(const QString &filename);
 
 	QString fileName;
@@ -24,6 +23,9 @@ public:
 
 	QTimer *animate_timer;
 	double tval, fps, fsteps;
+
+	QTimer *autoReloadTimer;
+	QString autoReloadInfo;
 
 	Context root_ctx;
 	AbstractModule *root_module;      // Result of parsing
@@ -51,7 +53,7 @@ public:
 	static const int maxRecentFiles = 10;
 	QAction *actionRecentFile[maxRecentFiles];
 
-	MainWindow(const char *filename = 0);
+	MainWindow(const QString &filename);
 	~MainWindow();
 
 protected:
@@ -73,6 +75,9 @@ private:
 	void compile(bool procevents);
 	void compileCSG(bool procevents);
 	bool maybeSave();
+	static void consoleOutput(const QString &msg, void *userdata) {
+		static_cast<MainWindow*>(userdata)->console->append(msg);
+	}
 
 private slots:
 	void actionNew();
@@ -86,10 +91,6 @@ private slots:
 	void actionReload();
 
 private slots:
-	void editIndent();
-	void editUnindent();
-	void editComment();
-	void editUncomment();
 	void pasteViewportTranslation();
 	void pasteViewportRotation();
 	void hideEditor();
@@ -111,6 +112,8 @@ private slots:
 
 public:
 	void viewModeActionsUncheck();
+	void setCurrentOutput();
+	void clearCurrentOutput();
 
 public slots:
 #ifdef ENABLE_OPENCSG
@@ -141,9 +144,12 @@ public slots:
 	void dragEnterEvent(QDragEnterEvent *event);
 	void dropEvent(QDropEvent *event);
 	void helpAbout();
+	void helpHomepage();
 	void helpManual();
 	void quit();
 	void actionReloadCompile();
+	void checkAutoReload();
+	void autoReloadSet(bool);
 };
 
 #endif

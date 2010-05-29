@@ -46,6 +46,15 @@ public:
 class Module : public AbstractModule
 {
 public:
+	QHash< QString, Module*> usedlibs;
+
+	struct libs_cache_ent {
+		Module *mod;
+		QString cache_id, msg;
+	};
+	static QHash<QString, libs_cache_ent> libs_cache;
+	static Module *compile_library(QString filename);
+
 	QVector<QString> argnames;
 	QVector<Expression*> argexpr;
 

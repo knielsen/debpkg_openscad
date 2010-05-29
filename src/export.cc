@@ -24,7 +24,7 @@
  */
 
 #include "printutils.h"
-#include "MainWindow.h"
+#include "polyset.h"
 #include "dxfdata.h"
 
 #include <QApplication>
@@ -70,6 +70,9 @@ void cgal_nef3_to_polyset(PolySet *ps, CGAL_Nef_polyhedron *root_N)
 	}
 }
 
+/*!
+	Saves the current 3D CGAL Nef polyhedron as STL to the given absolute filename.
+ */
 void export_stl(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *pd)
 {
 	CGAL_Polyhedron P;
@@ -84,10 +87,10 @@ void export_stl(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *
 	if (!f) {
 		PRINTA("Can't open STL file \"%1\" for STL export: %2", 
 					 filename, QString(strerror(errno)));
-		MainWindow::current_win = NULL;
+		set_output_handler(NULL, NULL);
 		return;
 	}
-	fprintf(f, "solid\n");
+	fprintf(f, "solid OpenSCAD_Model\n");
 
 	int facet_count = 0;
 	for (FCI fi = P.facets_begin(); fi != P.facets_end(); ++fi) {
@@ -117,9 +120,12 @@ void export_stl(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *
 				double nx = (y1-y2)*(z1-z3) - (z1-z2)*(y1-y3);
 				double ny = (z1-z2)*(x1-x3) - (x1-x2)*(z1-z3);
 				double nz = (x1-x2)*(y1-y3) - (y1-y2)*(x1-x3);
-				double n_scale = 1 / sqrt(nx*nx + ny*ny + nz*nz);
+				double nlength = sqrt(nx*nx + ny*ny + nz*nz);
+				// Avoid generating normals for polygons with zero area
+				double eps = 0.000001;
+				if (nlength < eps) nlength = 1.0;
 				fprintf(f, "  facet normal %f %f %f\n",
-						nx * n_scale, ny * n_scale, nz * n_scale);
+						nx / nlength, ny / nlength, nz  / nlength);
 				fprintf(f, "    outer loop\n");
 				fprintf(f, "      vertex %s\n", vs1.toAscii().data());
 				fprintf(f, "      vertex %s\n", vs2.toAscii().data());
@@ -134,7 +140,7 @@ void export_stl(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *
 		}
 	}
 
-	fprintf(f, "endsolid\n");
+	fprintf(f, "endsolid OpenSCAD_Model\n");
 	fclose(f);
 }
 
@@ -143,13 +149,16 @@ void export_off(CGAL_Nef_polyhedron*, QString, QProgressDialog*)
 	PRINTF("WARNING: OFF import is not implemented yet.");
 }
 
+/*!
+	Saves the current 2D CGAL Nef polyhedron as DXF to the given absolute filename.
+ */
 void export_dxf(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *)
 {
 	FILE *f = fopen(filename.toUtf8().data(), "w");
 	if (!f) {
 		PRINTA("Can't open DXF file \"%1\" for DXF export: %2", 
 					 filename, QString(strerror(errno)));
-		MainWindow::current_win = NULL;
+		set_output_handler(NULL, NULL);
 		return;
 	}
 

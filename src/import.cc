@@ -93,7 +93,7 @@ AbstractNode *ImportModule::evaluate(const Context *ctx, const ModuleInstantiati
 	node->fs = c.lookup_variable("$fs").num;
 	node->fa = c.lookup_variable("$fa").num;
 
-	node->filename = c.lookup_variable("file").text;
+	node->filename = c.get_absolute_path(c.lookup_variable("file").text);
 	node->layername = c.lookup_variable("layer", true).text;
 	node->convexity = c.lookup_variable("convexity", true).num;
 
@@ -225,7 +225,7 @@ QString ImportNode::dump(QString indent) const
 					"$fn = %g, $fa = %g, $fs = %g);\n",
 					filename.toAscii().data(), (int)st.st_mtime, (int)st.st_size,
 					layername.toAscii().data(), origin_x, origin_y, scale, convexity,
-					fn, fs, fa);
+					fn, fa, fs);
 		((AbstractNode*)this)->dump_cache = indent + QString("n%1: ").arg(idx) + text;
 	}
 	return dump_cache;

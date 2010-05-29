@@ -56,9 +56,18 @@ static void help(const char *progname)
 	exit(1);
 }
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+static void version()
+{
+	printf("OpenSCAD version %s\n", TOSTRING(OPENSCAD_VERSION));
+	exit(1);
+}
+
 QString commandline_commands;
 const char *make_command = NULL;
 QSet<QString> dependencies;
+QString currentdir;
 QString examplesdir;
 QString librarydir;
 
@@ -101,25 +110,49 @@ int main(int argc, char **argv)
 #ifdef Q_WS_MAC
 	app.installEventFilter(new EventFilter(&app));
 #endif
+	QDir original_path = QDir::current();
 
-  // set up groups for QSettings
-  QCoreApplication::setOrganizationName("OpenSCAD");
-  QCoreApplication::setOrganizationDomain("openscad.org");
-  QCoreApplication::setApplicationName("OpenSCAD");
-
+	// set up groups for QSettings
+	QCoreApplication::setOrganizationName("OpenSCAD");
+	QCoreApplication::setOrganizationDomain("openscad.org");
+	QCoreApplication::setApplicationName("OpenSCAD");
 
 	const char *filename = NULL;
 	const char *stl_output_file = NULL;
 	const char *off_output_file = NULL;
 	const char *dxf_output_file = NULL;
 	const char *deps_output_file = NULL;
-
+	
+	static struct option long_options[] =
+             {
+               {"version", no_argument,	0, 'v'},
+               {"help",    no_argument, 0, 'h'},
+               {0, 0, 0, 0}
+             };
+	int option_index = 0;
+	
 	int opt;
-
-	while ((opt = getopt(argc, argv, "s:o:x:d:m:D:")) != -1)
+	while ((opt = getopt_long(argc, argv, "s:o:x:d:m:D:vh", long_options, &option_index)) != -1)
 	{
 		switch (opt)
 		{
+		case 0:
+			switch (option_index)
+			{
+				case 'v':
+					version();
+					break;
+				case 'h':
+					help(argv[0]);
+					break;
+			}
+			break;
+		case 'v':
+			version();
+			break;
+		case 'h':
+			help(argv[0]);
+			break;
 		case 's':
 			if (stl_output_file || off_output_file || dxf_output_file)
 				help(argv[0]);
@@ -161,16 +194,20 @@ int main(int argc, char **argv)
 		help(argv[0]);
 #endif
 
+	currentdir = QDir::currentPath();
+
 	QDir exdir(QApplication::instance()->applicationDirPath());
 #ifdef Q_WS_MAC
 	exdir.cd("../Resources"); // Examples can be bundled
 	if (!exdir.exists("examples")) exdir.cd("../../..");
-#endif
-#ifdef linux
-	if (exdir.cd("../../examples")) {
+#elif defined(Q_OS_UNIX)
+	if (exdir.cd("../share/openscad/examples")) {
 		examplesdir = exdir.path();
 	} else
 	if (exdir.cd("../../share/openscad/examples")) {
+		examplesdir = exdir.path();
+	} else
+	if (exdir.cd("../../examples")) {
 		examplesdir = exdir.path();
 	} else
 #endif
@@ -182,6 +219,16 @@ int main(int argc, char **argv)
 #ifdef Q_WS_MAC
 	libdir.cd("../Resources"); // Libraries can be bundled
 	if (!libdir.exists("libraries")) libdir.cd("../../..");
+#elif defined(Q_OS_UNIX)
+	if (libdir.cd("../share/openscad/libraries")) {
+		librarydir = libdir.path();
+	} else
+	if (libdir.cd("../../share/openscad/libraries")) {
+		librarydir = libdir.path();
+	} else
+	if (libdir.cd("../../libraries")) {
+		librarydir = libdir.path();
+	} else
 #endif
 	if (libdir.cd("libraries")) {
 		librarydir = libdir.path();
@@ -232,7 +279,6 @@ int main(int argc, char **argv)
 			root_module = parse((text+commandline_commands).toAscii().data(), fileInfo.absolutePath().toLocal8Bit(), false);
 		}
 
-		QString original_path = QDir::currentPath();
 		QDir::setCurrent(fileInfo.absolutePath());
 
 		AbstractNode::resetIndexCounter();
@@ -241,7 +287,7 @@ int main(int argc, char **argv)
 		CGAL_Nef_polyhedron *root_N;
 		root_N = new CGAL_Nef_polyhedron(root_node->render_cgal_nef_polyhedron());
 
-		QDir::setCurrent(original_path);
+		QDir::setCurrent(original_path.absolutePath());
 
 		if (deps_output_file) {
 			fp = fopen(deps_output_file, "wt");
@@ -279,18 +325,23 @@ int main(int argc, char **argv)
 		installAppleEventHandlers();
 #endif		
 
+		QString qfilename;
+		if (filename) qfilename = QFileInfo(original_path, filename).absoluteFilePath();
+
+#if 0 /*** disabled by clifford wolf: adds rendering artefacts with OpenCSG ***/
 		// turn on anti-aliasing
 		QGLFormat f;
 		f.setSampleBuffers(true);
 		f.setSamples(4);
 		QGLFormat::setDefaultFormat(f);
+#endif
 #ifdef ENABLE_MDI
-		new MainWindow(filename);
+		new MainWindow(qfilename);
 		while (optind < argc)
-			new MainWindow(argv[optind++]);
+			new MainWindow(QFileInfo(original_path, argv[optind++]).absoluteFilePath());
 		app.connect(&app, SIGNAL(lastWindowClosed()), &app, SLOT(quit()));
 #else
-		MainWindow *m = new MainWindow(filename);
+		MainWindow *m = new MainWindow(qfilename);
 		app.connect(m, SIGNAL(destroyed()), &app, SLOT(quit()));
 #endif
 		rc = app.exec();

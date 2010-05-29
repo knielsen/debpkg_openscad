@@ -91,7 +91,11 @@ AbstractNode *DxfLinearExtrudeModule::evaluate(const Context *ctx, const ModuleI
 	Value twist = c.lookup_variable("twist", true);
 	Value slices = c.lookup_variable("slices", true);
 
-	node->filename = file.text;
+	if(!file.text.isNull())
+		node->filename = c.get_absolute_path(file.text);
+	else
+		node->filename = file.text;
+
 	node->layername = layer.text;
 	node->height = height.num;
 	node->convexity = (int)convexity.num;
@@ -210,7 +214,7 @@ static void add_slice(PolySet *ps, DxfData::Path *pt, double rot1, double rot2, 
 	}
 }
 
-PolySet *DxfLinearExtrudeNode::render_polyset(render_mode_e rm) const
+PolySet *DxfLinearExtrudeNode::render_polyset(render_mode_e) const
 {
 	QString key = mk_cache_id();
 	if (PolySet::ps_cache.contains(key)) {
@@ -330,7 +334,7 @@ QString DxfLinearExtrudeNode::dump(QString indent) const
 			text += t2;
 		}
 		QString t3;
-		t3.sprintf(", $fn = %g, $fa = %g, $fs = %g) {\n", fn, fs, fa);
+		t3.sprintf(", $fn = %g, $fa = %g, $fs = %g) {\n", fn, fa, fs);
 		text += t3;
 		foreach (AbstractNode *v, children)
 			text += v->dump(indent + QString("\t"));
