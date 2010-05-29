@@ -4,16 +4,23 @@ BUGS
 o Some invalid DXF data gets pass the import checks and breaks the tessing code
 o Tesselation via GLU sometimes produces strange results
 o Export STL: Exports existing CGAL model even though the current model is changed, but not CGAL rendered
+o It's now possible to start a new rendering while one is already running.
+  -> turn off most (or all) interaction while rendering
+o Look into the polygon winding and rotate_extrude() problem reported by Britton
 
 CRASH BUGS
 ----------
 o Broken polyhedron() entities are not correctly detected and cause CGAL segfaults
-o Non-manifold objects make CGAL crash (e.g. two cubes which touch at one edge)
-
+o linear_extrude(50) square([5,0]);
+o union() {
+    linear_extrude(height=10, twist=90) circle(5);
+    translate([7,-5,0]) linear_extrude(height=10, twist=180) polygon(points = [[0,0], [10,0], [5,10]]);
+  }
 
 USER INTERFACE
 --------------
 o Preferences
+  - Remember settings done in menus between sessions (automatic reload, perspective, show*, hide*)
   - Beautify color schemes
   - Color schemes read from file
   - Color scheme editor
@@ -33,8 +40,9 @@ o MDI
   - currentPath is global but is used by each document, e.g. parser
     and handle_dep.
 o 3D View
+  - OpenGL 2.0 test: What, exactly, is needed from OpenGL 2.0? Can we use 1.x with extensions?
   - Improve mouse rotation
-  - Add modifier key combos to handle pan on 1 mouse button systems
+  - Add modifier key combos to handle pan and zoom on 1 mouse button systems
   - Show grid
   - 4 x split view w/orthogonal cameras?
   - Quick highlighting of object under the cursor in the editor
@@ -42,28 +50,29 @@ o 3D View
   - overlay indicator displaying current view mode
   - OpenCSG rendering: Coincident surfaces causes z-buffer fighting. Is this somehow
     avoidable tuning the depth tests in OpenCSG? 
-o Editor
+o Editor wishlist
+  - More infrastructure for external editor (allow communication from the outside)
+  - Preferences GUI for the features below
   - line numbers
   - tear-off/maximize options?
   - Save somehow uses current dir, even if the file is already saved earlier
-  - Autocompletion/hints for builtin (and user-defined) functions/modules
+  - Code completion/hints for builtin (and user-defined) functions/modules
   - builtin quick function reference/help
   - Drawer/popup with all modules/functions listed which can be inserted into
     the editor by clicking or drag&drop -> icons in toolbar?
     -> This would be moving in the direction of a traditional CAD GUI
        and needs a fair bit of thinking.
-  - More infrastructur for external editor (or is the reload good enough?)
-  - Evaluate QCodeEdit (http://qcodeedit.edyuk.org)
   - Display some kind of line wrap indicator
   - Couple the source code to the AST to allow highlighting selected elements
     in the source code in the 3D view
   - Tabbed editor for designs including other files
-  - modifier flag is broken
   - C-c/C-v should work on the focused widget, not always in the editor
 
 o Computation
   - Run CGAL rendering in a backgroud thread
   - Enable viewing/editing while rendering
+  - Progress: Call progresswidget more often to avoid app hanging for multiple
+    seconds (i.e. make cancel button more responsive)
 o Misc
   - Reload and compile: Ask for confirmation if file is locally edited
     (make this configurable in preferences?)
@@ -76,14 +85,15 @@ ENGINE
 o Primitives
   - Springs, spirals (requested by Cathal Garvey)
   - (TTF) Text
+  - Image-based height field like http://www.thingiverse.com/thing:2078
 o 2D Subsystem
   - Performance: Is it necessary to union children before extrusion
     when compiling? Can this be postponed to CGAL evaluation time?
   - Add inset() operation
 o Built-in modules
   - extrude*: Allow the base 2D primitive to have a Z value
+  - rotate_extrude(): Allow for specification of start/stop/sweep angle?
 o Advanced Transformations
-  - Add statement for 2D and 3D minkowski sum
   - Add statement for refinement via surface subdivision
   - Add statement for intersections in cartesian product of childs
 o Function-Module-Interface
@@ -112,6 +122,8 @@ o Misc
   - Go through default values of parameters (e.g. cube() has x,y,z=1 while linear_extrude() has height=100)
   - Add support for symbolic names to child() statement 
   - Add 'lines' object type for non-solid 2d drawings
+  - Is there a reason why modules like echo, empty if, empty for loop returns an
+    empty AbstractNode instead of being ignored?
 o Grammar
   - dim->name -> dim->label
   - A random(seed) function
@@ -132,8 +144,22 @@ o C++-ify
   - Use static_cast/dynamic_cast instead of C-style casts
 o dxflinextrude and dxfrotextrude could share code
 o Consider decoupling DXF-specific functionality from the 2D subsystem
-o Make the interfaces from OpenSCAD and OpenCSG and CGAL cleaner to facilitate
-  experimentation with other frameworks (ref. Nef_polyhedron_2() problems)
+o Visitation refactoring
+  - Make AbstractNode members private/protected?
+
+TESTING
+-------
+o Caching and MDI looks suspicious when the code relies on external resources
+  which might be loaded from difference locations in different documents
+  -> we might get a false cache hit
+o Are contructs like "child(0)" cached? Could this give false cache hits?
+o Write some cmd-line apps that dump an openscad file to misc. formats
+  (dump, stl, dxf)
+o Write a simple test script that collects verified and current STL renderings
+  and displays them side-by-side or smth.
+o Write simple driver scripts for comparing output of above command
+o Collect "all" available OpenSCAD scripts from the internets and run the integration
+  tests on them all
 
 INFRASTRUCTURE
 --------------
@@ -142,8 +168,11 @@ o Use a logging framework to get debugging/info output more under control?
 
 MISC
 ----
-o Collect "all" available OpenSCAD scripts from the internets and batch convert them
-  to STL to assist with robustness testing.
+o Streamline the cmd-line interface a bit
+  - Implicit output file format
 o Mac OS X:
-  - universal binary -> fix cgal and opencsg
+  - 32-bit compatibility
+    o Build everything including i386 arch
 
+o Write checklists for typical extension work (add new module, add new function)
+  -> make sure new test files are added

@@ -1,16 +1,20 @@
 #!/usr/bin/make -f
 
-# DH_VERBOSE=1
+# export DH_VERBOSE=1
+
+# this hardcoded stuff is, to quote bug#571640, crap. unfortunately,
+# the solution suggested there (conflicting with qmake-qt3) does not
+# work here as this package indirectly build-depends on it via
+# libcgal-dev
+QMAKEARGS=-makefile -nocache "QMAKE_CFLAGS_RELEASE=-g -O2" "QMAKE_CFLAGS_DEBUG=-g -O2" "QMAKE_CXXFLAGS_RELEASE=-g -O2" "QMAKE_CXXFLAGS_DEBUG=-g -O2" QMAKE_STRIP=: PREFIX=/usr
 
 %:
 	dh $@
 
-binary:
-	dh $@ --before dh_auto_configure
-	qmake-qt4
-	dh $@ --after dh_auto_configure
+override_dh_auto_configure:
+	qmake-qt4 ${QMAKEARGS}
 
-build:
-	dh $@ --before dh_auto_configure
-	qmake-qt4
-	dh $@ --after dh_auto_configure
+override_dh_compress:
+	# i consider these files image files, which, according to dh_compress
+	# man page, should not be compressed.
+	dh_compress -X examples

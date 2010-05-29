@@ -66,9 +66,18 @@
 #include <QMessageBox>
 #include <QDesktopServices>
 #include <QSettings>
+#ifdef _QCODE_EDIT_
+#include "qdocument.h"
+#include "qformatscheme.h"
+#include "qlanguagefactory.h"
+#endif
 
 //for chdir
 #include <unistd.h>
+
+// for stat()
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifdef ENABLE_CGAL
 
@@ -115,9 +124,7 @@ static char copyrighttext[] =
 	"the Free Software Foundation; either version 2 of the License, or"
 	"(at your option) any later version.";
 
-QPointer<MainWindow> MainWindow::current_win = NULL;
-
-MainWindow::MainWindow(const char *filename)
+MainWindow::MainWindow(const QString &filename)
 {
 	setupUi(this);
 
@@ -158,8 +165,16 @@ MainWindow::MainWindow(const char *filename)
 	fsteps = 1;
 
 	highlighter = NULL;
-
-	editor->setWordWrapMode(QTextOption::WrapAnywhere); // Not designable
+#ifdef _QCODE_EDIT_
+	QFormatScheme *formats = new QFormatScheme("qxs/openscad.qxf");
+	QDocument::setDefaultFormatScheme(formats);
+	QLanguageFactory *languages = new QLanguageFactory(formats,this);
+	languages->addDefinitionPath("qxs");
+	languages->setLanguage(editor, "openscad");
+#else
+	editor->setTabStopWidth(30);
+#endif
+	editor->setLineWrapping(true); // Not designable
 	setFont("", 0); // Init default font
 
 	screen->statusLabel = new QLabel(this);
@@ -167,6 +182,10 @@ MainWindow::MainWindow(const char *filename)
 
 	animate_timer = new QTimer(this);
 	connect(animate_timer, SIGNAL(timeout()), this, SLOT(updateTVal()));
+
+	autoReloadTimer = new QTimer(this);
+	autoReloadTimer->setSingleShot(false);
+	connect(autoReloadTimer, SIGNAL(timeout()), this, SLOT(checkAutoReload()));
 
 	connect(e_tval, SIGNAL(textChanged(QString)), this, SLOT(actionCompile()));
 	connect(e_fps, SIGNAL(textChanged(QString)), this, SLOT(updatedFps()));
@@ -220,10 +239,10 @@ MainWindow::MainWindow(const char *filename)
 	connect(this->editActionCut, SIGNAL(triggered()), editor, SLOT(cut()));
 	connect(this->editActionCopy, SIGNAL(triggered()), editor, SLOT(copy()));
 	connect(this->editActionPaste, SIGNAL(triggered()), editor, SLOT(paste()));
-	connect(this->editActionIndent, SIGNAL(triggered()), this, SLOT(editIndent()));
-	connect(this->editActionUnindent, SIGNAL(triggered()), this, SLOT(editUnindent()));
-	connect(this->editActionComment, SIGNAL(triggered()), this, SLOT(editComment()));
-	connect(this->editActionUncomment, SIGNAL(triggered()), this, SLOT(editUncomment()));
+	connect(this->editActionIndent, SIGNAL(triggered()), editor, SLOT(indentSelection()));
+	connect(this->editActionUnindent, SIGNAL(triggered()), editor, SLOT(unindentSelection()));
+	connect(this->editActionComment, SIGNAL(triggered()), editor, SLOT(commentSelection()));
+	connect(this->editActionUncomment, SIGNAL(triggered()), editor, SLOT(uncommentSelection()));
 	connect(this->editActionPasteVPT, SIGNAL(triggered()), this, SLOT(pasteViewportTranslation()));
 	connect(this->editActionPasteVPR, SIGNAL(triggered()), this, SLOT(pasteViewportRotation()));
 	connect(this->editActionZoomIn, SIGNAL(triggered()), editor, SLOT(zoomIn()));
@@ -232,6 +251,7 @@ MainWindow::MainWindow(const char *filename)
 	connect(this->editActionPreferences, SIGNAL(triggered()), this, SLOT(preferences()));
 
 	// Design menu
+	connect(this->designActionAutoReload, SIGNAL(toggled(bool)), this, SLOT(autoReloadSet(bool)));
 	connect(this->designActionReloadAndCompile, SIGNAL(triggered()), this, SLOT(actionReloadCompile()));
 	connect(this->designActionCompile, SIGNAL(triggered()), this, SLOT(actionCompile()));
 #ifdef ENABLE_CGAL
@@ -288,25 +308,31 @@ MainWindow::MainWindow(const char *filename)
 
 	// Help menu
 	connect(this->helpActionAbout, SIGNAL(triggered()), this, SLOT(helpAbout()));
+	connect(this->helpActionHomepage, SIGNAL(triggered()), this, SLOT(helpHomepage()));
 	connect(this->helpActionManual, SIGNAL(triggered()), this, SLOT(helpManual()));
 
 
 	console->setReadOnly(true);
-	current_win = this;
+	setCurrentOutput();
 
 	PRINT(helptitle);
 	PRINT(copyrighttext);
 	PRINT("");
 
-	if (filename) {
+	if (!filename.isEmpty()) {
 		openFile(filename);
 	} else {
 		setFileName("");
 	}
 
 	connect(editor->document(), SIGNAL(contentsChanged()), this, SLOT(animateUpdateDocChanged()));
+#ifdef _QCODE_EDIT_
+	connect(editor, SIGNAL(contentModified(bool)), this, SLOT(setWindowModified(bool)));
+	connect(editor, SIGNAL(contentModified(bool)), fileActionSave, SLOT(setEnabled(bool)));
+#else
 	connect(editor->document(), SIGNAL(modificationChanged(bool)), this, SLOT(setWindowModified(bool)));
 	connect(editor->document(), SIGNAL(modificationChanged(bool)), fileActionSave, SLOT(setEnabled(bool)));
+#endif
 	connect(screen, SIGNAL(doAnimateUpdate()), this, SLOT(animateUpdate()));
 
 	connect(Preferences::inst(), SIGNAL(requestRedraw()), this->screen, SLOT(updateGL()));
@@ -332,7 +358,7 @@ MainWindow::MainWindow(const char *filename)
 	viewPerspective();
 
 	setAcceptDrops(true);
-	current_win = NULL;
+	clearCurrentOutput();
 }
 
 MainWindow::~MainWindow()
@@ -386,7 +412,7 @@ static void report_func(const class AbstractNode*, void *vp, int mark)
 #ifdef ENABLE_MDI
 void MainWindow::requestOpenFile(const QString &filename)
 {
-	new MainWindow(filename.toUtf8());
+	new MainWindow(filename);
 }
 #else
 void MainWindow::requestOpenFile(const QString &)
@@ -398,9 +424,14 @@ void
 MainWindow::openFile(const QString &new_filename)
 {
 #ifdef ENABLE_MDI
+#ifdef _QCODE_EDIT_
+	if (this->editor->document()->lines() > 1 ||
+			!this->editor->document()->text(true, false).trimmed().isEmpty()) {
+#else
 	if (!editor->toPlainText().isEmpty()) {
-		new MainWindow(new_filename.toUtf8());
-		current_win = NULL;
+#endif
+		new MainWindow(new_filename);
+		clearCurrentOutput();
 		return;
 	}
 #endif
@@ -414,6 +445,7 @@ MainWindow::setFileName(const QString &filename)
 {
 	if (filename.isEmpty()) {
 		this->fileName.clear();
+		this->root_ctx.document_path = currentdir;
 		setWindowTitle("OpenSCAD - New Document[*]");
 	}
 	else {
@@ -436,6 +468,7 @@ MainWindow::setFileName(const QString &filename)
 			this->fileName = fileinfo.fileName();
 		}
 		
+		this->root_ctx.document_path = fileinfo.dir().absolutePath();
 		QDir::setCurrent(fileinfo.dir().absolutePath());
 	}
 
@@ -478,7 +511,7 @@ void MainWindow::updateTVal()
 
 void MainWindow::load()
 {
-	current_win = this;
+	setCurrentOutput();
 	if (!this->fileName.isEmpty()) {
 		QFile file(this->fileName);
 		if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -490,7 +523,7 @@ void MainWindow::load()
 			editor->setPlainText(text);
 		}
 	}
-	current_win = this;
+	setCurrentOutput();
 }
 
 AbstractNode *MainWindow::find_root_tag(AbstractNode *n)
@@ -589,9 +622,14 @@ void MainWindow::compile(bool procevents)
 
 	if (!root_module) {
 		if (!animate_panel->isVisible()) {
+#ifdef _QCODE_EDIT_
+			QDocumentCursor cursor = editor->cursor();
+			cursor.setPosition(parser_error_pos);
+#else
 			QTextCursor cursor = editor->textCursor();
 			cursor.setPosition(parser_error_pos);
 			editor->setTextCursor(cursor);
+#endif
 		}
 		goto fail;
 	}
@@ -772,7 +810,7 @@ void MainWindow::compileCSG(bool procevents)
 void MainWindow::actionNew()
 {
 #ifdef ENABLE_MDI
-	new MainWindow;
+	new MainWindow(QString());
 #else
 	setFileName("");
 	editor->setPlainText("");
@@ -781,10 +819,10 @@ void MainWindow::actionNew()
 
 void MainWindow::actionOpen()
 {
-	current_win = this;
+	setCurrentOutput();
 	QString new_filename = QFileDialog::getOpenFileName(this, "Open File", "", "OpenSCAD Designs (*.scad)");
 	if (!new_filename.isEmpty()) openFile(new_filename);
-	current_win = NULL;
+	clearCurrentOutput();
 }
 
 void MainWindow::actionOpenRecent()
@@ -853,7 +891,7 @@ void MainWindow::actionSave()
 		actionSaveAs();
 	}
 	else {
-		current_win = this;
+		setCurrentOutput();
 		QFile file(this->fileName);
 		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
 			PRINTA("Failed to open file for writing: %1 (%2)", this->fileName, file.errorString());
@@ -861,9 +899,9 @@ void MainWindow::actionSave()
 		else {
 			QTextStream(&file) << this->editor->toPlainText();
 			PRINTA("Saved design `%1'.", this->fileName);
-			this->editor->document()->setModified(false);
+			this->editor->setContentModified(false);
 		}
-		current_win = NULL;
+		clearCurrentOutput();
 	}
 }
 
@@ -897,76 +935,6 @@ void MainWindow::actionReload()
 	load();
 }
 
-void MainWindow::editIndent()
-{
-	QTextCursor cursor = editor->textCursor();
-	int p1 = cursor.selectionStart();
-	QString txt = cursor.selectedText();
-
-	txt.replace(QString(QChar(8233)), QString(QChar(8233)) + QString("\t"));
-	if (txt.endsWith(QString(QChar(8233)) + QString("\t")))
-		txt.chop(1);
-	txt = QString("\t") + txt;
-
-	cursor.insertText(txt);
-	int p2 = cursor.position();
-	cursor.setPosition(p1, QTextCursor::MoveAnchor);
-	cursor.setPosition(p2, QTextCursor::KeepAnchor);
-	editor->setTextCursor(cursor);
-}
-
-void MainWindow::editUnindent()
-{
-	QTextCursor cursor = editor->textCursor();
-	int p1 = cursor.selectionStart();
-	QString txt = cursor.selectedText();
-
-	txt.replace(QString(QChar(8233)) + QString("\t"), QString(QChar(8233)));
-	if (txt.startsWith(QString("\t")))
-		txt.remove(0, 1);
-
-	cursor.insertText(txt);
-	int p2 = cursor.position();
-	cursor.setPosition(p1, QTextCursor::MoveAnchor);
-	cursor.setPosition(p2, QTextCursor::KeepAnchor);
-	editor->setTextCursor(cursor);
-}
-
-void MainWindow::editComment()
-{
-	QTextCursor cursor = editor->textCursor();
-	int p1 = cursor.selectionStart();
-	QString txt = cursor.selectedText();
-
-	txt.replace(QString(QChar(8233)), QString(QChar(8233)) + QString("//"));
-	if (txt.endsWith(QString(QChar(8233)) + QString("//")))
-		txt.chop(2);
-	txt = QString("//") + txt;
-
-	cursor.insertText(txt);
-	int p2 = cursor.position();
-	cursor.setPosition(p1, QTextCursor::MoveAnchor);
-	cursor.setPosition(p2, QTextCursor::KeepAnchor);
-	editor->setTextCursor(cursor);
-}
-
-void MainWindow::editUncomment()
-{
-	QTextCursor cursor = editor->textCursor();
-	int p1 = cursor.selectionStart();
-	QString txt = cursor.selectedText();
-
-	txt.replace(QString(QChar(8233)) + QString("//"), QString(QChar(8233)));
-	if (txt.startsWith(QString("//")))
-		txt.remove(0, 2);
-
-	cursor.insertText(txt);
-	int p2 = cursor.position();
-	cursor.setPosition(p1, QTextCursor::MoveAnchor);
-	cursor.setPosition(p2, QTextCursor::KeepAnchor);
-	editor->setTextCursor(cursor);
-}
-
 void MainWindow::hideEditor()
 {
 	if (editActionHide->isChecked()) {
@@ -978,7 +946,11 @@ void MainWindow::hideEditor()
 
 void MainWindow::pasteViewportTranslation()
 {
+#ifdef _QCODE_EDIT_
+	QDocumentCursor cursor = editor->cursor();
+#else
 	QTextCursor cursor = editor->textCursor();
+#endif
 	QString txt;
 	txt.sprintf("[ %.2f, %.2f, %.2f ]", -screen->object_trans_x, -screen->object_trans_y, -screen->object_trans_z);
 	cursor.insertText(txt);
@@ -986,20 +958,58 @@ void MainWindow::pasteViewportTranslation()
 
 void MainWindow::pasteViewportRotation()
 {
+#ifdef _QCODE_EDIT_
+	QDocumentCursor cursor = editor->cursor();
+#else
 	QTextCursor cursor = editor->textCursor();
+#endif
 	QString txt;
 	txt.sprintf("[ %.2f, %.2f, %.2f ]",
 		fmodf(360 - screen->object_rot_x + 90, 360), fmodf(360 - screen->object_rot_y, 360), fmodf(360 - screen->object_rot_z, 360));
 	cursor.insertText(txt);
 }
 
+void MainWindow::checkAutoReload()
+{
+	QString new_stinfo;
+	struct stat st;
+	memset(&st, 0, sizeof(struct stat));
+	stat(this->fileName.toAscii().data(), &st);
+	new_stinfo.sprintf("%x.%x", (int)st.st_mtime, (int)st.st_size);
+	if (new_stinfo != autoReloadInfo)
+		actionReloadCompile();
+	autoReloadInfo = new_stinfo;
+}
+
+void MainWindow::autoReloadSet(bool on)
+{
+	if (on) {
+		autoReloadInfo = QString();
+		autoReloadTimer->start(200);
+	} else {
+		autoReloadTimer->stop();
+	}
+}
+
 void MainWindow::actionReloadCompile()
 {
+	if (editor->isContentModified()) {
+		QMessageBox::StandardButton ret;
+		ret = QMessageBox::warning(this, "Application",
+				"The document has been modified.\n"
+				"Do you really want to reload the file?",
+				QMessageBox::Yes | QMessageBox::No);
+		if (ret != QMessageBox::Yes) {
+			designActionAutoReload->setChecked(false);
+			return;
+		}
+	}
+
 	console->clear();
 
 	load();
 
-	current_win = this;
+	setCurrentOutput();
 	compile(true);
 	if (this->root_node) compileCSG(true);
 
@@ -1013,12 +1023,12 @@ void MainWindow::actionReloadCompile()
 	{
 		screen->updateGL();
 	}
-	current_win = NULL;
+	clearCurrentOutput();
 }
 
 void MainWindow::actionCompile()
 {
-	current_win = this;
+	setCurrentOutput();
 	console->clear();
 
 	compile(!viewActionAnimate->isChecked());
@@ -1026,7 +1036,11 @@ void MainWindow::actionCompile()
 
 	// Go to non-CGAL view mode
 	if (!viewActionOpenCSG->isChecked() && !viewActionThrownTogether->isChecked()) {
+#ifdef ENABLE_OPENCSG
 		viewModeOpenCSG();
+#else
+		viewModeThrownTogether();
+#endif
 	}
 	else {
 		screen->updateGL();
@@ -1041,14 +1055,14 @@ void MainWindow::actionCompile()
 		img.save(filename, "PNG");
 	}
 	
-	current_win = NULL;
+	clearCurrentOutput();
 }
 
 #ifdef ENABLE_CGAL
 
 void MainWindow::actionRenderCGAL()
 {
-	current_win = this;
+	setCurrentOutput();
 	console->clear();
 
 	compile(true);
@@ -1156,14 +1170,14 @@ void MainWindow::actionRenderCGAL()
 	this->statusBar()->removeWidget(pd);
 #endif
 	delete pd;
-	current_win = NULL;
+	clearCurrentOutput();
 }
 
 #endif /* ENABLE_CGAL */
 
 void MainWindow::actionDisplayAST()
 {
-	current_win = this;
+	setCurrentOutput();
 	QTextEdit *e = new QTextEdit(this);
 	e->setWindowFlags(Qt::Window);
 	e->setTabStopWidth(30);
@@ -1176,12 +1190,12 @@ void MainWindow::actionDisplayAST()
 	}
 	e->show();
 	e->resize(600, 400);
-	current_win = NULL;
+	clearCurrentOutput();
 }
 
 void MainWindow::actionDisplayCSGTree()
 {
-	current_win = this;
+	setCurrentOutput();
 	QTextEdit *e = new QTextEdit(this);
 	e->setWindowFlags(Qt::Window);
 	e->setTabStopWidth(30);
@@ -1194,12 +1208,12 @@ void MainWindow::actionDisplayCSGTree()
 	}
 	e->show();
 	e->resize(600, 400);
-	current_win = NULL;
+	clearCurrentOutput();
 }
 
 void MainWindow::actionDisplayCSGProducts()
 {
-	current_win = this;
+	setCurrentOutput();
 	QTextEdit *e = new QTextEdit(this);
 	e->setWindowFlags(Qt::Window);
 	e->setTabStopWidth(30);
@@ -1208,7 +1222,7 @@ void MainWindow::actionDisplayCSGProducts()
 	e->setPlainText(QString("\nCSG before normalization:\n%1\n\n\nCSG after normalization:\n%2\n\n\nCSG rendering chain:\n%3\n\n\nHighlights CSG rendering chain:\n%4\n\n\nBackground CSG rendering chain:\n%5\n").arg(root_raw_term ? root_raw_term->dump() : "N/A", root_norm_term ? root_norm_term->dump() : "N/A", root_chain ? root_chain->dump() : "N/A", highlights_chain ? highlights_chain->dump() : "N/A", background_chain ? background_chain->dump() : "N/A"));
 	e->show();
 	e->resize(600, 400);
-	current_win = NULL;
+	clearCurrentOutput();
 }
 
 #ifdef ENABLE_CGAL
@@ -1218,23 +1232,23 @@ void MainWindow::actionExportSTLorOFF(bool)
 #endif
 {
 #ifdef ENABLE_CGAL
-	current_win = this;
+	setCurrentOutput();
 
 	if (!this->root_N) {
 		PRINT("Nothing to export! Try building first (press F6).");
-		current_win = NULL;
+		clearCurrentOutput();
 		return;
 	}
 
 	if (this->root_N->dim != 3) {
 		PRINT("Current top level object is not a 3D object.");
-		current_win = NULL;
+		clearCurrentOutput();
 		return;
 	}
 
 	if (!this->root_N->p3.is_simple()) {
 		PRINT("Object isn't a valid 2-manifold! Modify your design..");
-		current_win = NULL;
+		clearCurrentOutput();
 		return;
 	}
 
@@ -1243,7 +1257,7 @@ void MainWindow::actionExportSTLorOFF(bool)
 			stl_mode ? "STL Files (*.stl)" : "OFF Files (*.off)");
 	if (stl_filename.isEmpty()) {
 		PRINTF("No filename specified. %s export aborted.", stl_mode ? "STL" : "OFF");
-		current_win = NULL;
+		clearCurrentOutput();
 		return;
 	}
 
@@ -1264,7 +1278,7 @@ void MainWindow::actionExportSTLorOFF(bool)
 
 	delete pd;
 
-	current_win = NULL;
+	clearCurrentOutput();
 #endif /* ENABLE_CGAL */
 }
 
@@ -1281,17 +1295,17 @@ void MainWindow::actionExportOFF()
 void MainWindow::actionExportDXF()
 {
 #ifdef ENABLE_CGAL
-	current_win = this;
+	setCurrentOutput();
 
 	if (!this->root_N) {
 		PRINT("Nothing to export! Try building first (press F6).");
-		current_win = NULL;
+		clearCurrentOutput();
 		return;
 	}
 
 	if (this->root_N->dim != 2) {
 		PRINT("Current top level object is not a 2D object.");
-		current_win = NULL;
+		clearCurrentOutput();
 		return;
 	}
 
@@ -1299,14 +1313,14 @@ void MainWindow::actionExportDXF()
 			"Export DXF File", "", "DXF Files (*.dxf)");
 	if (stl_filename.isEmpty()) {
 		PRINTF("No filename specified. DXF export aborted.");
-		current_win = NULL;
+		clearCurrentOutput();
 		return;
 	}
 
 	export_dxf(this->root_N, stl_filename, NULL);
 	PRINTF("DXF export finished.");
 
-	current_win = NULL;
+	clearCurrentOutput();
 #endif /* ENABLE_CGAL */
 }
 
@@ -1750,14 +1764,14 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event)
 
 void MainWindow::dropEvent(QDropEvent *event)
 {
-	current_win = this;
+	setCurrentOutput();
 	const QList<QUrl> urls = event->mimeData()->urls();
 	for (int i = 0; i < urls.size(); i++) {
 		if (urls[i].scheme() != "file")
 			continue;
 		openFile(urls[i].path());
 	}
-	current_win = NULL;
+	clearCurrentOutput();
 }
 
 void
@@ -1765,6 +1779,12 @@ MainWindow::helpAbout()
 {
 	qApp->setWindowIcon(QApplication::windowIcon());
 	QMessageBox::information(this, "About OpenSCAD", QString(helptitle) + QString(copyrighttext));
+}
+
+void
+MainWindow::helpHomepage()
+{
+	QDesktopServices::openUrl(QUrl("http://openscad.org/"));
 }
 
 void
@@ -1780,7 +1800,7 @@ MainWindow::helpManual()
 bool
 MainWindow::maybeSave()
 {
-	if (editor->document()->isModified()) {
+	if (editor->isContentModified()) {
 		QMessageBox::StandardButton ret;
 		ret = QMessageBox::warning(this, "Application",
 				"The document has been modified.\n"
@@ -1828,4 +1848,14 @@ void MainWindow::quit()
 	QCloseEvent ev;
 	QApplication::sendEvent(QApplication::instance(), &ev);
 	if (ev.isAccepted()) QApplication::instance()->quit();
+}
+
+void MainWindow::setCurrentOutput()
+{
+	set_output_handler(&MainWindow::consoleOutput, this);
+}
+
+void MainWindow::clearCurrentOutput()
+{
+	set_output_handler(NULL, NULL);
 }

@@ -84,7 +84,11 @@ AbstractNode *DxfRotateExtrudeModule::evaluate(const Context *ctx, const ModuleI
 	Value origin = c.lookup_variable("origin", true);
 	Value scale = c.lookup_variable("scale", true);
 
-	node->filename = file.text;
+	if(!file.text.isNull())
+		node->filename = c.get_absolute_path(file.text);
+	else
+		node->filename = file.text;
+
 	node->layername = layer.text;
 	node->convexity = (int)convexity.num;
 	origin.getv2(node->origin_x, node->origin_y);
@@ -113,7 +117,7 @@ void register_builtin_dxf_rotate_extrude()
 	builtin_modules["rotate_extrude"] = new DxfRotateExtrudeModule();
 }
 
-PolySet *DxfRotateExtrudeNode::render_polyset(render_mode_e rm) const
+PolySet *DxfRotateExtrudeNode::render_polyset(render_mode_e) const
 {
 	QString key = mk_cache_id();
 	if (PolySet::ps_cache.contains(key)) {
@@ -221,7 +225,7 @@ QString DxfRotateExtrudeNode::dump(QString indent) const
 				"$fn = %g, $fa = %g, $fs = %g) {\n",
 				filename.toAscii().data(), (int)st.st_mtime, (int)st.st_size,
 				layername.toAscii().data(), origin_x, origin_y, scale, convexity,
-				fn, fs, fa);
+				fn, fa, fs);
 		foreach (AbstractNode *v, children)
 			text += v->dump(indent + QString("\t"));
 		text += indent + "}\n";

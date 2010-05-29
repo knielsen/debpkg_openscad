@@ -10,13 +10,23 @@ RCC_DIR = objects
 INCLUDEPATH += src
 
 macx {
+  DEPLOYDIR = $$(MACOSX_DEPLOY_DIR)
+  !isEmpty(DEPLOYDIR) {
+    INCLUDEPATH += $$DEPLOYDIR/include
+    LIBS += -L$$DEPLOYDIR/lib
+  }
+  # add CONFIG+=deploy to the qmake command-line to make a deployment build
+  deploy {
+    message("Building deployment version")
+    CONFIG += x86 x86_64
+  }
+
   TARGET = OpenSCAD
   ICON = icons/OpenSCAD.icns
   QMAKE_INFO_PLIST = Info.plist
   APP_RESOURCES.path = Contents/Resources
   APP_RESOURCES.files = OpenSCAD.sdef
   QMAKE_BUNDLE_DATA += APP_RESOURCES
-  #CONFIG += x86 ppc
   LIBS += -framework Carbon
 }
 else {
@@ -34,7 +44,10 @@ QT += opengl
 macx:CONFIG += mdi
 CONFIG += cgal
 CONFIG += opencsg
-macx:CONFIG += progresswidget
+CONFIG += progresswidget
+
+#Uncomment the following line to enable QCodeEdit
+#CONFIG += qcodeedit
 
 mdi {
   # MDI needs an OpenCSG library that is compiled with OpenCSG-Reset-Hack.patch applied
@@ -50,6 +63,7 @@ progresswidget {
 
 include(cgal.pri)
 include(opencsg.pri)
+include(eigen2.pri)
 
 # Optionally specify location of Eigen2 using the 
 # EIGEN2DIR env. variable
@@ -95,7 +109,8 @@ HEADERS += src/CGAL_renderer.h \
            src/polyset.h \
            src/printutils.h \
            src/value.h \
-           src/progress.h
+           src/progress.h \
+           src/editor.h
 
 SOURCES += src/openscad.cc \
            src/mainwin.cc \
@@ -113,6 +128,9 @@ SOURCES += src/openscad.cc \
            src/transform.cc \
            src/primitives.cc \
            src/projection.cc \
+           src/cgaladv.cc \
+           src/cgaladv_minkowski3.cc \
+           src/cgaladv_minkowski2.cc \
            src/surface.cc \
            src/control.cc \
            src/render.cc \
@@ -128,7 +146,8 @@ SOURCES += src/openscad.cc \
            src/printutils.cc \
            src/nef2dxf.cc \
            src/Preferences.cc \
-           src/progress.cc
+           src/progress.cc \
+           src/editor.cc
 
 macx {
   HEADERS += src/AppleEvents.h \
@@ -138,3 +157,12 @@ macx {
 
 target.path = /usr/bin/
 INSTALLS += target
+
+examples.path = /usr/local/share/openscad/examples/
+examples.files = examples/*
+# INSTALLS += examples # debian/examples takes care of that
+
+libraries.path = /usr/share/openscad/libraries/
+libraries.files = libraries/*
+INSTALLS += libraries
+

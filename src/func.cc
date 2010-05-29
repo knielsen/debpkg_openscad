@@ -80,9 +80,9 @@ BuiltinFunction::~BuiltinFunction()
 {
 }
 
-Value BuiltinFunction::evaluate(const Context*, const QVector<QString> &call_argnames, const QVector<Value> &call_argvalues) const
+Value BuiltinFunction::evaluate(const Context *ctx, const QVector<QString> &call_argnames, const QVector<Value> &call_argvalues) const
 {
-	return eval_func(call_argnames, call_argvalues);
+	return eval_func(ctx, call_argnames, call_argvalues);
 }
 
 QString BuiltinFunction::dump(QString indent, QString name) const
@@ -110,7 +110,14 @@ static double rad2deg(double x)
 	return x;
 }
 
-Value builtin_min(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_abs(const Context *, const QVector<QString>&, const QVector<Value> &args)
+{
+	if (args.size() == 1 && args[0].type == Value::NUMBER)
+		return Value(fabs(args[0].num));
+	return Value();
+}
+
+Value builtin_min(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() >= 1 && args[0].type == Value::NUMBER) {
 		double val = args[0].num;
@@ -122,7 +129,7 @@ Value builtin_min(const QVector<QString>&, const QVector<Value> &args)
 	return Value();
 }
 
-Value builtin_max(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_max(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() >= 1 && args[0].type == Value::NUMBER) {
 		double val = args[0].num;
@@ -134,91 +141,114 @@ Value builtin_max(const QVector<QString>&, const QVector<Value> &args)
 	return Value();
 }
 
-Value builtin_sin(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_sin(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(sin(deg2rad(args[0].num)));
 	return Value();
 }
 
-Value builtin_cos(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_cos(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(cos(deg2rad(args[0].num)));
 	return Value();
 }
 
-Value builtin_asin(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_asin(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(rad2deg(asin(args[0].num)));
 	return Value();
 }
 
-Value builtin_acos(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_acos(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(rad2deg(acos(args[0].num)));
 	return Value();
 }
 
-Value builtin_tan(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_tan(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(tan(deg2rad(args[0].num)));
 	return Value();
 }
 
-Value builtin_atan(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_atan(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(rad2deg(atan(args[0].num)));
 	return Value();
 }
 
-Value builtin_atan2(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_atan2(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 2 && args[0].type == Value::NUMBER && args[1].type == Value::NUMBER)
 		return Value(rad2deg(atan2(args[0].num, args[1].num)));
 	return Value();
 }
 
-Value builtin_pow(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_pow(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 2 && args[0].type == Value::NUMBER && args[1].type == Value::NUMBER)
 		return Value(pow(args[0].num, args[1].num));
 	return Value();
 }
 
-Value builtin_round(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_round(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(round(args[0].num));
 	return Value();
 }
 
-Value builtin_ceil(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_ceil(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(ceil(args[0].num));
 	return Value();
 }
 
-Value builtin_floor(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_floor(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(floor(args[0].num));
 	return Value();
 }
 
-Value builtin_sqrt(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_sqrt(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
 		return Value(sqrt(args[0].num));
 	return Value();
 }
 
-Value builtin_str(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_exp(const Context *, const QVector<QString>&, const QVector<Value> &args)
+{
+	if (args.size() == 1 && args[0].type == Value::NUMBER)
+		return Value(exp(args[0].num));
+	return Value();
+}
+
+Value builtin_log(const Context *, const QVector<QString>&, const QVector<Value> &args)
+{
+	if (args.size() == 2 && args[0].type == Value::NUMBER && args[1].type == Value::NUMBER)
+		return Value(log(args[1].num) / log(args[0].num));
+	if (args.size() == 1 && args[0].type == Value::NUMBER)
+		return Value(log(args[0].num) / log(10));
+	return Value();
+}
+
+Value builtin_ln(const Context *, const QVector<QString>&, const QVector<Value> &args)
+{
+	if (args.size() == 1 && args[0].type == Value::NUMBER)
+		return Value(log(args[0].num));
+	return Value();
+}
+
+Value builtin_str(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	QString str;
 	for (int i = 0; i < args.size(); i++)
@@ -231,7 +261,7 @@ Value builtin_str(const QVector<QString>&, const QVector<Value> &args)
 	return Value(str);
 }
 
-Value builtin_lookup(const QVector<QString>&, const QVector<Value> &args)
+Value builtin_lookup(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
 	double p, low_p, low_v, high_p, high_v;
 	if (args.size() < 2 || !args[0].getnum(p) || args[1].vec.size() < 2 || args[1].vec[0]->vec.size() < 2)
@@ -261,6 +291,7 @@ Value builtin_lookup(const QVector<QString>&, const QVector<Value> &args)
 
 void initialize_builtin_functions()
 {
+	builtin_functions["abs"] = new BuiltinFunction(&builtin_abs);
 	builtin_functions["min"] = new BuiltinFunction(&builtin_min);
 	builtin_functions["max"] = new BuiltinFunction(&builtin_max);
 	builtin_functions["sin"] = new BuiltinFunction(&builtin_sin);
@@ -270,11 +301,14 @@ void initialize_builtin_functions()
 	builtin_functions["tan"] = new BuiltinFunction(&builtin_tan);
 	builtin_functions["atan"] = new BuiltinFunction(&builtin_atan);
 	builtin_functions["atan2"] = new BuiltinFunction(&builtin_atan2);
-	builtin_functions["pow"] = new BuiltinFunction(&builtin_pow);
 	builtin_functions["round"] = new BuiltinFunction(&builtin_round);
 	builtin_functions["ceil"] = new BuiltinFunction(&builtin_ceil);
 	builtin_functions["floor"] = new BuiltinFunction(&builtin_floor);
+	builtin_functions["pow"] = new BuiltinFunction(&builtin_pow);
 	builtin_functions["sqrt"] = new BuiltinFunction(&builtin_sqrt);
+	builtin_functions["exp"] = new BuiltinFunction(&builtin_exp);
+	builtin_functions["log"] = new BuiltinFunction(&builtin_log);
+	builtin_functions["ln"] = new BuiltinFunction(&builtin_ln);
 	builtin_functions["str"] = new BuiltinFunction(&builtin_str);
 	builtin_functions["lookup"] = new BuiltinFunction(&builtin_lookup);
 	initialize_builtin_dxf_dim();
