@@ -5,7 +5,7 @@ Build-Depends: debhelper (>= 7.0.50~), qt4-qmake (>=4.4), libcgal-dev (>=3.5), l
 Standards-Version: 3.8.4
 Section: contrib/graphics
 Homepage: http://openscad.org/
-Vcs-Browser: http://gitorious.org/openscad-debian/openscad/commits/master
+Vcs-Browser: http://gitorious.org/openscad-debian/openscad/commits/debian
 Vcs-git: git://gitorious.org/openscad-debian/openscad.git/
 
 Package: openscad
