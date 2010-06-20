@@ -1,3 +1,9 @@
+openscad (2010.05-3) unstable; urgency=low
+
+  * New man page for openscad
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 20 Jun 2010 15:55:59 +0200
+
 openscad (2010.05-2) unstable; urgency=low
 
   * New openscad.desktop
