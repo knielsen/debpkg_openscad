@@ -1,8 +1,11 @@
-openscad (2010.05-3) unstable; urgency=low
+openscad (2010.06~svn560-1) unstable; urgency=low
 
+  * Import bugfixes from upstream SVN
+    - Accept 3D parameters for 2D functions
+    - Fix locale dependent export problems
   * New man page for openscad
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 20 Jun 2010 15:55:59 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 26 Jun 2010 18:28:12 +0200
 
 openscad (2010.05-2) unstable; urgency=low
 
