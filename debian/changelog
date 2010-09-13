@@ -5,8 +5,9 @@ openscad (2010.06~svn568-1) unstable; urgency=low
     - Better CGAL exception handling
     - Offer to save when creating new file
     - New sign() function
+  * Change Standards-Version to 3.9.1 (no changes)
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 13 Sep 2010 20:21:14 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 13 Sep 2010 21:10:28 +0200
 
 openscad (2010.06~svn560-1) unstable; urgency=low
 
