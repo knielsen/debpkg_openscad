@@ -201,9 +201,6 @@ int main(int argc, char **argv)
 	exdir.cd("../Resources"); // Examples can be bundled
 	if (!exdir.exists("examples")) exdir.cd("../../..");
 #elif defined(Q_OS_UNIX)
-	if (exdir.cd("../share/doc/openscad/examples")) {
-		examplesdir = exdir.path();
-	} else
 	if (exdir.cd("../share/openscad/examples")) {
 		examplesdir = exdir.path();
 	} else

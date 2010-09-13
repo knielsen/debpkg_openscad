@@ -6,8 +6,9 @@ openscad (2010.06~svn568-1) unstable; urgency=low
     - Offer to save when creating new file
     - New sign() function
   * Change Standards-Version to 3.9.1 (no changes)
+  * Removed examples patch, symlinking instead
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 13 Sep 2010 21:10:28 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 13 Sep 2010 21:19:16 +0200
 
 openscad (2010.06~svn560-1) unstable; urgency=low
 
