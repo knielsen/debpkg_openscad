@@ -191,9 +191,9 @@ macx {
 target.path = /usr/bin/
 INSTALLS += target
 
-examples.path = /usr/local/share/openscad/examples/
+examples.path = /usr/share/openscad/examples/
 examples.files = examples/*
-# INSTALLS += examples # debian/examples takes care of that
+INSTALLS += examples
 
 libraries.path = /usr/share/openscad/libraries/
 libraries.files = libraries/*

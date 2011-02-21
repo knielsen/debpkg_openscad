@@ -7,8 +7,9 @@ openscad (2011.01~git20110204-1) unstable; urgency=low
     - Bugfixes
   * New library dependencies
   * Copyright updates
+  * Leave installing examples to the upstream installer
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 21 Feb 2011 19:05:58 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 21 Feb 2011 22:35:07 +0100
 
 openscad (2010.06~svn568-1) unstable; urgency=low
 
