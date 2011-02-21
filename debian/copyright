@@ -3,7 +3,7 @@ Name: opencsg
 Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
 Source: http://opencsg.org/
 
-Copyright: © 2009-2010 Clifford Wolf <clifford@clifford.at>
+Copyright: © 2009-2011 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
 License: GPL-2+ with CGAL exception
     This program is free software; you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the Free
@@ -23,7 +23,7 @@ License: GPL-2+ with CGAL exception
     A copy of the GNU General Public License can be found in
     /usr/share/common-licenses/GPL-2.
 
-Files: libraries/rounder.scad
+Files: libraries/boxes.scad
 Copyright: © 2010 Marius Kintel
 License: BSD
 
@@ -70,6 +70,10 @@ License: Qt Commercial or LGPL-2.1+ or GPL-3+
     contact the sales department at qt-sales@nokia.com.
 FIXME: technically this looks like a gpl violation (no CGAL exception here)
 
+Files: scripts/googlecode_upload.py
+Copyright: 2006-2007 Google Inc.
+License: Apache 2.0
+
 Files: debian/*
-Copyright: © 2010 Christian M. Amsüss <chrysn@fsfe.org>
+Copyright: © 2010-2011 Christian M. Amsüss <chrysn@fsfe.org>
 License: GPL-2+ with CGAL exception

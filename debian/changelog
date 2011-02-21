@@ -1,3 +1,15 @@
+openscad (2011.01~git20110204-1) unstable; urgency=low
+
+  * Import changes from upstream git
+    - Added rands() function
+    - Added support for string escapes
+    - Enhancements in nested includes, number parsing, and DXF output
+    - Bugfixes
+  * New library dependencies
+  * Copyright updates
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 21 Feb 2011 19:05:58 +0100
+
 openscad (2010.06~svn568-1) unstable; urgency=low
 
   * Import bugfixes from upstream SVN
