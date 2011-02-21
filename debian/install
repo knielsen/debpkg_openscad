@@ -1,2 +1,2 @@
-openscad.desktop /usr/share/applications/
+debian/openscad.desktop /usr/share/applications/
 openscad.png /usr/share/pixmaps/
