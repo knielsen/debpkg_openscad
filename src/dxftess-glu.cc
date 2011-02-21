@@ -2,13 +2,14 @@
 #include "dxfdata.h"
 #include "polyset.h"
 #include "grid.h"
+#include <stdio.h>
 
 #ifdef ENABLE_OPENCSG
 // this must be included before the GL headers
 #  include <GL/glew.h>
 #endif
 #include <qgl.h>
-#include <math.h>
+#include "mathc99.h"
 
 #ifdef WIN32
 #  define STDCALL __stdcall

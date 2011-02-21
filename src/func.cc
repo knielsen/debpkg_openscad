@@ -1,6 +1,7 @@
 /*
- *  OpenSCAD (www.openscad.at)
- *  Copyright (C) 2009  Clifford Wolf <clifford@clifford.at>
+ *  OpenSCAD (www.openscad.org)
+ *  Copyright (C) 2009-2011 Clifford Wolf <clifford@clifford.at> and
+ *                          Marius Kintel <marius@kintel.net>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,7 +29,8 @@
 #include "context.h"
 #include "dxfdim.h"
 #include "builtin.h"
-#include <math.h>
+#include "mathc99.h"
+#include <time.h>
 
 AbstractFunction::~AbstractFunction()
 {
@@ -123,6 +125,51 @@ Value builtin_sign(const Context *, const QVector<QString>&, const QVector<Value
 		return Value((args[0].num<0) ? -1.0 : ((args[0].num>0) ? 1.0 : 0.0));
 	return Value();
 }
+
+double frand() 
+{ 
+    return rand()/(double(RAND_MAX)+1); 
+} 
+
+double frand(double min, double max) 
+{ 
+    return (min>max) ? frand()*(min-max)+max : frand()*(max-min)+min;  
+} 
+
+Value builtin_rands(const Context *, const QVector<QString>&, const QVector<Value> &args)
+{
+	if (args.size() == 3 &&
+			args[0].type == Value::NUMBER && 
+			args[1].type == Value::NUMBER && 
+			args[2].type == Value::NUMBER)
+	{
+		srand((unsigned int)time(0));
+	}
+	else if (args.size() == 4 && 
+					 args[0].type == Value::NUMBER && 
+					 args[1].type == Value::NUMBER && 
+					 args[2].type == Value::NUMBER && 
+					 args[3].type == Value::NUMBER)
+	{
+		srand((unsigned int)args[3].num);
+	}
+	else
+	{
+		return Value();
+	}
+	
+	Value v;
+	v.type = Value::VECTOR;
+	
+	for (int i=0; i<args[2].num; i++)
+	{	
+		Value * r = new Value(frand(args[0].num, args[1].num));
+		v.vec.append(r);
+	}
+	
+	return v;
+}
+
 
 Value builtin_min(const Context *, const QVector<QString>&, const QVector<Value> &args)
 {
@@ -244,7 +291,7 @@ Value builtin_log(const Context *, const QVector<QString>&, const QVector<Value>
 	if (args.size() == 2 && args[0].type == Value::NUMBER && args[1].type == Value::NUMBER)
 		return Value(log(args[1].num) / log(args[0].num));
 	if (args.size() == 1 && args[0].type == Value::NUMBER)
-		return Value(log(args[0].num) / log(10));
+		return Value(log(args[0].num) / log(10.0));
 	return Value();
 }
 
@@ -300,6 +347,7 @@ void initialize_builtin_functions()
 {
 	builtin_functions["abs"] = new BuiltinFunction(&builtin_abs);
 	builtin_functions["sign"] = new BuiltinFunction(&builtin_sign);
+	builtin_functions["rands"] = new BuiltinFunction(&builtin_rands);
 	builtin_functions["min"] = new BuiltinFunction(&builtin_min);
 	builtin_functions["max"] = new BuiltinFunction(&builtin_max);
 	builtin_functions["sin"] = new BuiltinFunction(&builtin_sin);
