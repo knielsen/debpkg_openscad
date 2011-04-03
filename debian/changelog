@@ -1,3 +1,9 @@
+openscad (2011.01~git20110204-2) unstable; urgency=low
+
+  * Removing explicit libgmp dependency according to upstream
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 03 Apr 2011 14:35:52 +0200
+
 openscad (2011.01~git20110204-1) unstable; urgency=low
 
   * Import changes from upstream git
