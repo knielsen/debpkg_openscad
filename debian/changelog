@@ -1,13 +1,8 @@
-openscad (2011.01~git20110204-3) unstable; urgency=low
-
-  * Removing explicit dependency on libmpfr (if it still works, it's not a
-    dependency)
-
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 03 Apr 2011 15:39:58 +0200
-
 openscad (2011.01~git20110204-2) unstable; urgency=low
 
-  * Removing explicit libgmp dependency according to upstream
+  * Removing versioned dependency on libgmp dependency according to upstream
+  * Removing versioned dependency on libmpfr (building works w/o as well,
+    especially concerning Ubuntu lucid)
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 03 Apr 2011 14:35:52 +0200
 
