@@ -57,6 +57,7 @@ class PrimitiveNode : public AbstractPolyNode
 public:
 	bool center;
 	double x, y, z, h, r1, r2;
+	static const double F_MINIMUM = 0.01;
 	double fn, fs, fa;
 	primitive_type_e type;
 	int convexity;
@@ -104,6 +105,16 @@ AbstractNode *PrimitiveModule::evaluate(const Context *ctx, const ModuleInstanti
 	node->fn = c.lookup_variable("$fn").num;
 	node->fs = c.lookup_variable("$fs").num;
 	node->fa = c.lookup_variable("$fa").num;
+
+	if (node->fs < PrimitiveNode::F_MINIMUM) {
+		PRINTF("WARNING: $fs too small - clamping to %f", PrimitiveNode::F_MINIMUM);
+		node->fs = PrimitiveNode::F_MINIMUM;
+	}
+	if (node->fa < PrimitiveNode::F_MINIMUM) {
+		PRINTF("WARNING: $fa too small - clamping to %f", PrimitiveNode::F_MINIMUM);
+		node->fa = PrimitiveNode::F_MINIMUM;
+	}
+
 
 	if (type == CUBE) {
 		Value size = c.lookup_variable("size");
@@ -208,6 +219,19 @@ int get_fragments_from_r(double r, double fn, double fs, double fa)
 	return (int)ceil(fmax(fmin(360.0 / fa, r*M_PI / fs), 5));
 }
 
+struct point2d {
+	double x, y;
+};
+
+static void generate_circle(point2d *circle, double r, int fragments)
+{
+	for (int i=0; i<fragments; i++) {
+		double phi = (M_PI*2* (i + 0.5)) / fragments;
+		circle[i].x = r*cos(phi);
+		circle[i].y = r*sin(phi);
+	}
+}
+
 PolySet *PrimitiveNode::render_polyset(render_mode_e) const
 {
 	PolySet *p = new PolySet();
@@ -268,70 +292,66 @@ PolySet *PrimitiveNode::render_polyset(render_mode_e) const
 
 	if (type == SPHERE && r1 > 0)
 	{
-		struct point2d {
-			double x, y;
-		};
-
 		struct ring_s {
-			int fragments;
 			point2d *points;
-			double r, z;
+			double z;
 		};
 
-		int rings = get_fragments_from_r(r1, fn, fs, fa);
+		int fragments = get_fragments_from_r(r1, fn, fs, fa);
+		int rings = fragments/2;
+// Uncomment the following three lines to enable experimental sphere tesselation
+//		if (rings % 2 == 0) rings++; // To ensure that the middle ring is at phi == 0 degrees
+
 		ring_s *ring = new ring_s[rings];
 
+//		double offset = 0.5 * ((fragments / 2) % 2);
 		for (int i = 0; i < rings; i++) {
+//			double phi = (M_PI * (i + offset)) / (fragments/2);
 			double phi = (M_PI * (i + 0.5)) / rings;
-			ring[i].r = r1 * sin(phi);
+			double r = r1 * sin(phi);
 			ring[i].z = r1 * cos(phi);
-			ring[i].fragments = get_fragments_from_r(ring[i].r, fn, fs, fa);
-			ring[i].points = new point2d[ring[i].fragments];
-			for (int j = 0; j < ring[i].fragments; j++) {
-				phi = (M_PI*2*j) / ring[i].fragments;
-				ring[i].points[j].x = ring[i].r * cos(phi);
-				ring[i].points[j].y = ring[i].r * sin(phi);
-			}
+			ring[i].points = new point2d[fragments];
+			generate_circle(ring[i].points, r, fragments);
 		}
 
 		p->append_poly();
-		for (int i = 0; i < ring[0].fragments; i++)
+		for (int i = 0; i < fragments; i++)
 			p->append_vertex(ring[0].points[i].x, ring[0].points[i].y, ring[0].z);
 
 		for (int i = 0; i < rings-1; i++) {
 			ring_s *r1 = &ring[i];
 			ring_s *r2 = &ring[i+1];
 			int r1i = 0, r2i = 0;
-			while (r1i < r1->fragments || r2i < r2->fragments)
+			while (r1i < fragments || r2i < fragments)
 			{
-				if (r1i >= r1->fragments)
+				if (r1i >= fragments)
 					goto sphere_next_r2;
-				if (r2i >= r2->fragments)
+				if (r2i >= fragments)
 					goto sphere_next_r1;
-				if ((double)r1i / r1->fragments <
-						(double)r2i / r2->fragments)
+				if ((double)r1i / fragments <
+						(double)r2i / fragments)
 				{
 sphere_next_r1:
 					p->append_poly();
-					int r1j = (r1i+1) % r1->fragments;
+					int r1j = (r1i+1) % fragments;
 					p->insert_vertex(r1->points[r1i].x, r1->points[r1i].y, r1->z);
 					p->insert_vertex(r1->points[r1j].x, r1->points[r1j].y, r1->z);
-					p->insert_vertex(r2->points[r2i % r2->fragments].x, r2->points[r2i % r2->fragments].y, r2->z);
+					p->insert_vertex(r2->points[r2i % fragments].x, r2->points[r2i % fragments].y, r2->z);
 					r1i++;
 				} else {
 sphere_next_r2:
 					p->append_poly();
-					int r2j = (r2i+1) % r2->fragments;
+					int r2j = (r2i+1) % fragments;
 					p->append_vertex(r2->points[r2i].x, r2->points[r2i].y, r2->z);
 					p->append_vertex(r2->points[r2j].x, r2->points[r2j].y, r2->z);
-					p->append_vertex(r1->points[r1i % r1->fragments].x, r1->points[r1i % r1->fragments].y, r1->z);
+					p->append_vertex(r1->points[r1i % fragments].x, r1->points[r1i % fragments].y, r1->z);
 					r2i++;
 				}
 			}
 		}
 
 		p->append_poly();
-		for (int i = 0; i < ring[rings-1].fragments; i++)
+		for (int i = 0; i < fragments; i++)
 			p->insert_vertex(ring[rings-1].points[i].x, ring[rings-1].points[i].y, ring[rings-1].z);
 
 		delete[] ring;
@@ -350,44 +370,33 @@ sphere_next_r2:
 			z2 = h;
 		}
 
-		struct point2d {
-			double x, y;
-		};
-
 		point2d *circle1 = new point2d[fragments];
 		point2d *circle2 = new point2d[fragments];
 
-		for (int i=0; i<fragments; i++) {
-			double phi = (M_PI*2*i) / fragments;
-			if (r1 > 0) {
-				circle1[i].x = r1*cos(phi);
-				circle1[i].y = r1*sin(phi);
-			} else {
-				circle1[i].x = 0;
-				circle1[i].y = 0;
-			}
-			if (r2 > 0) {
-				circle2[i].x = r2*cos(phi);
-				circle2[i].y = r2*sin(phi);
-			} else {
-				circle2[i].x = 0;
-				circle2[i].y = 0;
-			}
-		}
+		generate_circle(circle1, r1, fragments);
+		generate_circle(circle2, r2, fragments);
 		
 		for (int i=0; i<fragments; i++) {
 			int j = (i+1) % fragments;
-			if (r1 > 0) {
+			if (r1 == r2) {
 				p->append_poly();
 				p->insert_vertex(circle1[i].x, circle1[i].y, z1);
 				p->insert_vertex(circle2[i].x, circle2[i].y, z2);
-				p->insert_vertex(circle1[j].x, circle1[j].y, z1);
-			}
-			if (r2 > 0) {
-				p->append_poly();
-				p->insert_vertex(circle2[i].x, circle2[i].y, z2);
 				p->insert_vertex(circle2[j].x, circle2[j].y, z2);
 				p->insert_vertex(circle1[j].x, circle1[j].y, z1);
+			} else {
+				if (r1 > 0) {
+					p->append_poly();
+					p->insert_vertex(circle1[i].x, circle1[i].y, z1);
+					p->insert_vertex(circle2[i].x, circle2[i].y, z2);
+					p->insert_vertex(circle1[j].x, circle1[j].y, z1);
+				}
+				if (r2 > 0) {
+					p->append_poly();
+					p->insert_vertex(circle2[i].x, circle2[i].y, z2);
+					p->insert_vertex(circle2[j].x, circle2[j].y, z2);
+					p->insert_vertex(circle1[j].x, circle1[j].y, z1);
+				}
 			}
 		}
 
