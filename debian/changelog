@@ -4,8 +4,9 @@ openscad (2011.04-1) unstable; urgency=low
     - Added hull() for convex hulls (2D object only)
     - minkowski() now supports 2D objects
     - DXF output uses LWPOLYLINE instead of LINE
+  * Change Standards-Version to 3.9.2 (no changes)
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 27 Apr 2011 18:45:15 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 27 Apr 2011 19:51:55 +0200
 
 openscad (2011.01~git20110204-2) unstable; urgency=low
 
