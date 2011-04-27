@@ -1,3 +1,12 @@
+openscad (2011.04-1) unstable; urgency=low
+
+  * New upstream release 
+    - Added hull() for convex hulls (2D object only)
+    - minkowski() now supports 2D objects
+    - DXF output uses LWPOLYLINE instead of LINE
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 27 Apr 2011 18:45:15 +0200
+
 openscad (2011.01~git20110204-2) unstable; urgency=low
 
   * Removing versioned dependency on libgmp dependency according to upstream
