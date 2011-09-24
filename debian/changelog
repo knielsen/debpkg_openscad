@@ -2,8 +2,9 @@ openscad (2011.06-2) unstable; urgency=low
 
   * Adapt libglew dependency to 1.6 | anything
   * Updated watchfile to github hosting
+  * Updated copyright to current DEP5 version
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 24 Sep 2011 03:13:47 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 24 Sep 2011 03:29:41 +0200
 
 openscad (2011.06-1) unstable; urgency=low
 

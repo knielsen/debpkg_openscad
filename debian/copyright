@@ -1,27 +1,9 @@
-Format-Specification: http://dep.debian.net/deps/dep5/
-Name: opencsg
-Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
+Format: http://dep.debian.net/deps/dep5/
+Upstream-Name: opencsg
 Source: http://opencsg.org/
 
 Copyright: © 2009-2011 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
 License: GPL-2+ with CGAL exception
-    This program is free software; you can redistribute it and/or modify it
-    under the terms of the GNU General Public License as published by the Free
-    Software Foundation; either version 2 of the License, or (at your option)
-    any later version.
-
-    As a special exception, you have permission to link this program
-    with the CGAL library and distribute executables, as long as you
-    follow the requirements of the GNU GPL in regard to all of the
-    software in the executable aside from CGAL.
-
-    This program is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-    more details.
-
-    A copy of the GNU General Public License can be found in
-    /usr/share/common-licenses/GPL-2.
 
 Files: libraries/boxes.scad
 Copyright: © 2010 Marius Kintel
@@ -34,10 +16,41 @@ License: GPL-2+
 Files: src/CGAL_renderer.h
 Copyright: © 1997-2002 Max-Planck-Institute Saarbruecken (Germany)
 License: QPL
-FIXME: as this is in the source tarball, i should make a dfsg-free package or ask upstream not to ship it
+FIXME: as this is in the source tarball, i should make a dfsg-free package or ask upstream not to ship it (seems not to be used at all)
 
 Files: src/qtcolorbutton/*
 Copyright: © 2009 Nokia Corporation and/or its subsidiary(-ies)
+License: Qt Commercial or LGPL-2.1+ or GPL-3+
+FIXME: technically this looks like a gpl violation (no CGAL exception here); again, this is not used
+
+Files: scripts/googlecode_upload.py
+Copyright: 2006-2007 Google Inc.
+License: Apache 2.0
+
+Files: debian/*
+Copyright: © 2010-2011 Christian M. Amsüss <chrysn@fsfe.org>
+License: GPL-2+ with CGAL exception
+
+License: GPL-2+ with CGAL exception
+    This program is free software; you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the Free
+    Software Foundation; either version 2 of the License, or (at your option)
+    any later version.
+    
+    As a special exception, you have permission to link this program
+    with the CGAL library and distribute executables, as long as you
+    follow the requirements of the GNU GPL in regard to all of the
+    software in the executable aside from CGAL.
+    
+    This program is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+    more details.
+    
+    A copy of the GNU General Public License can be found in
+    /usr/share/common-licenses/GPL-2.
+
+
 License: Qt Commercial or LGPL-2.1+ or GPL-3+
     Commercial Usage
     Licensees holding valid Qt Commercial licenses may use this file in
@@ -68,12 +81,3 @@ License: Qt Commercial or LGPL-2.1+ or GPL-3+
     
     If you are unsure which license is appropriate for your use, please
     contact the sales department at qt-sales@nokia.com.
-FIXME: technically this looks like a gpl violation (no CGAL exception here)
-
-Files: scripts/googlecode_upload.py
-Copyright: 2006-2007 Google Inc.
-License: Apache 2.0
-
-Files: debian/*
-Copyright: © 2010-2011 Christian M. Amsüss <chrysn@fsfe.org>
-License: GPL-2+ with CGAL exception
