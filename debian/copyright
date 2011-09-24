@@ -20,64 +20,72 @@ FIXME: as this is in the source tarball, i should make a dfsg-free package or as
 
 Files: src/qtcolorbutton/*
 Copyright: © 2009 Nokia Corporation and/or its subsidiary(-ies)
-License: Qt Commercial or LGPL-2.1+ or GPL-3+
+License: Qt-Commercial or LGPL-2.1+ with Nokia exception or GPL-3+
 FIXME: technically this looks like a gpl violation (no CGAL exception here); again, this is not used
 
 Files: scripts/googlecode_upload.py
 Copyright: 2006-2007 Google Inc.
-License: Apache 2.0
+License: Apache
 
 Files: debian/*
 Copyright: © 2010-2011 Christian M. Amsüss <chrysn@fsfe.org>
 License: GPL-2+ with CGAL exception
 
 License: GPL-2+ with CGAL exception
-    This program is free software; you can redistribute it and/or modify it
-    under the terms of the GNU General Public License as published by the Free
-    Software Foundation; either version 2 of the License, or (at your option)
-    any later version.
-    
-    As a special exception, you have permission to link this program
-    with the CGAL library and distribute executables, as long as you
-    follow the requirements of the GNU GPL in regard to all of the
-    software in the executable aside from CGAL.
-    
-    This program is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-    more details.
-    
-    A copy of the GNU General Public License can be found in
-    /usr/share/common-licenses/GPL-2.
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the Free
+ Software Foundation; either version 2 of the License, or (at your option)
+ any later version.
+ .
+ As a special exception, you have permission to link this program
+ with the CGAL library and distribute executables, as long as you
+ follow the requirements of the GNU GPL in regard to all of the
+ software in the executable aside from CGAL.
+ .
+ This program is distributed in the hope that it will be useful, but WITHOUT
+ ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ more details.
+ .
+ A copy of the GNU General Public License can be found in
+ /usr/share/common-licenses/GPL-2.
 
 
-License: Qt Commercial or LGPL-2.1+ or GPL-3+
-    Commercial Usage
-    Licensees holding valid Qt Commercial licenses may use this file in
-    accordance with the Qt Commercial License Agreement provided with the
-    Software or, alternatively, in accordance with the terms contained in
-    a written agreement between you and Nokia.
-    
-    GNU Lesser General Public License Usage
-    Alternatively, this file may be used under the terms of the GNU Lesser
-    General Public License version 2.1 as published by the Free Software
-    Foundation and appearing in the file LICENSE.LGPL included in the
-    packaging of this file.  Please review the following information to
-    ensure the GNU Lesser General Public License version 2.1 requirements
-    will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-    
-    In addition, as a special exception, Nokia gives you certain
-    additional rights. These rights are described in the Nokia Qt LGPL
-    Exception version 1.0, included in the file LGPL_EXCEPTION.txt in this
-    package.
-    
-    GNU General Public License Usage
-    Alternatively, this file may be used under the terms of the GNU
-    General Public License version 3.0 as published by the Free Software
-    Foundation and appearing in the file LICENSE.GPL included in the
-    packaging of this file.  Please review the following information to
-    ensure the GNU General Public License version 3.0 requirements will be
-    met: http://www.gnu.org/copyleft/gpl.html.
-    
-    If you are unsure which license is appropriate for your use, please
-    contact the sales department at qt-sales@nokia.com.
+License: Qt-Commercial
+ Licensees holding valid Qt Commercial licenses may use this file in
+ accordance with the Qt Commercial License Agreement provided with the
+ Software or, alternatively, in accordance with the terms contained in
+ a written agreement between you and Nokia.
+
+License: LGPL-2.1+ with Nokia exception
+ GNU Lesser General Public License Usage
+ Alternatively, this file may be used under the terms of the GNU Lesser
+ General Public License version 2.1 as published by the Free Software
+ Foundation and appearing in the file LICENSE.LGPL included in the
+ packaging of this file.  Please review the following information to
+ ensure the GNU Lesser General Public License version 2.1 requirements
+ will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+ .
+ In addition, as a special exception, Nokia gives you certain
+ additional rights. These rights are described in the Nokia Qt LGPL
+ Exception version 1.0, included in the file LGPL_EXCEPTION.txt in this
+ package.
+
+License: GPL-3+
+ GNU General Public License Usage
+ Alternatively, this file may be used under the terms of the GNU
+ General Public License version 3.0 as published by the Free Software
+ Foundation and appearing in the file LICENSE.GPL included in the
+ packaging of this file.  Please review the following information to
+ ensure the GNU General Public License version 3.0 requirements will be
+ met: http://www.gnu.org/copyleft/gpl.html.
+
+License: BSD
+ FIXME: no detailed description given
+
+License: QPL
+ FIXME: we can't ship this in this tarball anyway w/o making it nonfree
+
+License: Apache
+ Licensed under the terms of the Apache Software License 2.0:
+ http://www.apache.org/licenses/LICENSE-2.0
