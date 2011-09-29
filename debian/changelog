@@ -1,3 +1,15 @@
+openscad (2011.09~git20110929-1) experimental; urgency=low
+
+  * Imported changes from upstream git
+    - OFF file format support
+    - universal import statement (deprecating some others)
+    - support for alpha channel and named colors
+    - more flexible if statement
+    - much refactoring ("visitor branch")
+    - bugfixes
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 30 Sep 2011 01:38:00 +0200
+
 openscad (2011.06-2) unstable; urgency=low
 
   * Adapt libglew dependency to 1.6 | anything
