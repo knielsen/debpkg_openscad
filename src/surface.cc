@@ -31,9 +31,16 @@
 #include "builtin.h"
 #include "dxftess.h"
 #include "printutils.h"
-#include "openscad.h" // handle_dep()
+#include "handle_dep.h" // handle_dep()
+#include "visitor.h"
 
 #include <QFile>
+#include <QRegExp>
+#include <QStringList>
+#include <sstream>
+#include <boost/unordered_map.hpp>
+#include <boost/assign/std/vector.hpp>
+using namespace boost::assign; // bring 'operator+=()' into scope
 
 class SurfaceModule : public AbstractModule
 {
@@ -45,12 +52,17 @@ public:
 class SurfaceNode : public AbstractPolyNode
 {
 public:
-	QString filename;
+	SurfaceNode(const ModuleInstantiation *mi) : AbstractPolyNode(mi) { }
+  virtual Response accept(class State &state, Visitor &visitor) const {
+		return visitor.visit(state, *this);
+	}
+	virtual std::string toString() const;
+	virtual std::string name() const { return "surface"; }
+
+	std::string filename;
 	bool center;
 	int convexity;
-	SurfaceNode(const ModuleInstantiation *mi) : AbstractPolyNode(mi) { }
-	virtual PolySet *render_polyset(render_mode_e mode) const;
-	virtual QString dump(QString indent) const;
+	virtual PolySet *evaluate_polyset(class PolySetEvaluator *) const;
 };
 
 AbstractNode *SurfaceModule::evaluate(const Context *ctx, const ModuleInstantiation *inst) const
@@ -59,13 +71,14 @@ AbstractNode *SurfaceModule::evaluate(const Context *ctx, const ModuleInstantiat
 	node->center = false;
 	node->convexity = 1;
 
-	QVector<QString> argnames = QVector<QString>() << "file" << "center" << "convexity";
-	QVector<Expression*> argexpr;
+	std::vector<std::string> argnames;
+	argnames += "file", "center", "convexity";
+	std::vector<Expression*> argexpr;
 
 	Context c(ctx);
 	c.args(argnames, argexpr, inst->argnames, inst->argvalues);
 
-	node->filename = c.get_absolute_path(c.lookup_variable("file").text);
+	node->filename = c.getAbsolutePath(c.lookup_variable("file").text);
 
 	Value center = c.lookup_variable("center", true);
 	if (center.type == Value::BOOL) {
@@ -85,18 +98,19 @@ void register_builtin_surface()
 	builtin_modules["surface"] = new SurfaceModule();
 }
 
-PolySet *SurfaceNode::render_polyset(render_mode_e) const
+PolySet *SurfaceNode::evaluate_polyset(class PolySetEvaluator *) const
 {
 	handle_dep(filename);
-	QFile f(filename);
+	QFile f(QString::fromStdString(filename));
 
 	if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-		PRINTF("WARNING: Can't open DXF file `%s'.", filename.toAscii().data());
+		PRINTF("WARNING: Can't open DAT file `%s'.", filename.c_str());
 		return NULL;
 	}
 
+	PolySet *p = new PolySet();
 	int lines = 0, columns = 0;
-	QHash<QPair<int,int>,double> data;
+	boost::unordered_map<std::pair<int,int>,double> data;
 	double min_val = 0;
 
 	while (!f.atEnd())
@@ -113,13 +127,12 @@ PolySet *SurfaceNode::render_polyset(render_mode_e) const
 			if (i >= columns)
 				columns = i + 1;
 			double v = fields[i].toDouble();
-			data[QPair<int,int>(lines, i)] = v;
+			data[std::make_pair(lines, i)] = v;
 			min_val = fmin(v-1, min_val);
 		}
 		lines++;
 	}
 
-	PolySet *p = new PolySet();
 	p->convexity = convexity;
 
 	double ox = center ? -columns/2.0 : 0;
@@ -128,10 +141,10 @@ PolySet *SurfaceNode::render_polyset(render_mode_e) const
 	for (int i = 1; i < lines; i++)
 	for (int j = 1; j < columns; j++)
 	{
-		double v1 = data[QPair<int,int>(i-1, j-1)];
-		double v2 = data[QPair<int,int>(i-1, j)];
-		double v3 = data[QPair<int,int>(i, j-1)];
-		double v4 = data[QPair<int,int>(i, j)];
+		double v1 = data[std::make_pair(i-1, j-1)];
+		double v2 = data[std::make_pair(i-1, j)];
+		double v3 = data[std::make_pair(i, j-1)];
+		double v4 = data[std::make_pair(i, j)];
 		double vx = (v1 + v2 + v3 + v4) / 4;
 
 		p->append_poly();
@@ -159,14 +172,14 @@ PolySet *SurfaceNode::render_polyset(render_mode_e) const
 	{
 		p->append_poly();
 		p->append_vertex(ox + 0, oy + i-1, min_val);
-		p->append_vertex(ox + 0, oy + i-1, data[QPair<int,int>(i-1, 0)]);
-		p->append_vertex(ox + 0, oy + i, data[QPair<int,int>(i, 0)]);
+		p->append_vertex(ox + 0, oy + i-1, data[std::make_pair(i-1, 0)]);
+		p->append_vertex(ox + 0, oy + i, data[std::make_pair(i, 0)]);
 		p->append_vertex(ox + 0, oy + i, min_val);
 
 		p->append_poly();
 		p->insert_vertex(ox + columns-1, oy + i-1, min_val);
-		p->insert_vertex(ox + columns-1, oy + i-1, data[QPair<int,int>(i-1, columns-1)]);
-		p->insert_vertex(ox + columns-1, oy + i, data[QPair<int,int>(i, columns-1)]);
+		p->insert_vertex(ox + columns-1, oy + i-1, data[std::make_pair(i-1, columns-1)]);
+		p->insert_vertex(ox + columns-1, oy + i, data[std::make_pair(i, columns-1)]);
 		p->insert_vertex(ox + columns-1, oy + i, min_val);
 	}
 
@@ -174,14 +187,14 @@ PolySet *SurfaceNode::render_polyset(render_mode_e) const
 	{
 		p->append_poly();
 		p->insert_vertex(ox + i-1, oy + 0, min_val);
-		p->insert_vertex(ox + i-1, oy + 0, data[QPair<int,int>(0, i-1)]);
-		p->insert_vertex(ox + i, oy + 0, data[QPair<int,int>(0, i)]);
+		p->insert_vertex(ox + i-1, oy + 0, data[std::make_pair(0, i-1)]);
+		p->insert_vertex(ox + i, oy + 0, data[std::make_pair(0, i)]);
 		p->insert_vertex(ox + i, oy + 0, min_val);
 
 		p->append_poly();
 		p->append_vertex(ox + i-1, oy + lines-1, min_val);
-		p->append_vertex(ox + i-1, oy + lines-1, data[QPair<int,int>(lines-1, i-1)]);
-		p->append_vertex(ox + i, oy + lines-1, data[QPair<int,int>(lines-1, i)]);
+		p->append_vertex(ox + i-1, oy + lines-1, data[std::make_pair(lines-1, i-1)]);
+		p->append_vertex(ox + i, oy + lines-1, data[std::make_pair(lines-1, i)]);
 		p->append_vertex(ox + i, oy + lines-1, min_val);
 	}
 
@@ -198,14 +211,12 @@ PolySet *SurfaceNode::render_polyset(render_mode_e) const
 	return p;
 }
 
-QString SurfaceNode::dump(QString indent) const
+std::string SurfaceNode::toString() const
 {
-	if (dump_cache.isEmpty()) {
-		QString text;
-		text.sprintf("surface(file = \"%s\", center = %s);\n",
-				filename.toAscii().data(), center ? "true" : "false");
-		((AbstractNode*)this)->dump_cache = indent + QString("n%1: ").arg(idx) + text;
-	}
-	return dump_cache;
-}
+	std::stringstream stream;
 
+	stream << this->name() << "(file = \"" << this->filename
+				 << "\", center = " << (this->center ? "true" : "false") << ")";
+
+	return stream.str();
+}

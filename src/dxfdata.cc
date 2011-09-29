@@ -24,24 +24,25 @@
  *
  */
 
+#include "myqhash.h"
 #include "dxfdata.h"
 #include "grid.h"
 #include "printutils.h"
-#include "openscad.h" // handle_dep()
+#include "handle_dep.h"
+#include "openscad.h" // get_fragments_from_r()
 
 #include <QFile>
 #include <QTextStream>
-#include <QHash>
-#include <QVector>
 #include "mathc99.h"
 #include <assert.h>
+#include <boost/unordered_map.hpp>
+#include <boost/foreach.hpp>
+#include <algorithm>
 
 struct Line {
-	typedef DxfData::Point Point;
-	Point *p[2];
+	int idx[2]; // indices into DxfData::points
 	bool disabled;
-	Line(Point *p1, Point *p2) { p[0] = p1; p[1] = p2; disabled = false; }
-	Line() { p[0] = NULL; p[1] = NULL; disabled = false; }
+	Line(int i1 = -1, int i2 = -1) { idx[0] = i1; idx[1] = i2; disabled = false; }
 };
 
 DxfData::DxfData()
@@ -49,51 +50,53 @@ DxfData::DxfData()
 }
 
 /*!
-	Reads a layer from the given file, or all layers if layename.isNull()
+	Reads a layer from the given file, or all layers if layername.empty()
  */
-DxfData::DxfData(double fn, double fs, double fa, QString filename, QString layername, double xorigin, double yorigin, double scale)
+DxfData::DxfData(double fn, double fs, double fa, 
+								 const std::string &filename, const std::string &layername, 
+								 double xorigin, double yorigin, double scale)
 {
 	handle_dep(filename); // Register ourselves as a dependency
 
-	QFile f(filename);
+	QFile f(QString::fromStdString(filename));
 	if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-		PRINTF("WARNING: Can't open DXF file `%s'.", filename.toUtf8().data());
+		PRINTF("WARNING: Can't open DXF file `%s'.", filename.c_str());
 		return;
 	}
 	QTextStream stream(&f);
 
-	Grid2d< QVector<int> > grid(GRID_COARSE);
-	QList<Line> lines;                       // Global lines
-	QHash< QString, QList<Line> > blockdata; // Lines in blocks
+	Grid2d< std::vector<int> > grid(GRID_COARSE);
+	std::vector<Line> lines;                       // Global lines
+	boost::unordered_map< std::string, std::vector<Line> > blockdata; // Lines in blocks
 
 	bool in_entities_section = false;
 	bool in_blocks_section = false;
-	QString current_block;
+	std::string current_block;
 
 #define ADD_LINE(_x1, _y1, _x2, _y2) do {										\
 		double _p1x = _x1, _p1y = _y1, _p2x = _x2, _p2y = _y2;  \
 		if (!in_entities_section && !in_blocks_section)         \
 			break;                                                \
 		if (in_entities_section &&                              \
-				!(layername.isNull() || layername == layer))        \
+				!(layername.empty() || layername == layer))         \
 			break;                                                \
 		grid.align(_p1x, _p1y);                                 \
 		grid.align(_p2x, _p2y);                                 \
-		grid.data(_p1x, _p1y).append(lines.count());            \
-		grid.data(_p2x, _p2y).append(lines.count());            \
+		grid.data(_p1x, _p1y).push_back(lines.size());          \
+		grid.data(_p2x, _p2y).push_back(lines.size());          \
 		if (in_entities_section)                                \
-			lines.append(                                         \
+			lines.push_back(                                      \
 				Line(addPoint(_p1x, _p1y), addPoint(_p2x, _p2y)));	\
-		if (in_blocks_section && !current_block.isNull())       \
-			blockdata[current_block].append(                      \
+		if (in_blocks_section && !current_block.empty())        \
+			blockdata[current_block].push_back(	                  \
 				Line(addPoint(_p1x, _p1y), addPoint(_p2x, _p2y)));	\
 	} while (0)
 
-	QString mode, layer, name, iddata;
+	std::string mode, layer, name, iddata;
 	int dimtype = 0;
 	double coords[7][2]; // Used by DIMENSION entities
-	QVector<double> xverts;
-	QVector<double> yverts;
+	std::vector<double> xverts;
+	std::vector<double> yverts;
 	double radius = 0;
 	double arc_start_angle = 0, arc_stop_angle = 0;
 	double ellipse_start_angle = 0, ellipse_stop_angle = 0;
@@ -102,8 +105,8 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 		for (int j = 0; j < 2; j++)
 			coords[i][j] = 0;
 
-	QHash<QString, int> unsupported_entities_list;
-
+	typedef boost::unordered_map<std::string, int> EntityList;
+	EntityList unsupported_entities_list;
 
 	//
 	// Parse DXF file. Will populate this->points, this->dims, lines and blockdata
@@ -117,7 +120,7 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 		int id = id_str.toInt(&status);
 
 		if (!status) {
-			PRINTA("WARNING: Illegal ID `%1' in `%3'.", id_str, filename);
+			PRINTF("WARNING: Illegal ID `%s' in `%s'.", id_str.toUtf8().data(), filename.c_str());
 			break;
 		}
 
@@ -162,16 +165,16 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 			}
 			else if (mode == "CIRCLE") {
 				int n = get_fragments_from_r(radius, fn, fs, fa);
-				Point center(xverts[0], yverts[0]);
+				Vector2d center(xverts[0], yverts[0]);
 				for (int i = 0; i < n; i++) {
 					double a1 = (2*M_PI*i)/n;
 					double a2 = (2*M_PI*(i+1))/n;
-					ADD_LINE(cos(a1)*radius + center.x, sin(a1)*radius + center.y,
-									 cos(a2)*radius + center.x, sin(a2)*radius + center.y);
+					ADD_LINE(cos(a1)*radius + center[0], sin(a1)*radius + center[1],
+									 cos(a2)*radius + center[0], sin(a2)*radius + center[1]);
 				}
 			}
 			else if (mode == "ARC") {
-				Point center(xverts[0], yverts[0]);
+				Vector2d center(xverts[0], yverts[0]);
 				int n = get_fragments_from_r(radius, fn, fs, fa);
 				while (arc_start_angle > arc_stop_angle)
 					arc_stop_angle += 360.0;
@@ -181,29 +184,29 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 					double a2 = ((arc_stop_angle-arc_start_angle)*(i+1))/n;
 					a1 = (arc_start_angle + a1) * M_PI / 180.0;
 					a2 = (arc_start_angle + a2) * M_PI / 180.0;
-					ADD_LINE(cos(a1)*radius + center.x, sin(a1)*radius + center.y,
-									 cos(a2)*radius + center.x, sin(a2)*radius + center.y);
+					ADD_LINE(cos(a1)*radius + center[0], sin(a1)*radius + center[1],
+									 cos(a2)*radius + center[0], sin(a2)*radius + center[1]);
 				}
 			}
 			else if (mode == "ELLIPSE") {
 				// Commented code is meant as documentation of vector math
 				while (ellipse_start_angle > ellipse_stop_angle) ellipse_stop_angle += 2 * M_PI;
 //				Vector2d center(xverts[0], yverts[0]);
-				Point center(xverts[0], yverts[0]);
+				Vector2d center(xverts[0], yverts[0]);
 //				Vector2d ce(xverts[1], yverts[1]);
-				Point ce(xverts[1], yverts[1]);
+				Vector2d ce(xverts[1], yverts[1]);
 //				double r_major = ce.length();
-				double r_major = sqrt(ce.x*ce.x + ce.y*ce.y);
+				double r_major = sqrt(ce[0]*ce[0] + ce[1]*ce[1]);
 //				double rot_angle = ce.angle();
 				double rot_angle;
 				{
 //					double dot = ce.dot(Vector2d(1.0, 0.0));
-					double dot = ce.x;
+					double dot = ce[0];
 					double cosval = dot / r_major;
 					if (cosval > 1.0) cosval = 1.0;
 					if (cosval < -1.0) cosval = -1.0;
 					rot_angle = acos(cosval);
-					if (ce.y < 0.0) rot_angle = 2 * M_PI - rot_angle;
+					if (ce[1] < 0.0) rot_angle = 2 * M_PI - rot_angle;
 				}
 
 				// the ratio stored in 'radius; due to the parser code not checking entity type
@@ -212,24 +215,24 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 				int n = get_fragments_from_r(r_major, fn, fs, fa);
 				n = (int)ceil(n * sweep_angle / (2 * M_PI));
 //				Vector2d p1;
-				Point p1;
+				Vector2d p1;
 				for (int i=0;i<=n;i++) {
 					double a = (ellipse_start_angle + sweep_angle*i/n);
 //					Vector2d p2(cos(a)*r_major, sin(a)*r_minor);
-					Point p2(cos(a)*r_major, sin(a)*r_minor);
+					Vector2d p2(cos(a)*r_major, sin(a)*r_minor);
 //					p2.rotate(rot_angle);
-					Point p2_rot(cos(rot_angle)*p2.x - sin(rot_angle)*p2.y,
-											 sin(rot_angle)*p2.x + cos(rot_angle)*p2.y);
+					Vector2d p2_rot(cos(rot_angle)*p2[0] - sin(rot_angle)*p2[1],
+											 sin(rot_angle)*p2[0] + cos(rot_angle)*p2[1]);
 //					p2 += center;
-					p2_rot.x += center.x;
-					p2_rot.y += center.y;
+					p2_rot[0] += center[0];
+					p2_rot[1] += center[1];
 					if (i > 0) {
 // 						ADD_LINE(p1[0], p1[1], p2[0], p2[1]);
-						ADD_LINE(p1.x, p1.y, p2_rot.x, p2_rot.y);
+						ADD_LINE(p1[0], p1[1], p2_rot[0], p2_rot[1]);
 					}
 //					p1 = p2;
-					p1.x = p2_rot.x;
-					p1.y = p2_rot.y;
+					p1[0] = p2_rot[0];
+					p1[1] = p2_rot[1];
 				}
 			}
 			else if (mode == "INSERT") {
@@ -238,10 +241,10 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 				int n = blockdata[iddata].size();
 				for (int i = 0; i < n; i++) {
 					double a = arc_start_angle * M_PI / 180.0;
-					double lx1 = blockdata[iddata][i].p[0]->x * ellipse_start_angle;
-					double ly1 = blockdata[iddata][i].p[0]->y * ellipse_stop_angle;
-					double lx2 = blockdata[iddata][i].p[1]->x * ellipse_start_angle;
-					double ly2 = blockdata[iddata][i].p[1]->y * ellipse_stop_angle;
+					double lx1 = this->points[blockdata[iddata][i].idx[0]][0] * ellipse_start_angle;
+					double ly1 = this->points[blockdata[iddata][i].idx[0]][1] * ellipse_stop_angle;
+					double lx2 = this->points[blockdata[iddata][i].idx[1]][0] * ellipse_start_angle;
+					double ly2 = this->points[blockdata[iddata][i].idx[1]][1] * ellipse_stop_angle;
 					double px1 = (cos(a)*lx1 - sin(a)*ly1) * scale + xverts[0];
 					double py1 = (sin(a)*lx1 + cos(a)*ly1) * scale + yverts[0];
 					double px2 = (cos(a)*lx2 - sin(a)*ly2) * scale + xverts[0];
@@ -250,32 +253,32 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 				}
 			}
 			else if (mode == "DIMENSION" &&
-					(layername.isNull() || layername == layer)) {
-				this->dims.append(Dim());
-				this->dims.last().type = dimtype;
+					(layername.empty() || layername == layer)) {
+				this->dims.push_back(Dim());
+				this->dims.back().type = dimtype;
 				for (int i = 0; i < 7; i++)
 					for (int j = 0; j < 2; j++)
-						this->dims.last().coords[i][j] = coords[i][j];
-				this->dims.last().angle = arc_start_angle;
-				this->dims.last().length = radius;
-				this->dims.last().name = name;
+						this->dims.back().coords[i][j] = coords[i][j];
+				this->dims.back().angle = arc_start_angle;
+				this->dims.back().length = radius;
+				this->dims.back().name = name;
 			}
 			else if (mode == "BLOCK") {
 				current_block = iddata;
 			}
 			else if (mode == "ENDBLK") {
-				current_block = QString();
+				current_block.erase();
 			}
 			else if (mode == "ENDSEC") {
 			}
 			else if (in_blocks_section || (in_entities_section &&
-					(layername.isNull() || layername == layer))) {
+					(layername.empty() || layername == layer))) {
 				unsupported_entities_list[mode]++;
 			}
-			mode = data;
-			layer = QString();
-			name = QString();
-			iddata = QString();
+			mode = data.toStdString();
+			layer.erase();
+			name.erase();
+			iddata.erase();
 			dimtype = 0;
 			for (int i = 0; i < 7; i++)
 				for (int j = 0; j < 2; j++)
@@ -289,37 +292,37 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 			}
 			break;
 		case 1:
-			name = data;
+			name = data.toStdString();
 			break;
 		case 2:
-			iddata = data;
+			iddata = data.toStdString();
 			break;
 		case 8:
-			layer = data;
+			layer = data.toStdString();
 			break;
 		case 10:
 			if (in_blocks_section)
-				xverts.append((data.toDouble()));
+				xverts.push_back((data.toDouble()));
 			else
-				xverts.append((data.toDouble() - xorigin) * scale);
+				xverts.push_back((data.toDouble() - xorigin) * scale);
 			break;
 		case 11:
 			if (in_blocks_section)
-				xverts.append((data.toDouble()));
+				xverts.push_back((data.toDouble()));
 			else
-				xverts.append((data.toDouble() - xorigin) * scale);
+				xverts.push_back((data.toDouble() - xorigin) * scale);
 			break;
 		case 20:
 			if (in_blocks_section)
-				yverts.append((data.toDouble()));
+				yverts.push_back((data.toDouble()));
 			else
-				yverts.append((data.toDouble() - yorigin) * scale);
+				yverts.push_back((data.toDouble() - yorigin) * scale);
 			break;
 		case 21:
 			if (in_blocks_section)
-				yverts.append((data.toDouble()));
+				yverts.push_back((data.toDouble()));
 			else
-				yverts.append((data.toDouble() - yorigin) * scale);
+				yverts.push_back((data.toDouble() - yorigin) * scale);
 			break;
 		case 40:
 			// CIRCLE, ARC: radius
@@ -355,40 +358,40 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 		}
 	}
 
-	QHashIterator<QString, int> i(unsupported_entities_list);
-	while (i.hasNext()) {
-		i.next();
-		if (layername.isNull()) {
-			PRINTA("WARNING: Unsupported DXF Entity `%1' (%2x) in `%3'.",
-					 i.key(), QString::number(i.value()), filename);
+	BOOST_FOREACH(const EntityList::value_type &i, unsupported_entities_list) {
+		if (layername.empty()) {
+			PRINTF("WARNING: Unsupported DXF Entity `%s' (%x) in `%s'.",
+						 i.first.c_str(), i.second, filename.c_str());
 		} else {
-			PRINTA("WARNING: Unsupported DXF Entity `%1' (%2x) in layer `%3' of `%4'.",
-					 i.key(), QString::number(i.value()), layername, filename);
+			PRINTF("WARNING: Unsupported DXF Entity `%s' (%x) in layer `%s' of `%s'.",
+						 i.first.c_str(), i.second, layername.c_str(), filename.c_str());
 		}
 	}
 
 	// Extract paths from parsed data
 
-	QHash<int, int> enabled_lines;
-	for (int i = 0; i < lines.count(); i++) {
+	typedef boost::unordered_map<int, int> LineMap;
+	LineMap enabled_lines;
+	for (size_t i = 0; i < lines.size(); i++) {
 		enabled_lines[i] = i;
 	}
 
 	// extract all open paths
-	while (enabled_lines.count() > 0)
+	while (enabled_lines.size() > 0)
 	{
 		int current_line, current_point;
 
-		foreach (int i, enabled_lines) {
+		BOOST_FOREACH(const LineMap::value_type &l, enabled_lines) {
+			int idx = l.second;
 			for (int j = 0; j < 2; j++) {
-				QVector<int> *lv = &grid.data(lines[i].p[j]->x, lines[i].p[j]->y);
-				for (int ki = 0; ki < lv->count(); ki++) {
+				std::vector<int> *lv = &grid.data(this->points[lines[idx].idx[j]][0], this->points[lines[idx].idx[j]][1]);
+				for (size_t ki = 0; ki < lv->size(); ki++) {
 					int k = lv->at(ki);
-					if (k == i || lines[k].disabled)
+					if (k == idx || lines[k].disabled)
 						continue;
 					goto next_open_path_j;
 				}
-				current_line = i;
+				current_line = idx;
 				current_point = j;
 				goto create_open_path;
 			next_open_path_j:;
@@ -398,26 +401,26 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 		break;
 
 	create_open_path:
-		this->paths.append(Path());
-		Path *this_path = &this->paths.last();
+		this->paths.push_back(Path());
+		Path *this_path = &this->paths.back();
 
-		this_path->points.append(lines[current_line].p[current_point]);
+		this_path->indices.push_back(lines[current_line].idx[current_point]);
 		while (1) {
-			this_path->points.append(lines[current_line].p[!current_point]);
-			Point *ref_point = lines[current_line].p[!current_point];
+			this_path->indices.push_back(lines[current_line].idx[!current_point]);
+			const Vector2d &ref_point = this->points[lines[current_line].idx[!current_point]];
 			lines[current_line].disabled = true;
-			enabled_lines.remove(current_line);
-			QVector<int> *lv = &grid.data(ref_point->x, ref_point->y);
-			for (int ki = 0; ki < lv->count(); ki++) {
+			enabled_lines.erase(current_line);
+			std::vector<int> *lv = &grid.data(ref_point[0], ref_point[1]);
+			for (size_t ki = 0; ki < lv->size(); ki++) {
 				int k = lv->at(ki);
 				if (lines[k].disabled)
 					continue;
-				if (grid.eq(ref_point->x, ref_point->y, lines[k].p[0]->x, lines[k].p[0]->y)) {
+				if (grid.eq(ref_point[0], ref_point[1], this->points[lines[k].idx[0]][0], this->points[lines[k].idx[0]][1])) {
 					current_line = k;
 					current_point = 0;
 					goto found_next_line_in_open_path;
 				}
-				if (grid.eq(ref_point->x, ref_point->y, lines[k].p[1]->x, lines[k].p[1]->y)) {
+				if (grid.eq(ref_point[0], ref_point[1], this->points[lines[k].idx[1]][0], this->points[lines[k].idx[1]][1])) {
 					current_line = k;
 					current_point = 1;
 					goto found_next_line_in_open_path;
@@ -429,31 +432,31 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 	}
 
 	// extract all closed paths
-	while (enabled_lines.count() > 0)
+	while (enabled_lines.size() > 0)
 	{
-		int current_line = enabled_lines.begin().value(), current_point = 0;
+		int current_line = enabled_lines.begin()->second, current_point = 0;
 
-		this->paths.append(Path());
-		Path *this_path = &this->paths.last();
+		this->paths.push_back(Path());
+		Path *this_path = &this->paths.back();
 		this_path->is_closed = true;
 		
-		this_path->points.append(lines[current_line].p[current_point]);
+		this_path->indices.push_back(lines[current_line].idx[current_point]);
 		while (1) {
-			this_path->points.append(lines[current_line].p[!current_point]);
-			Point *ref_point = lines[current_line].p[!current_point];
+			this_path->indices.push_back(lines[current_line].idx[!current_point]);
+			const Vector2d &ref_point = this->points[lines[current_line].idx[!current_point]];
 			lines[current_line].disabled = true;
-			enabled_lines.remove(current_line);
-			QVector<int> *lv = &grid.data(ref_point->x, ref_point->y);
-			for (int ki = 0; ki < lv->count(); ki++) {
+			enabled_lines.erase(current_line);
+			std::vector<int> *lv = &grid.data(ref_point[0], ref_point[1]);
+			for (size_t ki = 0; ki < lv->size(); ki++) {
 				int k = lv->at(ki);
 				if (lines[k].disabled)
 					continue;
-				if (grid.eq(ref_point->x, ref_point->y, lines[k].p[0]->x, lines[k].p[0]->y)) {
+				if (grid.eq(ref_point[0], ref_point[1], this->points[lines[k].idx[0]][0], this->points[lines[k].idx[0]][1])) {
 					current_line = k;
 					current_point = 0;
 					goto found_next_line_in_closed_path;
 				}
-				if (grid.eq(ref_point->x, ref_point->y, lines[k].p[1]->x, lines[k].p[1]->y)) {
+					if (grid.eq(ref_point[0], ref_point[1], this->points[lines[k].idx[1]][0], this->points[lines[k].idx[1]][1])) {
 					current_line = k;
 					current_point = 1;
 					goto found_next_line_in_closed_path;
@@ -468,10 +471,10 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 
 #if 0
 	printf("----- DXF Data -----\n");
-	for (int i = 0; i < this->paths.count(); i++) {
+	for (int i = 0; i < this->paths.size(); i++) {
 		printf("Path %d (%s):\n", i, this->paths[i].is_closed ? "closed" : "open");
-		for (int j = 0; j < this->paths[i].points.count(); j++)
-			printf("  %f %f\n", this->paths[i].points[j]->x, this->paths[i].points[j]->y);
+		for (int j = 0; j < this->paths[i].points.size(); j++)
+			printf("  %f %f\n", (*this->paths[i].points[j])[0], (*this->paths[i].points[j])[1]);
 	}
 	printf("--------------------\n");
 	fflush(stdout);
@@ -484,26 +487,26 @@ DxfData::DxfData(double fn, double fs, double fa, QString filename, QString laye
 */
 void DxfData::fixup_path_direction()
 {
-	for (int i = 0; i < this->paths.count(); i++) {
+	for (size_t i = 0; i < this->paths.size(); i++) {
 		if (!this->paths[i].is_closed)
 			break;
 		this->paths[i].is_inner = true;
-		double min_x = this->paths[i].points[0]->x;
+		double min_x = this->points[this->paths[i].indices[0]][0];
 		int min_x_point = 0;
-		for (int j = 1; j < this->paths[i].points.count(); j++) {
-			if (this->paths[i].points[j]->x < min_x) {
-				min_x = this->paths[i].points[j]->x;
+		for (size_t j = 1; j < this->paths[i].indices.size(); j++) {
+			if (this->points[this->paths[i].indices[j]][0] < min_x) {
+				min_x = this->points[this->paths[i].indices[j]][0];
 				min_x_point = j;
 			}
 		}
 		// rotate points if the path is in non-standard rotation
 		int b = min_x_point;
-		int a = b == 0 ? this->paths[i].points.count() - 2 : b - 1;
-		int c = b == this->paths[i].points.count() - 1 ? 1 : b + 1;
-		double ax = this->paths[i].points[a]->x - this->paths[i].points[b]->x;
-		double ay = this->paths[i].points[a]->y - this->paths[i].points[b]->y;
-		double cx = this->paths[i].points[c]->x - this->paths[i].points[b]->x;
-		double cy = this->paths[i].points[c]->y - this->paths[i].points[b]->y;
+		int a = b == 0 ? this->paths[i].indices.size() - 2 : b - 1;
+		int c = b == this->paths[i].indices.size() - 1 ? 1 : b + 1;
+		double ax = this->points[this->paths[i].indices[a]][0] - this->points[this->paths[i].indices[b]][0];
+		double ay = this->points[this->paths[i].indices[a]][1] - this->points[this->paths[i].indices[b]][1];
+		double cx = this->points[this->paths[i].indices[c]][0] - this->points[this->paths[i].indices[b]][0];
+		double cy = this->points[this->paths[i].indices[c]][1] - this->points[this->paths[i].indices[b]][1];
 #if 0
 		printf("Rotate check:\n");
 		printf("  a/b/c indices = %d %d %d\n", a, b, c);
@@ -512,15 +515,17 @@ void DxfData::fixup_path_direction()
 #endif
 		// FIXME: atan2() usually takes y,x. This variant probably makes the path clockwise..
 		if (atan2(ax, ay) < atan2(cx, cy)) {
-			for (int j = 0; j < this->paths[i].points.count()/2; j++)
-				this->paths[i].points.swap(j, this->paths[i].points.count()-1-j);
+			std::reverse(this->paths[i].indices.begin(), this->paths[i].indices.end());
 		}
 	}
 }
 
-DxfData::Point *DxfData::addPoint(double x, double y)
+/*!
+	Adds a vertex and returns the index into DxfData::points
+ */
+int DxfData::addPoint(double x, double y)
 {
-	this->points.append(Point(x, y));
-	return &this->points.last();
+	this->points.push_back(Vector2d(x, y));
+	return this->points.size()-1;
 }
 

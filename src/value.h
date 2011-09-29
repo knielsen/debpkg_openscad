@@ -1,8 +1,8 @@
 #ifndef VALUE_H_
 #define VALUE_H_
 
-#include <QVector>
-#include <QString>
+#include <vector>
+#include <string>
 
 class Value
 {
@@ -20,18 +20,18 @@ public:
 
 	bool b;
 	double num;
-	QVector<Value*> vec;
+	std::vector<Value*> vec;
 	double range_begin;
 	double range_step;
 	double range_end;
-	QString text;
+	std::string text;
 
 	Value();
 	~Value();
 
 	Value(bool v);
 	Value(double v);
-	Value(const QString &t);
+	Value(const std::string &t);
 
 	Value(const Value &v);
 	Value& operator = (const Value &v);
@@ -59,10 +59,16 @@ public:
 	bool getv2(double &x, double &y) const;
 	bool getv3(double &x, double &y, double &z) const;
 
-	QString dump() const;
+	std::string toString() const;
+
+	bool toBool() const;
+
+	void append(Value *val);
 
 private:
 	void reset_undef();
 };
+
+std::ostream &operator<<(std::ostream &stream, const Value &value);
 
 #endif

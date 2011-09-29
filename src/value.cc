@@ -26,6 +26,8 @@
 
 #include "value.h"
 #include "mathc99.h"
+#include <assert.h>
+#include <sstream>
 
 Value::Value()
 {
@@ -34,8 +36,7 @@ Value::Value()
 
 Value::~Value()
 {
-	for (int i = 0; i < this->vec.size(); i++)
-		delete this->vec[i];
+	for (size_t i = 0; i < this->vec.size(); i++) delete this->vec[i];
 	this->vec.clear();
 }
 
@@ -53,7 +54,7 @@ Value::Value(double v)
 	this->num = v;
 }
 
-Value::Value(const QString &t)
+Value::Value(const std::string &t)
 {
 	reset_undef();
 	this->type = STRING;
@@ -71,8 +72,9 @@ Value& Value::operator = (const Value &v)
 	this->type = v.type;
 	this->b = v.b;
 	this->num = v.num;
-	for (int i = 0; i < v.vec.size(); i++)
-		this->vec.append(new Value(*v.vec[i]));
+	for (size_t i = 0; i < v.vec.size(); i++) {
+		this->vec.push_back(new Value(*v.vec[i]));
+	}
 	this->range_begin = v.range_begin;
 	this->range_step = v.range_step;
 	this->range_end = v.range_end;
@@ -109,8 +111,8 @@ Value Value::operator + (const Value &v) const
 	if (this->type == VECTOR && v.type == VECTOR) {
 		Value r;
 		r.type = VECTOR;
-		for (int i = 0; i < this->vec.size() && i < v.vec.size(); i++)
-			r.vec.append(new Value(*this->vec[i] + *v.vec[i]));
+		for (size_t i = 0; i < this->vec.size() && i < v.vec.size(); i++)
+			r.vec.push_back(new Value(*this->vec[i] + *v.vec[i]));
 		return r;
 	}
 	if (this->type == NUMBER && v.type == NUMBER) {
@@ -124,8 +126,8 @@ Value Value::operator - (const Value &v) const
 	if (this->type == VECTOR && v.type == VECTOR) {
 		Value r;
 		r.type = VECTOR;
-		for (int i = 0; i < this->vec.size() && i < v.vec.size(); i++)
-			r.vec.append(new Value(*this->vec[i] - *v.vec[i]));
+		for (size_t i = 0; i < this->vec.size() && i < v.vec.size(); i++)
+			r.vec.push_back(new Value(*this->vec[i] - *v.vec[i]));
 		return r;
 	}
 	if (this->type == NUMBER && v.type == NUMBER) {
@@ -139,15 +141,15 @@ Value Value::operator * (const Value &v) const
 	if (this->type == VECTOR && v.type == NUMBER) {
 		Value r;
 		r.type = VECTOR;
-		for (int i = 0; i < this->vec.size(); i++)
-			r.vec.append(new Value(*this->vec[i] * v));
+		for (size_t i = 0; i < this->vec.size(); i++)
+			r.vec.push_back(new Value(*this->vec[i] * v));
 		return r;
 	}
 	if (this->type == NUMBER && v.type == VECTOR) {
 		Value r;
 		r.type = VECTOR;
-		for (int i = 0; i < v.vec.size(); i++)
-			r.vec.append(new Value(*this * *v.vec[i]));
+		for (size_t i = 0; i < v.vec.size(); i++)
+			r.vec.push_back(new Value(*this * *v.vec[i]));
 		return r;
 	}
 	if (this->type == NUMBER && v.type == NUMBER) {
@@ -161,15 +163,15 @@ Value Value::operator / (const Value &v) const
 	if (this->type == VECTOR && v.type == NUMBER) {
 		Value r;
 		r.type = VECTOR;
-		for (int i = 0; i < this->vec.size(); i++)
-			r.vec.append(new Value(*this->vec[i] / v));
+		for (size_t i = 0; i < this->vec.size(); i++)
+			r.vec.push_back(new Value(*this->vec[i] / v));
 		return r;
 	}
 	if (this->type == NUMBER && v.type == VECTOR) {
 		Value r;
 		r.type = VECTOR;
-		for (int i = 0; i < v.vec.size(); i++)
-			r.vec.append(new Value(v / *v.vec[i]));
+		for (size_t i = 0; i < v.vec.size(); i++)
+			r.vec.push_back(new Value(v / *v.vec[i]));
 		return r;
 	}
 	if (this->type == NUMBER && v.type == NUMBER) {
@@ -216,7 +218,7 @@ Value Value::operator == (const Value &v) const
 	if (this->type == VECTOR && v.type == VECTOR) {
 		if (this->vec.size() != v.vec.size())
 			return Value(false);
-		for (int i=0; i<this->vec.size(); i++)
+		for (size_t i=0; i<this->vec.size(); i++)
 			if (!(*this->vec[i] == *v.vec[i]).b)
 				return Value(false);
 		return Value(true);
@@ -254,8 +256,8 @@ Value Value::inv() const
 	if (this->type == VECTOR) {
 		Value r;
 		r.type = VECTOR;
-		for (int i = 0; i < this->vec.size(); i++)
-			r.vec.append(new Value(this->vec[i]->inv()));
+		for (size_t i = 0; i < this->vec.size(); i++)
+			r.vec.push_back(new Value(this->vec[i]->inv()));
 		return r;
 	}
 	if (this->type == NUMBER)
@@ -307,46 +309,95 @@ bool Value::getv3(double &x, double &y, double &z) const
 	return true;
 }
 
-QString Value::dump() const
-{
-	if (this->type == STRING) {
-		return QString("\"") + this->text + QString("\"");
-	}
-	if (this->type == VECTOR) {
-		QString text = "[";
-		for (int i = 0; i < this->vec.size(); i++) {
-			if (i > 0)
-				text += ", ";
-			text += this->vec[i]->dump();
-		}
-		return text + "]";
-	}
-	if (this->type == RANGE) {
-		QString text;
-		text.sprintf("[ %g : %g : %g ]", this->range_begin, this->range_step, this->range_end);
-		return text;
-	}
-	if (this->type == NUMBER) {
-		QString text;
-		text.sprintf("%g", this->num);
-		return text;
-	}
-	if (this->type == BOOL) {
-		return QString(this->b ? "true" : "false");
-	}
-	return QString("undef");
-}
-
 void Value::reset_undef()
 {
 	this->type = UNDEFINED;
 	this->b = false;
 	this->num = 0;
-	for (int i = 0; i < this->vec.size(); i++)
-		delete this->vec[i];
+	for (size_t i = 0; i < this->vec.size(); i++) delete this->vec[i];
 	this->vec.clear();
 	this->range_begin = 0;
 	this->range_step = 0;
 	this->range_end = 0;
-	this->text = QString();
+	this->text = "";
 }
+
+std::string Value::toString() const
+{
+	std::stringstream stream;
+	stream.precision(16);
+
+	switch (this->type) {
+	case STRING:
+		stream << '"' << this->text << '"';
+		break;
+	case VECTOR:
+		stream << '[';
+		for (size_t i = 0; i < this->vec.size(); i++) {
+			if (i > 0) stream << ", ";
+			stream << *(this->vec[i]);
+		}
+		stream << ']';
+		break;
+	case RANGE:
+		stream	<< "[ "
+			<< this->range_begin
+			<< " : "
+			<< this->range_step
+			<< " : "
+			<< this->range_end
+			<< " ]";
+		break;
+	case NUMBER:
+		stream << this->num;
+		break;
+	case BOOL:
+		stream << this->b;
+		break;
+	default:
+		stream << "undef";
+	}
+
+	return stream.str();
+}
+
+bool Value::toBool() const
+{
+	switch (this->type) {
+	case STRING:
+		return this->text.size() > 0;
+		break;
+	case VECTOR:
+		return this->vec.size() > 0;
+		break;
+	case RANGE:
+		return true;
+		break;
+	case NUMBER:
+		return this->num != 0;
+		break;
+	case BOOL:
+		return this->b;
+		break;
+	default:
+		return false;
+		break;
+	}
+}
+
+/*!
+	Append a value to this vector.
+	This must be of type VECTOR.
+*/
+void Value::append(Value *val)
+{
+	assert(this->type == VECTOR);
+	this->vec.push_back(val);
+}
+
+std::ostream &operator<<(std::ostream &stream, const Value &value)
+{
+	stream << value.toString();
+	return stream;
+}
+

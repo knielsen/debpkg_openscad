@@ -4,11 +4,9 @@ BUGS
 o Some invalid DXF data gets pass the import checks and breaks the tessing code
 o Tesselation via GLU sometimes produces strange results
 o Export STL: Exports existing CGAL model even though the current model is changed, but not CGAL rendered
-o It's now possible to start a new rendering while one is already running (which call processEvents())
-  -> turn off most (or all) interaction while rendering
-  -> Lock all or only one MainWindow (MDI)?
 o Look into the polygon winding and rotate_extrude() problem reported by Britton
 o CGAL Aff_transformation_3 doesn't support non-affine transformations (non-aff-matrix.scad)
+o 2D union of polygons with a touching vertex doesn't work. see testdata/scad/bugs/polygon-touch.scad
 
 STL Import BUGS
 ---------------
@@ -42,17 +40,10 @@ Using STL-imported models is tricky and triggers multiple issues:
 CRASH BUGS
 ----------
 o Broken polyhedron() entities are not correctly detected and cause CGAL segfaults
-o linear_extrude(50) square([5,0]);
-o union() {
-    linear_extrude(height=10, twist=90) circle(5);
-    translate([7,-5,0]) linear_extrude(height=10, twist=180) polygon(points = [[0,0], [10,0], [5,10]]);
-  }
-o non-convex minkowski example from chrysn fails with an exception
 
 USER INTERFACE
 --------------
 o Preferences
-  - Remember settings done in menus between sessions (automatic reload, perspective, show*, hide*)
   - Beautify color schemes
   - Color schemes read from file
   - Color scheme editor
@@ -60,9 +51,7 @@ o Preferences
   - pointsize
   - OpenGL params
   - Default language feature settings
-  - Auto-view CSG/thrown together on load
   - Make the library search path configurable?
-o Export etc.: automatically add missing extension as in SaveAs
 o MDI
   - Think about how to do MDI the right way
   - Ctrl-W should close the current dialog, not the current main window
@@ -73,7 +62,7 @@ o MDI
     and handle_dep.
 o 3D View
   - OpenGL 2.0 test: What, exactly, is needed from OpenGL 2.0? Can we use 1.x with extensions?
-  - Improve mouse rotation
+  - Improve mouse rotation/zoom/pan
   - Add modifier key combos to handle pan and zoom on 1 mouse button systems
   - Show grid
   - Measurement ticks on the axes that look like rulers that one can turn off and on.
@@ -84,8 +73,12 @@ o 3D View
   - overlay indicator displaying current view mode
   - OpenCSG rendering: Coincident surfaces causes z-buffer fighting. Is this somehow
     avoidable tuning the depth tests in OpenCSG? 
+  - Make the 10.000 element OpenCSG limit configurable (Preferences) ?
   - Use OpenGL picking to facilitate ray-tracing like features like measuring
     thicknesses, distances, slot thicknesses etc.
+  - When specifying a transparency with the color() statement,
+    the object is not sorted and will be rendered wrongly
+  - Add option to change lights, e.g. add an optional camera light
 o Editor wishlist
   - More infrastructure for external editor (allow communication from the outside)
   - Preferences GUI for the features below
@@ -121,6 +114,8 @@ o Misc
   - Save: Ask for confirmation if file has been externally changed
   - Rename OpenCSG and CGAL to smth. not specific to the underlying libraries
     (e.g Preview, Render)
+o Cmd-line
+  - Add verbose option (PRINT command from mainwin.cc and progress output)
 
 ENGINE
 ------
@@ -136,20 +131,16 @@ o 2D Subsystem
 o Built-in modules
   - extrude*: Allow the base 2D primitive to have a Z value
   - rotate_extrude(): Allow for specification of start/stop/sweep angle?
-  - Convex hull of multiple 2D or 2D objects
+  - Convex hull of 3D objects
 o Advanced Transformations
   - Add statement for refinement via surface subdivision
   - Add statement for intersections in cartesian product of childs
+  - non-convex minkowski example from chrysn fails with an exception (testdata/scad/bugs/minkowski-assert.scad)
 o Function-Module-Interface
   - Pass a module instanciation to a function (e.g. for a volume() function)
   - Pass a function to a module instanciation (e.g. for dynamic extrusion paths)
 o Language Frontend
-  - include statement doesn't support nesting. This can be fixed by
-    keeping a nested stack of current input files in the lexer. See
-    the "Flex & Bison" O'Reilly book, "Start States and Nested Input
-    Files", page 28, for an example.
   - Allow local variables and functions everywhere (not only on module level)
-  - allow any expression to be evaluated as boolean (!0 = true, 0 = false)
   - Rethink for vs. intersection_for vs. group. Should for loops
     generate child lists instead, and make these passable to other
     modules or accessible by child()?
@@ -166,9 +157,6 @@ o Mesh optimization on STL export
   - Remove super small triangles (all sides are short)
   - Replace super thin triangles (one h is short)
 o Misc
-  - Add symbolic colors to the color() statement
-  - When specifying a transparency with the color() statement,
-    the object is not sorted and will be rendered wrongly
   - Go through default values of parameters (e.g. cube() has x,y,z=1 while linear_extrude() has height=100)
   - Add support for symbolic names to child() statement 
   - Add 'lines' object type for non-solid 2d drawings
@@ -176,11 +164,20 @@ o Misc
     empty AbstractNode instead of being ignored?
   - Bug: Using the background operator (%) on the only object in a scene triggers a
     CSG error: No top level object found
+  - Dependency tracking of libraries (USE'd modules) isn't implemented. See Mail from nophead 20110823.
 o Grammar
   - dim->name -> dim->label
   - A random(seed) function
-  - import_*() -> *_import() (consistent prefix vs. postfix)
   - linear_extrude()/rotate_extrude(): Cumbersome names? -> (extrude, revolve, lathe, sweep ?) 
+o Hollow donut problem
+  When extruding a 2D CSG tree (e.g. a polygon with a hole), the hole
+  information is lost when performing the extrusion. For linear
+  extrusions, this has only a minor visual impact, but for rotate
+  extrusion, the resulting CGAL models will lose the hole. The OpenCSG
+  rendering keeps the hole, but renders slightly incorrect.
+o CGAL issues
+  - CGAL doesn't handle almost planar polygons. Consider splitting into triangles ourselves. See WillamAdams/dodec.scad
+
 
 IDEAS FOR LANGUAGE CHANGES
 --------------------------
@@ -203,6 +200,9 @@ o dxflinextrude and dxfrotextrude could share code
 o Consider decoupling DXF-specific functionality from the 2D subsystem
 o Visitation refactoring
   - Make AbstractNode members private/protected?
+o Consider evaluating all referenced files relative to the document path instead
+  of being absolute. This would e.g. make regression testing of dumpcaching easier.
+  This would require us to pass a document contect to all traversal methods though.
 
 BUILD SYSTEM
 ------------
@@ -215,13 +215,10 @@ o Caching and MDI looks suspicious when the code relies on external resources
   which might be loaded from difference locations in different documents
   -> we might get a false cache hit
 o Are contructs like "child(0)" cached? Could this give false cache hits?
-o Write some cmd-line apps that dump an openscad file to misc. formats
-  (dump, stl, dxf)
-o Write a simple test script that collects verified and current STL renderings
-  and displays them side-by-side or smth.
-o Write simple driver scripts for comparing output of above command
 o Collect "all" available OpenSCAD scripts from the internets and run the integration
   tests on them all
+o dumptest tests:
+  - filename are dumped as absolute filenames - this will fail on other systems
 o Write a regression test for the hexagonal cylinder orientation issue
 
 INFRASTRUCTURE
@@ -233,6 +230,5 @@ MISC
 ----
 o Streamline the cmd-line interface a bit
   - Implicit output file format
-
 o Write checklists for typical extension work (add new module, add new function)
   -> make sure new test files are added

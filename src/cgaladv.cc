@@ -24,25 +24,16 @@
  *
  */
 
+#include "cgaladvnode.h"
 #include "module.h"
-#include "node.h"
 #include "context.h"
 #include "builtin.h"
 #include "printutils.h"
-#include "cgal.h"
-
-#ifdef ENABLE_CGAL
-extern CGAL_Nef_polyhedron3 minkowski3(CGAL_Nef_polyhedron3 a, CGAL_Nef_polyhedron3 b);
-extern CGAL_Nef_polyhedron2 minkowski2(CGAL_Nef_polyhedron2 a, CGAL_Nef_polyhedron2 b);
-extern CGAL_Nef_polyhedron2 convexhull2(std::list<CGAL_Nef_polyhedron2> a);
-#endif
-
-enum cgaladv_type_e {
-	MINKOWSKI,
-	GLIDE,
-	SUBDIV,
-	HULL
-};
+#include "PolySetEvaluator.h"
+#include <sstream>
+#include <assert.h>
+#include <boost/assign/std/vector.hpp>
+using namespace boost::assign; // bring 'operator+=()' into scope
 
 class CgaladvModule : public AbstractModule
 {
@@ -52,38 +43,21 @@ public:
 	virtual AbstractNode *evaluate(const Context *ctx, const ModuleInstantiation *inst) const;
 };
 
-class CgaladvNode : public AbstractNode
-{
-public:
-	Value path;
-	QString subdiv_type;
-	int convexity, level;
-	cgaladv_type_e type;
-	CgaladvNode(const ModuleInstantiation *mi, cgaladv_type_e type) : AbstractNode(mi), type(type) {
-		convexity = 1;
-	}
-#ifdef ENABLE_CGAL
-	virtual CGAL_Nef_polyhedron render_cgal_nef_polyhedron() const;
-#endif
-	virtual CSGTerm *render_csg_term(double m[20], QVector<CSGTerm*> *highlights, QVector<CSGTerm*> *background) const;
-	virtual QString dump(QString indent) const;
-};
-
 AbstractNode *CgaladvModule::evaluate(const Context *ctx, const ModuleInstantiation *inst) const
 {
 	CgaladvNode *node = new CgaladvNode(inst, type);
 
-	QVector<QString> argnames;
-	QVector<Expression*> argexpr;
+	std::vector<std::string> argnames;
+	std::vector<Expression*> argexpr;
 
 	if (type == MINKOWSKI)
-		argnames = QVector<QString>() << "convexity";
+		argnames += "convexity";
 
 	if (type == GLIDE)
-		argnames = QVector<QString>() << "path" << "convexity";
+		argnames += "path", "convexity";
 
 	if (type == SUBDIV)
-		argnames = QVector<QString>() << "type" << "level" << "convexity";
+		argnames += "type", "level", "convexity";
 
 	Context c(ctx);
 	c.args(argnames, argexpr, inst->argnames, inst->argvalues);
@@ -113,13 +87,15 @@ AbstractNode *CgaladvModule::evaluate(const Context *ctx, const ModuleInstantiat
 	if (node->level <= 1)
 		node->level = 1;
 
-	foreach (ModuleInstantiation *v, inst->children) {
-		AbstractNode *n = v->evaluate(inst->ctx);
-		if (n)
-			node->children.append(n);
-	}
+	std::vector<AbstractNode *> evaluatednodes = inst->evaluateChildren();
+	node->children.insert(node->children.end(), evaluatednodes.begin(), evaluatednodes.end());
 
 	return node;
+}
+
+PolySet *CgaladvNode::evaluate_polyset(PolySetEvaluator *ps) const
+{
+	return ps->evaluatePolySet(*this);
 }
 
 void register_builtin_cgaladv()
@@ -130,129 +106,47 @@ void register_builtin_cgaladv()
 	builtin_modules["hull"] = new CgaladvModule(HULL);
 }
 
-#ifdef ENABLE_CGAL
-
-CGAL_Nef_polyhedron CgaladvNode::render_cgal_nef_polyhedron() const
+std::string CgaladvNode::name() const
 {
-	QString cache_id = mk_cache_id();
-	if (cgal_nef_cache.contains(cache_id)) {
-		progress_report();
-		PRINT(cgal_nef_cache[cache_id]->msg);
-		return cgal_nef_cache[cache_id]->N;
+	switch (this->type) {
+	case MINKOWSKI:
+		return "minkowski";
+		break;
+	case GLIDE:
+		return "glide";
+		break;
+	case SUBDIV:
+		return "subdiv";
+		break;
+	case HULL:
+		return "hull";
+		break;
+	default:
+		assert(false);
 	}
-
-	print_messages_push();
-	CGAL_Nef_polyhedron N;
-
-	if (type == MINKOWSKI)
-	{
-		bool first = true;
-		foreach(AbstractNode * v, children) {
-			if (v->modinst->tag_background)
-				continue;
-			if (first) {
-				N = v->render_cgal_nef_polyhedron();
-				if (N.dim != 0)
-					first = false;
-			} else {
-				CGAL_Nef_polyhedron tmp = v->render_cgal_nef_polyhedron();
-				if (N.dim == 3 && tmp.dim == 3) {
-					N.p3 = minkowski3(N.p3, tmp.p3);
-				}
-				if (N.dim == 2 && tmp.dim == 2) {
-					N.p2 = minkowski2(N.p2, tmp.p2);
-				}
-			}
-			v->progress_report();
-		}
-	}
-
-	if (type == GLIDE)
-	{
-		PRINT("WARNING: subdiv() is not implemented yet!");
-	}
-
-	if (type == SUBDIV)
-	{
-		PRINT("WARNING: subdiv() is not implemented yet!");
-	}
-
-	if (type == HULL)
-	{
-		std::list<CGAL_Nef_polyhedron2> polys;
-		bool all2d = true;
-		foreach(AbstractNode * v, children) {
-			if (v->modinst->tag_background)
-		    continue;
-			N = v->render_cgal_nef_polyhedron();
-			if (N.dim == 3) {
-		    //polys.push_back(tmp.p3);
-				PRINT("WARNING: hull() is not implemented yet for 3D objects!");
-		    all2d=false;
-			}
-			if (N.dim == 2) {
-		    polys.push_back(N.p2);
-			}
-			v->progress_report();
-		}
-
-		if (all2d)
-			N.p2 = convexhull2(polys);
-	}
-
-	cgal_nef_cache.insert(cache_id, new cgal_nef_cache_entry(N), N.weight());
-	print_messages_pop();
-	progress_report();
-
-	return N;
 }
 
-CSGTerm *CgaladvNode::render_csg_term(double m[20], QVector<CSGTerm*> *highlights, QVector<CSGTerm*> *background) const
+std::string CgaladvNode::toString() const
 {
-	if (type == MINKOWSKI)
-		return render_csg_term_from_nef(m, highlights, background, "minkowski", this->convexity);
+	std::stringstream stream;
 
-	if (type == GLIDE)
-		return render_csg_term_from_nef(m, highlights, background, "glide", this->convexity);
-
-	if (type == SUBDIV)
-		return render_csg_term_from_nef(m, highlights, background, "subdiv", this->convexity);
-
-	if (type == HULL)
-		return render_csg_term_from_nef(m, highlights, background, "hull", this->convexity);
-
-	return NULL;
-}
-
-#else // ENABLE_CGAL
-
-CSGTerm *CgaladvNode::render_csg_term(double m[20], QVector<CSGTerm*> *highlights, QVector<CSGTerm*> *background) const
-{
-	PRINT("WARNING: Found minkowski(), glide(), subdiv() or hull() statement but compiled without CGAL support!");
-	return NULL;
-}
-
-#endif // ENABLE_CGAL
-
-QString CgaladvNode::dump(QString indent) const
-{
-	if (dump_cache.isEmpty()) {
-		QString text;
-		if (type == MINKOWSKI)
-			text.sprintf("minkowski(convexity = %d) {\n", this->convexity);
-		if (type == GLIDE) {
-			text.sprintf(", convexity = %d) {\n", this->convexity);
-			text = QString("glide(path = ") + this->path.dump() + text;
-		}
-		if (type == SUBDIV)
-			text.sprintf("subdiv(level = %d, convexity = %d) {\n", this->level, this->convexity);
-		if (type == HULL)
-			text.sprintf("hull() {\n");
-		foreach (AbstractNode *v, this->children)
-			text += v->dump(indent + QString("\t"));
-		text += indent + "}\n";
-		((AbstractNode*)this)->dump_cache = indent + QString("n%1: ").arg(idx) + text;
+	stream << this->name();
+	switch (type) {
+	case MINKOWSKI:
+		stream << "(convexity = " << this->convexity << ")";
+		break;
+	case GLIDE:
+		stream << "(path = " << this->path << ", convexity = " << this->convexity << ")";
+		break;
+	case SUBDIV:
+		stream << "(level = " << this->level << ", convexity = " << this->convexity << ")";
+		break;
+	case HULL:
+		stream << "()";
+		break;
+	default:
+		assert(false);
 	}
-	return dump_cache;
-}
 
+	return stream.str();
+}

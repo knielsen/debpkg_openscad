@@ -24,23 +24,18 @@
  *
  */
 
+#include "rendernode.h"
 #include "module.h"
-#include "node.h"
-#include "polyset.h"
 #include "context.h"
-#include "dxfdata.h"
-#include "dxftess.h"
-#include "csgterm.h"
 #include "builtin.h"
 #include "printutils.h"
 #include "progress.h"
-#ifdef ENABLE_CGAL
-#  include "cgal.h"
-#endif
+#include "visitor.h"
+#include "PolySetEvaluator.h"
 
-#include <QProgressDialog>
-#include <QApplication>
-#include <QTime>
+#include <sstream>
+#include <boost/assign/std/vector.hpp>
+using namespace boost::assign; // bring 'operator+=()' into scope
 
 class RenderModule : public AbstractModule
 {
@@ -49,24 +44,13 @@ public:
 	virtual AbstractNode *evaluate(const Context *ctx, const ModuleInstantiation *inst) const;
 };
 
-class RenderNode : public AbstractNode
-{
-public:
-	int convexity;
-	RenderNode(const ModuleInstantiation *mi) : AbstractNode(mi), convexity(1) { }
-#ifdef ENABLE_CGAL
-	virtual CGAL_Nef_polyhedron render_cgal_nef_polyhedron() const;
-#endif
-	CSGTerm *render_csg_term(double m[20], QVector<CSGTerm*> *highlights, QVector<CSGTerm*> *background) const;
-	virtual QString dump(QString indent) const;
-};
-
 AbstractNode *RenderModule::evaluate(const Context *ctx, const ModuleInstantiation *inst) const
 {
 	RenderNode *node = new RenderNode(inst);
 
-	QVector<QString> argnames = QVector<QString>() << "convexity";
-	QVector<Expression*> argexpr;
+	std::vector<std::string> argnames;
+	argnames += "convexity";
+	std::vector<Expression*> argexpr;
 
 	Context c(ctx);
 	c.args(argnames, argexpr, inst->argnames, inst->argvalues);
@@ -75,13 +59,15 @@ AbstractNode *RenderModule::evaluate(const Context *ctx, const ModuleInstantiati
 	if (v.type == Value::NUMBER)
 		node->convexity = (int)v.num;
 
-	foreach (ModuleInstantiation *v, inst->children) {
-		AbstractNode *n = v->evaluate(inst->ctx);
-		if (n != NULL)
-			node->children.append(n);
-	}
+	std::vector<AbstractNode *> evaluatednodes = inst->evaluateChildren();
+	node->children.insert(node->children.end(), evaluatednodes.begin(), evaluatednodes.end());
 
 	return node;
+}
+
+class PolySet *RenderNode::evaluate_polyset(PolySetEvaluator *ps) const
+{
+	return ps->evaluatePolySet(*this);
 }
 
 void register_builtin_render()
@@ -89,176 +75,11 @@ void register_builtin_render()
 	builtin_modules["render"] = new RenderModule();
 }
 
-#ifdef ENABLE_CGAL
-
-CGAL_Nef_polyhedron RenderNode::render_cgal_nef_polyhedron() const
+std::string RenderNode::toString() const
 {
-	QString cache_id = mk_cache_id();
-	if (cgal_nef_cache.contains(cache_id)) {
-		progress_report();
-		PRINT(cgal_nef_cache[cache_id]->msg);
-		return cgal_nef_cache[cache_id]->N;
-	}
+	std::stringstream stream;
 
-	print_messages_push();
+	stream << this->name() << "(convexity = " << convexity << ")";
 
-	bool first = true;
-	CGAL_Nef_polyhedron N;
-	foreach(AbstractNode * v, children)
-	{
-		if (v->modinst->tag_background)
-			continue;
-		if (first) {
-			N = v->render_cgal_nef_polyhedron();
-			if (N.dim != 0)
-				first = false;
-		} else if (N.dim == 2) {
-			N.p2 += v->render_cgal_nef_polyhedron().p2;
-		} else if (N.dim == 3) {
-			N.p3 += v->render_cgal_nef_polyhedron().p3;
-		}
-		v->progress_report();
-	}
-
-	cgal_nef_cache.insert(cache_id, new cgal_nef_cache_entry(N), N.weight());
-	print_messages_pop();
-	progress_report();
-
-	return N;
+	return stream.str();
 }
-
-CSGTerm *AbstractNode::render_csg_term_from_nef(double m[20], QVector<CSGTerm*> *highlights, QVector<CSGTerm*> *background, const char *statement, int convexity) const
-{
-	QString key = mk_cache_id();
-	if (PolySet::ps_cache.contains(key)) {
-		PRINT(PolySet::ps_cache[key]->msg);
-		return AbstractPolyNode::render_csg_term_from_ps(m, highlights, background,
-				PolySet::ps_cache[key]->ps->link(), modinst, idx);
-	}
-
-	print_messages_push();
-	CGAL_Nef_polyhedron N;
-
-	QString cache_id = mk_cache_id();
-	if (cgal_nef_cache.contains(cache_id))
-	{
-		PRINT(cgal_nef_cache[cache_id]->msg);
-		N = cgal_nef_cache[cache_id]->N;
-	}
-	else
-	{
-		PRINTF_NOCACHE("Processing uncached %s statement...", statement);
-		// PRINTA("Cache ID: %1", cache_id);
-		QApplication::processEvents();
-
-		QTime t;
-		t.start();
-
-		N = this->render_cgal_nef_polyhedron();
-
-		int s = t.elapsed() / 1000;
-		PRINTF_NOCACHE("..rendering time: %d hours, %d minutes, %d seconds", s / (60*60), (s / 60) % 60, s % 60);
-	}
-
-	PolySet *ps = NULL;
-
-	if (N.dim == 2)
-	{
-		DxfData dd(N);
-		ps = new PolySet();
-		ps->is2d = true;
-		dxf_tesselate(ps, &dd, 0, true, false, 0);
-		dxf_border_to_ps(ps, &dd);
-	}
-
-	if (N.dim == 3)
-	{
-		if (!N.p3.is_simple()) {
-			PRINTF("WARNING: Result of %s() isn't valid 2-manifold! Modify your design..", statement);
-			return NULL;
-		}
-
-		ps = new PolySet();
-		
-		CGAL_Polyhedron P;
-		N.p3.convert_to_Polyhedron(P);
-
-		typedef CGAL_Polyhedron::Vertex Vertex;
-		typedef CGAL_Polyhedron::Vertex_const_iterator VCI;
-		typedef CGAL_Polyhedron::Facet_const_iterator FCI;
-		typedef CGAL_Polyhedron::Halfedge_around_facet_const_circulator HFCC;
-
-		for (FCI fi = P.facets_begin(); fi != P.facets_end(); ++fi) {
-			HFCC hc = fi->facet_begin();
-			HFCC hc_end = hc;
-			ps->append_poly();
-			do {
-				Vertex v = *VCI((hc++)->vertex());
-				double x = CGAL::to_double(v.point().x());
-				double y = CGAL::to_double(v.point().y());
-				double z = CGAL::to_double(v.point().z());
-				ps->append_vertex(x, y, z);
-			} while (hc != hc_end);
-		}
-	}
-
-	if (ps)
-	{
-		ps->convexity = convexity;
-		PolySet::ps_cache.insert(key, new PolySet::ps_cache_entry(ps->link()));
-
-		CSGTerm *term = new CSGTerm(ps, m, QString("n%1").arg(idx));
-		if (modinst->tag_highlight && highlights)
-			highlights->append(term->link());
-		if (modinst->tag_background && background) {
-			background->append(term);
-			return NULL;
-		}
-		return term;
-	}
-	print_messages_pop();
-
-	return NULL;
-}
-
-CSGTerm *RenderNode::render_csg_term(double m[20], QVector<CSGTerm*> *highlights, QVector<CSGTerm*> *background) const
-{
-	return render_csg_term_from_nef(m, highlights, background, "render", this->convexity);
-}
-
-#else
-
-CSGTerm *RenderNode::render_csg_term(double m[20], QVector<CSGTerm*> *highlights, QVector<CSGTerm*> *background) const
-{
-	CSGTerm *t1 = NULL;
-	PRINT("WARNING: Found render() statement but compiled without CGAL support!");
-	foreach(AbstractNode * v, children) {
-		CSGTerm *t2 = v->render_csg_term(m, highlights, background);
-		if (t2 && !t1) {
-			t1 = t2;
-		} else if (t2 && t1) {
-			t1 = new CSGTerm(CSGTerm::TYPE_UNION, t1, t2);
-		}
-	}
-	if (modinst->tag_highlight && highlights)
-		highlights->append(t1->link());
-	if (t1 && modinst->tag_background && background) {
-		background->append(t1);
-		return NULL;
-	}
-	return t1;
-}
-
-#endif
-
-QString RenderNode::dump(QString indent) const
-{
-	if (dump_cache.isEmpty()) {
-		QString text = indent + QString("n%1: ").arg(idx) + QString("render(convexity = %1) {\n").arg(QString::number(convexity));
-		foreach (AbstractNode *v, children)
-			text += v->dump(indent + QString("\t"));
-		((AbstractNode*)this)->dump_cache = text + indent + "}\n";
-	}
-	return dump_cache;
-}
-

@@ -1,33 +1,21 @@
 #ifndef POLYSET_H_
 #define POLYSET_H_
 
-#ifdef ENABLE_OPENCSG
-// this must be included before the GL headers
-#  include <GL/glew.h>
-#endif
-#include <qgl.h>
-
+#include <GL/glew.h>
 #include "grid.h"
-#ifdef ENABLE_OPENCSG
-#  include <opencsg.h>
-#endif
-#ifdef ENABLE_CGAL
-#  include "cgal.h"
-#endif
+#include <vector>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
-#include <QCache>
+using Eigen::Vector3d;
+typedef Eigen::AlignedBox<double, 3> BoundingBox;
 
 class PolySet
 {
 public:
-	struct Point {
-		double x, y, z;
-		Point() : x(0), y(0), z(0) { }
-		Point(double x, double y, double z) : x(x), y(y), z(z) { }
-	};
-	typedef QList<Point> Polygon;
-	QVector<Polygon> polygons;
-	QVector<Polygon> borders;
+	typedef std::vector<Vector3d> Polygon;
+	std::vector<Polygon> polygons;
+	std::vector<Polygon> borders;
 	Grid3d<void*> grid;
 
 	bool is2d;
@@ -36,16 +24,12 @@ public:
 	PolySet();
 	~PolySet();
 
+	bool empty() const { return polygons.size() == 0; }
 	void append_poly();
-	void append_vertex(double x, double y, double z);
-	void insert_vertex(double x, double y, double z);
+	void append_vertex(double x, double y, double z = 0.0);
+	void insert_vertex(double x, double y, double z = 0.0);
 
-	void append_vertex(double x, double y) {
-		append_vertex(x, y, 0.0);
-	}
-	void insert_vertex(double x, double y) {
-		insert_vertex(x, y, 0.0);
-	}
+	BoundingBox getBoundingBox() const;
 
 	enum colormode_e {
 		COLORMODE_NONE,
@@ -65,25 +49,8 @@ public:
 		CSGMODE_HIGHLIGHT_DIFFERENCE = 22
 	};
 
-	struct ps_cache_entry {
-		PolySet *ps;
-		QString msg;
-		ps_cache_entry(PolySet *ps);
-		~ps_cache_entry();
-	};
-
-	static QCache<QString,ps_cache_entry> ps_cache;
-
 	void render_surface(colormode_e colormode, csgmode_e csgmode, double *m, GLint *shaderinfo = NULL) const;
 	void render_edges(colormode_e colormode, csgmode_e csgmode) const;
-
-#ifdef ENABLE_CGAL
-	CGAL_Nef_polyhedron render_cgal_nef_polyhedron() const;
-#endif
-
-	int refcount;
-	PolySet *link();
-	void unlink();
 };
 
 #endif

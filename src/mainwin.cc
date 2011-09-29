@@ -24,6 +24,7 @@
  *
  */
 
+#include "PolySetCache.h"
 #include "MainWindow.h"
 #include "openscad.h" // examplesdir
 #include "Preferences.h"
@@ -40,11 +41,13 @@
 #include "dxftess.h"
 #include "progress.h"
 #ifdef ENABLE_OPENCSG
-#include "render-opencsg.h"
+#include "CSGTermEvaluator.h"
+#include "OpenCSGRenderer.h"
 #endif
 #ifdef USE_PROGRESSWIDGET
 #include "ProgressWidget.h"
 #endif
+#include "ThrownTogetherRenderer.h"
 
 #include <QMenu>
 #include <QTime>
@@ -73,43 +76,34 @@
 #include "qlanguagefactory.h"
 #endif
 
+#include <fstream>
+
+#include <algorithm>
+#include <boost/foreach.hpp>
+#include <boost/lambda/lambda.hpp>
+#include <boost/lambda/bind.hpp>
+using namespace boost::lambda;
+
 #ifdef ENABLE_CGAL
 
-#if 1
-#include "CGAL_renderer.h"
-using OpenSCAD::OGL::Polyhedron;
-using OpenSCAD::OGL::SNC_BOUNDARY;
-using OpenSCAD::OGL::SNC_SKELETON;
-using OpenSCAD::OGL::Nef3_Converter;
-#else
-// a little hackish: we need access to default-private members of
-// CGAL::OGL::Nef3_Converter so we can implement our own draw function
-// that does not scale the model. so we define 'class' to 'struct'
-// for this header..
-//
-// theoretically there could be two problems:
-// 1.) defining language keyword with the pre processor is illegal afair
-// 2.) the compiler could use a different memory layout or name mangling for structs
-//
-// both does not seam to be the case with todays compilers...
-//
-#define class struct
-#include <CGAL/Nef_3/OGL_helper.h>
-#undef class
-using CGAL::OGL::Polyhedron;
-using CGAL::OGL::SNC_BOUNDARY;
-using CGAL::OGL::SNC_SKELETON;
-using CGAL::OGL::Nef3_Converter;
-#endif
+#include "CGALCache.h"
+#include "CGALEvaluator.h"
+#include "PolySetCGALEvaluator.h"
+#include "CGALRenderer.h"
+#include "CGAL_Nef_polyhedron.h"
+#include "cgal.h"
+
 #endif // ENABLE_CGAL
+
+// Global application state
+unsigned int GuiLocker::gui_locked = 0;
 
 #define QUOTE(x__) # x__
 #define QUOTED(x__) QUOTE(x__)
 
 static char helptitle[] =
-	"OpenSCAD "
-	QUOTED(OPENSCAD_VERSION)
-  " (www.openscad.org)\n";
+	"OpenSCAD " QUOTED(OPENSCAD_VERSION) " (www.openscad.org)\n"
+	"Visitor refactored version\n";
 static char copyrighttext[] =
 	"Copyright (C) 2009-2011 Marius Kintel <marius@kintel.net> and Clifford Wolf <clifford@clifford.at>\n"
 	"\n"
@@ -117,6 +111,37 @@ static char copyrighttext[] =
 	"it under the terms of the GNU General Public License as published by"
 	"the Free Software Foundation; either version 2 of the License, or"
 	"(at your option) any later version.";
+
+static void
+settings_setValueList(const QString &key,const QList<int> &list)
+{
+	QSettings settings;
+	settings.beginWriteArray(key);
+	for (int i=0;i<list.size(); ++i) {
+		settings.setArrayIndex(i);
+		settings.setValue("entry",list[i]);
+	}
+	settings.endArray();
+}
+
+QList<int>
+settings_valueList(const QString &key, const QList<int> &defaultList = QList<int>())
+{
+	QSettings settings;
+	QList<int> result;
+	if (settings.contains(key+"/size")){
+		int length = settings.beginReadArray(key);
+		for (int i = 0; i < length; ++i) {
+			settings.setArrayIndex(i);
+			result += settings.value("entry").toInt();
+		}
+		settings.endArray();
+		return result;
+	} else {
+		return defaultList;
+	}
+
+}
 
 MainWindow::MainWindow(const QString &filename)
 {
@@ -129,11 +154,13 @@ MainWindow::MainWindow(const QString &filename)
 	root_ctx.set_variable("$fa", Value(12.0));
 	root_ctx.set_variable("$t", Value(0.0));
 
+	root_ctx.set_constant("PI",Value(M_PI));
+
 	Value zero3;
 	zero3.type = Value::VECTOR;
-	zero3.vec.append(new Value(0.0));
-	zero3.vec.append(new Value(0.0));
-	zero3.vec.append(new Value(0.0));
+	zero3.append(new Value(0.0));
+	zero3.append(new Value(0.0));
+	zero3.append(new Value(0.0));
 	root_ctx.set_variable("$vpt", zero3);
 	root_ctx.set_variable("$vpr", zero3);
 
@@ -144,15 +171,16 @@ MainWindow::MainWindow(const QString &filename)
 	root_chain = NULL;
 #ifdef ENABLE_CGAL
 	this->root_N = NULL;
-	this->recreate_cgal_ogl_p = false;
-	cgal_ogl_p = NULL;
-	cgal_ogl_ps = NULL;
+	this->cgalRenderer = NULL;
 #endif
+#ifdef ENABLE_OPENCSG
+	this->opencsgRenderer = NULL;
+#endif
+	this->thrownTogetherRenderer = NULL;
 
 	highlights_chain = NULL;
 	background_chain = NULL;
 	root_node = NULL;
-	enableOpenCSG = false;
 
 	tval = 0;
 	fps = 0;
@@ -171,8 +199,8 @@ MainWindow::MainWindow(const QString &filename)
 	editor->setLineWrapping(true); // Not designable
 	setFont("", 0); // Init default font
 
-	screen->statusLabel = new QLabel(this);
-	statusBar()->addWidget(screen->statusLabel);
+	this->glview->statusLabel = new QLabel(this);
+	statusBar()->addWidget(this->glview->statusLabel);
 
 	animate_timer = new QTimer(this);
 	connect(animate_timer, SIGNAL(timeout()), this, SLOT(updateTVal()));
@@ -267,7 +295,7 @@ MainWindow::MainWindow(const QString &filename)
 	this->viewActionOpenCSG->setVisible(false);
 #else
 	connect(this->viewActionOpenCSG, SIGNAL(triggered()), this, SLOT(viewModeOpenCSG()));
-	if (!screen->hasOpenCSGSupport()) {
+	if (!this->glview->hasOpenCSGSupport()) {
 		this->viewActionOpenCSG->setEnabled(false);
 	}
 #endif
@@ -296,11 +324,6 @@ MainWindow::MainWindow(const QString &filename)
 	connect(this->viewActionOrthogonal, SIGNAL(triggered()), this, SLOT(viewOrthogonal()));
 	connect(this->viewActionHide, SIGNAL(triggered()), this, SLOT(hideConsole()));
 
-// #ifdef ENABLE_CGAL
-// 	viewActionCGALSurface = menu->addAction("CGAL Surfaces", this, SLOT(viewModeCGALSurface()), QKeySequence(Qt::Key_F10));
-// 	viewActionCGALGrid = menu->addAction("CGAL Grid Only", this, SLOT(viewModeCGALGrid()), QKeySequence(Qt::Key_F11));
-// #endif
-
 	// Help menu
 	connect(this->helpActionAbout, SIGNAL(triggered()), this, SLOT(helpAbout()));
 	connect(this->helpActionHomepage, SIGNAL(triggered()), this, SLOT(helpHomepage()));
@@ -319,6 +342,7 @@ MainWindow::MainWindow(const QString &filename)
 	} else {
 		setFileName("");
 	}
+	updateRecentFileActions();
 
 	connect(editor->document(), SIGNAL(contentsChanged()), this, SLOT(animateUpdateDocChanged()));
 #ifdef _QCODE_EDIT_
@@ -328,49 +352,86 @@ MainWindow::MainWindow(const QString &filename)
 	connect(editor->document(), SIGNAL(modificationChanged(bool)), this, SLOT(setWindowModified(bool)));
 	connect(editor->document(), SIGNAL(modificationChanged(bool)), fileActionSave, SLOT(setEnabled(bool)));
 #endif
-	connect(screen, SIGNAL(doAnimateUpdate()), this, SLOT(animateUpdate()));
+	connect(this->glview, SIGNAL(doAnimateUpdate()), this, SLOT(animateUpdate()));
 
-	connect(Preferences::inst(), SIGNAL(requestRedraw()), this->screen, SLOT(updateGL()));
+	connect(Preferences::inst(), SIGNAL(requestRedraw()), this->glview, SLOT(updateGL()));
 	connect(Preferences::inst(), SIGNAL(fontChanged(const QString&,uint)), 
 					this, SLOT(setFont(const QString&,uint)));
 	Preferences::inst()->apply();
 
+	// make sure it looks nice..
+	QSettings settings;
+	resize(settings.value("window/size", QSize(800, 600)).toSize());
+	move(settings.value("window/position", QPoint(0, 0)).toPoint());
+	QList<int> s1sizes = settings_valueList("window/splitter1sizes",QList<int>()<<400<<400);
+	QList<int> s2sizes = settings_valueList("window/splitter2sizes",QList<int>()<<400<<200);
+	splitter1->setSizes(s1sizes);
+	splitter2->setSizes(s2sizes);
 
 	// display this window and check for OpenGL 2.0 (OpenCSG) support
 	viewModeThrownTogether();
 	show();
-
-	// make sure it looks nice..
-	resize(800, 600);
-	splitter1->setSizes(QList<int>() << 400 << 400);
-	splitter2->setSizes(QList<int>() << 400 << 200);
 
 #ifdef ENABLE_OPENCSG
 	viewModeOpenCSG();
 #else
 	viewModeThrownTogether();
 #endif
-	viewPerspective();
+	loadViewSettings();
+	loadDesignSettings();
 
 	setAcceptDrops(true);
 	clearCurrentOutput();
 }
 
+void
+MainWindow::loadViewSettings(){
+	QSettings settings;
+	if (settings.value("view/showEdges").toBool()) {
+		viewActionShowEdges->setChecked(true);
+		viewModeShowEdges();
+	}
+	if (settings.value("view/showAxes").toBool()) {
+		viewActionShowAxes->setChecked(true);
+		viewModeShowAxes();
+	}
+	if (settings.value("view/showCrosshairs").toBool()) {
+		viewActionShowCrosshairs->setChecked(true);
+		viewModeShowCrosshairs();
+	}
+	if (settings.value("view/orthogonalProjection").toBool()) {
+		viewOrthogonal();
+	} else {
+		viewPerspective();
+	}
+	if (settings.value("view/hideConsole").toBool()) {
+		viewActionHide->setChecked(true);
+		hideConsole();
+	}
+	if (settings.value("view/hideEditor").toBool()) {
+		editActionHide->setChecked(true);
+		hideEditor();
+	}
+}
+
+void
+MainWindow::loadDesignSettings()
+{
+	QSettings settings;
+	if (settings.value("design/autoReload").toBool())
+		designActionAutoReload->setChecked(true);
+}
+
 MainWindow::~MainWindow()
 {
-	if (root_module)
-		delete root_module;
-	if (root_node)
-		delete root_node;
+	if (root_module) delete root_module;
+	if (root_node) delete root_node;
 #ifdef ENABLE_CGAL
-	if (this->root_N)
-		delete this->root_N;
-	if (cgal_ogl_p) {
-		Polyhedron *p = (Polyhedron*)cgal_ogl_p;
-		delete p;
-	}
-	if (cgal_ogl_ps)
-		cgal_ogl_ps->unlink();
+	if (this->root_N) delete this->root_N;
+	delete this->cgalRenderer;
+#endif
+#ifdef ENABLE_OPENCSG
+	delete this->opencsgRenderer;
 #endif
 }
 
@@ -433,6 +494,7 @@ MainWindow::openFile(const QString &new_filename)
 	setFileName(new_filename);
 
 	load();
+	updateRecentFiles();
 }
 
 void
@@ -440,7 +502,7 @@ MainWindow::setFileName(const QString &filename)
 {
 	if (filename.isEmpty()) {
 		this->fileName.clear();
-		this->root_ctx.document_path = currentdir;
+		this->root_ctx.setDocumentPath(currentdir.toStdString());
 		setWindowTitle("OpenSCAD - New Document[*]");
 	}
 	else {
@@ -452,20 +514,28 @@ MainWindow::setFileName(const QString &filename)
 		QString infoFileName = fileinfo.absoluteFilePath();
 		if (!infoFileName.isEmpty()) {
 			this->fileName = infoFileName;
-			QSettings settings; // already set up properly via main.cpp
-			QStringList files = settings.value("recentFileList").toStringList();
-			files.removeAll(this->fileName);
-			files.prepend(this->fileName);
-			while (files.size() > maxRecentFiles)
-				files.removeLast();
-			settings.setValue("recentFileList", files);
 		} else {
 			this->fileName = fileinfo.fileName();
 		}
 		
-		this->root_ctx.document_path = fileinfo.dir().absolutePath();
+		this->root_ctx.setDocumentPath(fileinfo.dir().absolutePath().toStdString());
 		QDir::setCurrent(fileinfo.dir().absolutePath());
 	}
+
+}
+
+void MainWindow::updateRecentFiles()
+{
+	// Check that the canonical file path exists - only update recent files
+	// if it does. Should prevent empty list items on initial open etc.
+	QFileInfo fileinfo(this->fileName);
+	QString infoFileName = fileinfo.absoluteFilePath();
+	QSettings settings; // already set up properly via main.cpp
+	QStringList files = settings.value("recentFileList").toStringList();
+	files.removeAll(infoFileName);
+	files.prepend(infoFileName);
+	while (files.size() > maxRecentFiles) files.removeLast();
+	settings.setValue("recentFileList", files);
 
 	foreach(QWidget *widget, QApplication::topLevelWidgets()) {
 		MainWindow *mainWin = qobject_cast<MainWindow *>(widget);
@@ -474,6 +544,7 @@ MainWindow::setFileName(const QString &filename)
 		}
 	}
 }
+
 
 void MainWindow::updatedFps()
 {
@@ -523,7 +594,7 @@ void MainWindow::load()
 
 AbstractNode *MainWindow::find_root_tag(AbstractNode *n)
 {
-	foreach(AbstractNode *v, n->children) {
+	BOOST_FOREACH (AbstractNode *v, n->children) {
 		if (v->modinst->tag_root) return v;
 		if (AbstractNode *vroot = find_root_tag(v)) return vroot;
 	}
@@ -531,7 +602,7 @@ AbstractNode *MainWindow::find_root_tag(AbstractNode *n)
 }
 
 /*!
-	Parse and evaluate the design -> this->root_node
+	Parse and evaluate the design => this->root_node
 */
 void MainWindow::compile(bool procevents)
 {
@@ -539,83 +610,95 @@ void MainWindow::compile(bool procevents)
 	if (procevents)
 		QApplication::processEvents();
 
+  // Invalidate renderers before we kill the CSG tree
+	this->glview->setRenderer(NULL);
+	if (this->opencsgRenderer) {
+		delete this->opencsgRenderer;
+		this->opencsgRenderer = NULL;
+	}
+	if (this->thrownTogetherRenderer) {
+		delete this->thrownTogetherRenderer;
+		this->thrownTogetherRenderer = NULL;
+	}
 
 	// Remove previous CSG tree
-	if (root_module) {
-		delete root_module;
-		root_module = NULL;
+	if (this->root_module) {
+		delete this->root_module;
+		this->root_module = NULL;
 	}
 
-	if (absolute_root_node) {
-		delete absolute_root_node;
-		absolute_root_node = NULL;
+	if (this->absolute_root_node) {
+		delete this->absolute_root_node;
+		this->absolute_root_node = NULL;
 	}
 
-	if (root_raw_term) {
-		root_raw_term->unlink();
-		root_raw_term = NULL;
+	if (this->root_raw_term) {
+		this->root_raw_term->unlink();
+		this->root_raw_term = NULL;
 	}
 
-	if (root_norm_term) {
-		root_norm_term->unlink();
-		root_norm_term = NULL;
+	if (this->root_norm_term) {
+		this->root_norm_term->unlink();
+		this->root_norm_term = NULL;
 	}
 
-	if (root_chain) {
-		delete root_chain;
-		root_chain = NULL;
+	if (this->root_chain) {
+		delete this->root_chain;
+		this->root_chain = NULL;
 	}
 
-	foreach(CSGTerm *v, highlight_terms) {
-		v->unlink();
-	}
-	highlight_terms.clear();
-	if (highlights_chain) {
-		delete highlights_chain;
-		highlights_chain = NULL;
-	}
-	foreach(CSGTerm *v, background_terms) {
-		v->unlink();
-	}
-	background_terms.clear();
-	if (background_chain) {
-		delete background_chain;
-		background_chain = NULL;
-	}
-	root_node = NULL;
-	enableOpenCSG = false;
+	std::for_each(this->highlight_terms.begin(), this->highlight_terms.end(), 
+								bind(&CSGTerm::unlink, _1));
+
+	this->highlight_terms.clear();
+	delete this->highlights_chain;
+	this->highlights_chain = NULL;
+
+	std::for_each(this->background_terms.begin(), this->background_terms.end(), 
+								bind(&CSGTerm::unlink, _1));
+	this->background_terms.clear();
+	delete this->background_chain;
+	this->background_chain = NULL;
+
+	this->root_node = NULL;
+	this->tree.setRoot(NULL);
 
 	// Initialize special variables
-	root_ctx.set_variable("$t", Value(e_tval->text().toDouble()));
+	this->root_ctx.set_variable("$t", Value(e_tval->text().toDouble()));
 
 	Value vpt;
 	vpt.type = Value::VECTOR;
-	vpt.vec.append(new Value(-screen->object_trans_x));
-	vpt.vec.append(new Value(-screen->object_trans_y));
-	vpt.vec.append(new Value(-screen->object_trans_z));
-	root_ctx.set_variable("$vpt", vpt);
+	vpt.append(new Value(-this->glview->object_trans_x));
+	vpt.append(new Value(-this->glview->object_trans_y));
+	vpt.append(new Value(-this->glview->object_trans_z));
+	this->root_ctx.set_variable("$vpt", vpt);
 
 	Value vpr;
 	vpr.type = Value::VECTOR;
-	vpr.vec.append(new Value(fmodf(360 - screen->object_rot_x + 90, 360)));
-	vpr.vec.append(new Value(fmodf(360 - screen->object_rot_y, 360)));
-	vpr.vec.append(new Value(fmodf(360 - screen->object_rot_z, 360)));
+	vpr.append(new Value(fmodf(360 - this->glview->object_rot_x + 90, 360)));
+	vpr.append(new Value(fmodf(360 - this->glview->object_rot_y, 360)));
+	vpr.append(new Value(fmodf(360 - this->glview->object_rot_z, 360)));
 	root_ctx.set_variable("$vpr", vpr);
 
 	// Parse
-	last_compiled_doc = editor->toPlainText();
-	root_module = parse((last_compiled_doc + "\n" + commandline_commands).toAscii().data(), this->fileName.isEmpty() ? "" : QFileInfo(this->fileName).absolutePath().toLocal8Bit(), false);
+	this->last_compiled_doc = editor->toPlainText();
+	this->root_module = parse((this->last_compiled_doc + "\n" + 
+														 QString::fromStdString(commandline_commands)).toAscii().data(), 
+														this->fileName.isEmpty() ? 
+														"" : 
+														QFileInfo(this->fileName).absolutePath().toLocal8Bit(), 
+														false);
 
 	// Error highlighting
-	if (highlighter) {
-		delete highlighter;
-		highlighter = NULL;
+	if (this->highlighter) {
+		delete this->highlighter;
+		this->highlighter = NULL;
 	}
 	if (parser_error_pos >= 0) {
-		highlighter = new Highlighter(editor->document());
+		this->highlighter = new Highlighter(editor->document());
 	}
 
-	if (!root_module) {
+	if (!this->root_module) {
 		if (!animate_panel->isVisible()) {
 #ifdef _QCODE_EDIT_
 			QDocumentCursor cursor = editor->cursor();
@@ -635,19 +718,23 @@ void MainWindow::compile(bool procevents)
 		QApplication::processEvents();
 
 	AbstractNode::resetIndexCounter();
-	root_inst = ModuleInstantiation();
-	absolute_root_node = root_module->evaluate(&root_ctx, &root_inst);
+	this->root_inst = ModuleInstantiation();
+	this->absolute_root_node = this->root_module->evaluate(&this->root_ctx, &this->root_inst);
 
-	if (!absolute_root_node)
+	if (!this->absolute_root_node)
 		goto fail;
 
 	// Do we have an explicit root node (! modifier)?
-	if (!(this->root_node = find_root_tag(absolute_root_node))) {
-		this->root_node = absolute_root_node;
+	if (!(this->root_node = find_root_tag(this->absolute_root_node))) {
+		this->root_node = this->absolute_root_node;
 	}
-	root_node->dump("");
+	// FIXME: Consider giving away ownership of root_node to the Tree, or use reference counted pointers
+	this->tree.setRoot(this->root_node);
+  // Dump the tree (to initialize caches).
+  // FIXME: We shouldn't really need to do this explicitly..
+	this->tree.getString(*this->root_node);
 
-	if (1) {
+ 	if (1) {
 		PRINT("Compilation finished.");
 		if (procevents)
 			QApplication::processEvents();
@@ -656,18 +743,7 @@ fail:
 		if (parser_error_pos < 0) {
 			PRINT("ERROR: Compilation failed! (no top level object found)");
 		} else {
-			int line = 1;
-			QByteArray pb = last_compiled_doc.toAscii();
-			char *p = pb.data();
-			for (int i = 0; i < parser_error_pos; i++) {
-				if (p[i] == '\n')
-					line++;
-				if (p[i] == 0) {
-					line = -1;
-					break;
-				}
-			}
-			PRINTF("ERROR: Compilation failed! (parser error in line %d)", line);
+			PRINT("ERROR: Compilation failed!");
 		}
 		if (procevents)
 			QApplication::processEvents();
@@ -684,13 +760,6 @@ void MainWindow::compileCSG(bool procevents)
 	PRINT("Compiling design (CSG Products generation)...");
 	if (procevents)
 		QApplication::processEvents();
-
-	double m[20];
-
-	for (int i = 0; i < 16; i++)
-		m[i] = i % 5 == 0 ? 1.0 : 0.0;
-	for (int i = 16; i < 20; i++)
-		m[i] = -1;
 
 	// Main CSG evaluation
 	QTime t;
@@ -712,12 +781,17 @@ void MainWindow::compileCSG(bool procevents)
 
 	progress_report_prep(root_node, report_func, pd);
 	try {
-		root_raw_term = root_node->render_csg_term(m, &highlight_terms, &background_terms);
+		CGALEvaluator cgalevaluator(this->tree);
+		PolySetCGALEvaluator psevaluator(cgalevaluator);
+		CSGTermEvaluator csgrenderer(this->tree, &psevaluator);
+		root_raw_term = csgrenderer.evaluateCSGTerm(*root_node, highlight_terms, background_terms);
 		if (!root_raw_term) {
 			PRINT("ERROR: CSG generation failed! (no top level object found)");
 			if (procevents)
 				QApplication::processEvents();
 		}
+		PolySetCache::instance()->print();
+		CGALCache::instance()->print();
 	}
 	catch (ProgressCancelException e) {
 		PRINT("CSG generation cancelled.");
@@ -749,21 +823,14 @@ void MainWindow::compileCSG(bool procevents)
 		root_chain = new CSGChain();
 		root_chain->import(root_norm_term);
 		
-		if (root_chain->polysets.size() > 1000) {
-			PRINTF("WARNING: Normalized tree has %d elements!", root_chain->polysets.size());
-			PRINTF("WARNING: OpenCSG rendering has been disabled.");
-		} else {
-			enableOpenCSG = true;
-		}
-		
 		if (highlight_terms.size() > 0)
 		{
-			PRINTF("Compiling highlights (%d CSG Trees)...", highlight_terms.size());
+			PRINTF("Compiling highlights (%zu CSG Trees)...", highlight_terms.size());
 			if (procevents)
 				QApplication::processEvents();
 			
 			highlights_chain = new CSGChain();
-			for (int i = 0; i < highlight_terms.size(); i++) {
+			for (unsigned int i = 0; i < highlight_terms.size(); i++) {
 				while (1) {
 					CSGTerm *n = highlight_terms[i]->normalize();
 					highlight_terms[i]->unlink();
@@ -777,12 +844,12 @@ void MainWindow::compileCSG(bool procevents)
 		
 		if (background_terms.size() > 0)
 		{
-			PRINTF("Compiling background (%d CSG Trees)...", background_terms.size());
+			PRINTF("Compiling background (%zu CSG Trees)...", background_terms.size());
 			if (procevents)
 				QApplication::processEvents();
 			
 			background_chain = new CSGChain();
-			for (int i = 0; i < background_terms.size(); i++) {
+			for (unsigned int i = 0; i < background_terms.size(); i++) {
 				while (1) {
 					CSGTerm *n = background_terms[i]->normalize();
 					background_terms[i]->unlink();
@@ -793,6 +860,21 @@ void MainWindow::compileCSG(bool procevents)
 				background_chain->import(background_terms[i]);
 			}
 		}
+
+		if (root_chain->polysets.size() > 1000) {
+			PRINTF("WARNING: Normalized tree has %d elements!", root_chain->polysets.size());
+			PRINTF("WARNING: OpenCSG rendering has been disabled.");
+		}
+		else {
+			PRINTF("Normalized CSG tree has %d elements", root_chain->polysets.size());
+			this->opencsgRenderer = new OpenCSGRenderer(this->root_chain, 
+																									this->highlights_chain, 
+																									this->background_chain, 
+																									this->glview->shaderinfo);
+		}
+		this->thrownTogetherRenderer = new ThrownTogetherRenderer(this->root_chain, 
+																															this->highlights_chain, 
+																															this->background_chain);
 		
 		PRINT("CSG generation finished.");
 		int s = t.elapsed() / 1000;
@@ -819,7 +901,9 @@ void MainWindow::actionOpen()
 {
 	QString new_filename = QFileDialog::getOpenFileName(this, "Open File", "", "OpenSCAD Designs (*.scad)");
 #ifdef ENABLE_MDI
-	new MainWindow(new_filename);
+	if (!new_filename.isEmpty()) {
+		new MainWindow(new_filename);
+	}
 #else
 	if (!new_filename.isEmpty()) {
 		if (!maybeSave())
@@ -917,6 +1001,7 @@ void MainWindow::actionSave()
 			this->editor->setContentModified(false);
 		}
 		clearCurrentOutput();
+		updateRecentFiles();
 	}
 }
 
@@ -952,10 +1037,13 @@ void MainWindow::actionReload()
 
 void MainWindow::hideEditor()
 {
+	QSettings settings;
 	if (editActionHide->isChecked()) {
 		editor->hide();
+		settings.setValue("view/hideEditor",true);
 	} else {
 		editor->show();
+		settings.setValue("view/hideEditor",false);
 	}
 }
 
@@ -967,7 +1055,7 @@ void MainWindow::pasteViewportTranslation()
 	QTextCursor cursor = editor->textCursor();
 #endif
 	QString txt;
-	txt.sprintf("[ %.2f, %.2f, %.2f ]", -screen->object_trans_x, -screen->object_trans_y, -screen->object_trans_z);
+	txt.sprintf("[ %.2f, %.2f, %.2f ]", -this->glview->object_trans_x, -this->glview->object_trans_y, -this->glview->object_trans_z);
 	cursor.insertText(txt);
 }
 
@@ -980,7 +1068,7 @@ void MainWindow::pasteViewportRotation()
 #endif
 	QString txt;
 	txt.sprintf("[ %.2f, %.2f, %.2f ]",
-		fmodf(360 - screen->object_rot_x + 90, 360), fmodf(360 - screen->object_rot_y, 360), fmodf(360 - screen->object_rot_z, 360));
+		fmodf(360 - this->glview->object_rot_x + 90, 360), fmodf(360 - this->glview->object_rot_y, 360), fmodf(360 - this->glview->object_rot_z, 360));
 	cursor.insertText(txt);
 }
 
@@ -996,6 +1084,8 @@ void MainWindow::checkAutoReload()
 
 void MainWindow::autoReloadSet(bool on)
 {
+	QSettings settings;
+	settings.setValue("design/autoReload",designActionAutoReload->isChecked());
 	if (on) {
 		autoReloadInfo = QString();
 		autoReloadTimer->start(200);
@@ -1022,6 +1112,9 @@ bool MainWindow::checkModified()
 
 void MainWindow::actionReloadCompile()
 {
+	if (GuiLocker::isLocked()) return;
+	GuiLocker lock;
+
 	if (!checkModified()) return;
 
 	console->clear();
@@ -1032,21 +1125,26 @@ void MainWindow::actionReloadCompile()
 	compile(true);
 	if (this->root_node) compileCSG(true);
 
+	// Go to non-CGAL view mode
+	if (viewActionThrownTogether->isChecked()) {
+		viewModeThrownTogether();
+	}
+	else {
 #ifdef ENABLE_OPENCSG
-	if (!(viewActionOpenCSG->isVisible() && viewActionOpenCSG->isChecked()) &&
-			!viewActionThrownTogether->isChecked()) {
 		viewModeOpenCSG();
-	}
-	else
+#else
+		viewModeThrownTogether();
 #endif
-	{
-		screen->updateGL();
 	}
+
 	clearCurrentOutput();
 }
 
 void MainWindow::actionCompile()
 {
+	if (GuiLocker::isLocked()) return;
+	GuiLocker lock;
+
 	setCurrentOutput();
 	console->clear();
 
@@ -1054,19 +1152,19 @@ void MainWindow::actionCompile()
 	if (this->root_node) compileCSG(!viewActionAnimate->isChecked());
 
 	// Go to non-CGAL view mode
-	if (!viewActionOpenCSG->isChecked() && !viewActionThrownTogether->isChecked()) {
+	if (viewActionThrownTogether->isChecked()) {
+		viewModeThrownTogether();
+	}
+	else {
 #ifdef ENABLE_OPENCSG
 		viewModeOpenCSG();
 #else
 		viewModeThrownTogether();
 #endif
 	}
-	else {
-		screen->updateGL();
-	}
 
 	if (viewActionAnimate->isChecked() && e_dump->isChecked()) {
-		QImage img = screen->grabFrameBuffer();
+		QImage img = this->glview->grabFrameBuffer();
 		QString filename;
 		double s = e_fsteps->text().toDouble();
 		double t = e_tval->text().toDouble();
@@ -1081,18 +1179,24 @@ void MainWindow::actionCompile()
 
 void MainWindow::actionRenderCGAL()
 {
+	if (GuiLocker::isLocked()) return;
+	GuiLocker lock;
+
 	setCurrentOutput();
 	console->clear();
 
 	compile(true);
 
-	if (!root_module || !root_node)
+	if (!this->root_module || !this->root_node) {
 		return;
+	}
 
+	this->glview->setRenderer(NULL);
+	delete this->cgalRenderer;
+	this->cgalRenderer = NULL;
 	if (this->root_N) {
 		delete this->root_N;
 		this->root_N = NULL;
-		this->recreate_cgal_ogl_p = true;
 	}
 
 	PRINT("Rendering Polygon Mesh using CGAL...");
@@ -1117,9 +1221,12 @@ void MainWindow::actionRenderCGAL()
 
 	QApplication::processEvents();
 
-	progress_report_prep(root_node, report_func, pd);
+	progress_report_prep(this->root_node, report_func, pd);
 	try {
-		this->root_N = new CGAL_Nef_polyhedron(root_node->render_cgal_nef_polyhedron());
+		CGALEvaluator evaluator(this->tree);
+		this->root_N = new CGAL_Nef_polyhedron(evaluator.evaluateCGALMesh(*this->root_node));
+		PolySetCache::instance()->print();
+		CGALCache::instance()->print();
 	}
 	catch (ProgressCancelException e) {
 		PRINT("Rendering cancelled.");
@@ -1128,61 +1235,70 @@ void MainWindow::actionRenderCGAL()
 
 	if (this->root_N)
 	{
-		PRINTF("Number of vertices currently in CGAL cache: %d", AbstractNode::cgal_nef_cache.totalCost());
-		PRINTF("Number of objects currently in CGAL cache: %d", AbstractNode::cgal_nef_cache.size());
+		// FIXME: Reenable cache cost info
+// 		PRINTF("Number of vertices currently in CGAL cache: %d", AbstractNode::cgal_nef_cache.totalCost());
+// 		PRINTF("Number of objects currently in CGAL cache: %d", AbstractNode::cgal_nef_cache.size());
 		QApplication::processEvents();
 
 		if (this->root_N->dim == 2) {
 			PRINTF("   Top level object is a 2D object:");
 			QApplication::processEvents();
-			PRINTF("   Empty:      %6s", this->root_N->p2.is_empty() ? "yes" : "no");
+			PRINTF("   Empty:      %6s", this->root_N->p2->is_empty() ? "yes" : "no");
 			QApplication::processEvents();
-			PRINTF("   Plane:      %6s", this->root_N->p2.is_plane() ? "yes" : "no");
+			PRINTF("   Plane:      %6s", this->root_N->p2->is_plane() ? "yes" : "no");
 			QApplication::processEvents();
-			PRINTF("   Vertices:   %6d", (int)this->root_N->p2.explorer().number_of_vertices());
+			PRINTF("   Vertices:   %6d", (int)this->root_N->p2->explorer().number_of_vertices());
 			QApplication::processEvents();
-			PRINTF("   Halfedges:  %6d", (int)this->root_N->p2.explorer().number_of_halfedges());
+			PRINTF("   Halfedges:  %6d", (int)this->root_N->p2->explorer().number_of_halfedges());
 			QApplication::processEvents();
-			PRINTF("   Edges:      %6d", (int)this->root_N->p2.explorer().number_of_edges());
+			PRINTF("   Edges:      %6d", (int)this->root_N->p2->explorer().number_of_edges());
 			QApplication::processEvents();
-			PRINTF("   Faces:      %6d", (int)this->root_N->p2.explorer().number_of_faces());
+			PRINTF("   Faces:      %6d", (int)this->root_N->p2->explorer().number_of_faces());
 			QApplication::processEvents();
-			PRINTF("   FaceCycles: %6d", (int)this->root_N->p2.explorer().number_of_face_cycles());
+			PRINTF("   FaceCycles: %6d", (int)this->root_N->p2->explorer().number_of_face_cycles());
 			QApplication::processEvents();
-			PRINTF("   ConnComp:   %6d", (int)this->root_N->p2.explorer().number_of_connected_components());
+			PRINTF("   ConnComp:   %6d", (int)this->root_N->p2->explorer().number_of_connected_components());
 			QApplication::processEvents();
 		}
 
 		if (this->root_N->dim == 3) {
 			PRINTF("   Top level object is a 3D object:");
-			PRINTF("   Simple:     %6s", this->root_N->p3.is_simple() ? "yes" : "no");
+			PRINTF("   Simple:     %6s", this->root_N->p3->is_simple() ? "yes" : "no");
 			QApplication::processEvents();
-			PRINTF("   Valid:      %6s", this->root_N->p3.is_valid() ? "yes" : "no");
+			PRINTF("   Valid:      %6s", this->root_N->p3->is_valid() ? "yes" : "no");
 			QApplication::processEvents();
-			PRINTF("   Vertices:   %6d", (int)this->root_N->p3.number_of_vertices());
+			PRINTF("   Vertices:   %6d", (int)this->root_N->p3->number_of_vertices());
 			QApplication::processEvents();
-			PRINTF("   Halfedges:  %6d", (int)this->root_N->p3.number_of_halfedges());
+			PRINTF("   Halfedges:  %6d", (int)this->root_N->p3->number_of_halfedges());
 			QApplication::processEvents();
-			PRINTF("   Edges:      %6d", (int)this->root_N->p3.number_of_edges());
+			PRINTF("   Edges:      %6d", (int)this->root_N->p3->number_of_edges());
 			QApplication::processEvents();
-			PRINTF("   Halffacets: %6d", (int)this->root_N->p3.number_of_halffacets());
+			PRINTF("   Halffacets: %6d", (int)this->root_N->p3->number_of_halffacets());
 			QApplication::processEvents();
-			PRINTF("   Facets:     %6d", (int)this->root_N->p3.number_of_facets());
+			PRINTF("   Facets:     %6d", (int)this->root_N->p3->number_of_facets());
 			QApplication::processEvents();
-			PRINTF("   Volumes:    %6d", (int)this->root_N->p3.number_of_volumes());
+			PRINTF("   Volumes:    %6d", (int)this->root_N->p3->number_of_volumes());
 			QApplication::processEvents();
 		}
 
 		int s = t.elapsed() / 1000;
 		PRINTF("Total rendering time: %d hours, %d minutes, %d seconds", s / (60*60), (s / 60) % 60, s % 60);
 
-		if (!viewActionCGALSurfaces->isChecked() && !viewActionCGALGrid->isChecked()) {
-			viewModeCGALSurface();
-		} else {
-			screen->updateGL();
+		if (!this->root_N->empty()) {
+			this->cgalRenderer = new CGALRenderer(*this->root_N);
+			// Go to CGAL view mode
+			if (viewActionCGALGrid->isChecked()) {
+				viewModeCGALGrid();
+			}
+			else {
+				viewModeCGALSurface();
+			}
+			
+			PRINT("Rendering finished.");
 		}
-
-		PRINT("Rendering finished.");
+		else {
+			PRINT("WARNING: No top level geometry to render");
+		}
 	}
 
 #ifdef USE_PROGRESSWIDGET
@@ -1203,7 +1319,7 @@ void MainWindow::actionDisplayAST()
 	e->setWindowTitle("AST Dump");
 	e->setReadOnly(true);
 	if (root_module) {
-		e->setPlainText(root_module->dump("", ""));
+		e->setPlainText(QString::fromStdString(root_module->dump("", "")));
 	} else {
 		e->setPlainText("No AST to dump. Please try compiling first...");
 	}
@@ -1220,8 +1336,8 @@ void MainWindow::actionDisplayCSGTree()
 	e->setTabStopWidth(30);
 	e->setWindowTitle("CSG Tree Dump");
 	e->setReadOnly(true);
-	if (root_node) {
-		e->setPlainText(root_node->dump(""));
+	if (this->root_node) {
+		e->setPlainText(QString::fromStdString(this->tree.getString(*this->root_node)));
 	} else {
 		e->setPlainText("No CSG to dump. Please try compiling first...");
 	}
@@ -1238,7 +1354,7 @@ void MainWindow::actionDisplayCSGProducts()
 	e->setTabStopWidth(30);
 	e->setWindowTitle("CSG Products Dump");
 	e->setReadOnly(true);
-	e->setPlainText(QString("\nCSG before normalization:\n%1\n\n\nCSG after normalization:\n%2\n\n\nCSG rendering chain:\n%3\n\n\nHighlights CSG rendering chain:\n%4\n\n\nBackground CSG rendering chain:\n%5\n").arg(root_raw_term ? root_raw_term->dump() : "N/A", root_norm_term ? root_norm_term->dump() : "N/A", root_chain ? root_chain->dump() : "N/A", highlights_chain ? highlights_chain->dump() : "N/A", background_chain ? background_chain->dump() : "N/A"));
+	e->setPlainText(QString("\nCSG before normalization:\n%1\n\n\nCSG after normalization:\n%2\n\n\nCSG rendering chain:\n%3\n\n\nHighlights CSG rendering chain:\n%4\n\n\nBackground CSG rendering chain:\n%5\n").arg(root_raw_term ? QString::fromStdString(root_raw_term->dump()) : "N/A", root_norm_term ? QString::fromStdString(root_norm_term->dump()) : "N/A", root_chain ? QString::fromStdString(root_chain->dump()) : "N/A", highlights_chain ? QString::fromStdString(highlights_chain->dump()) : "N/A", background_chain ? QString::fromStdString(background_chain->dump()) : "N/A"));
 	e->show();
 	e->resize(600, 400);
 	clearCurrentOutput();
@@ -1250,6 +1366,8 @@ void MainWindow::actionExportSTLorOFF(bool stl_mode)
 void MainWindow::actionExportSTLorOFF(bool)
 #endif
 {
+	if (GuiLocker::isLocked()) return;
+	GuiLocker lock;
 #ifdef ENABLE_CGAL
 	setCurrentOutput();
 
@@ -1265,14 +1383,16 @@ void MainWindow::actionExportSTLorOFF(bool)
 		return;
 	}
 
-	if (!this->root_N->p3.is_simple()) {
+	if (!this->root_N->p3->is_simple()) {
 		PRINT("Object isn't a valid 2-manifold! Modify your design..");
 		clearCurrentOutput();
 		return;
 	}
 
+	QString suffix = stl_mode ? ".stl" : ".off";
 	QString stl_filename = QFileDialog::getSaveFileName(this,
-			stl_mode ? "Export STL File" : "Export OFF File", "",
+			stl_mode ? "Export STL File" : "Export OFF File", 
+			this->fileName.isEmpty() ? "Untitled"+suffix : QFileInfo(this->fileName).baseName()+suffix,
 			stl_mode ? "STL Files (*.stl)" : "OFF Files (*.off)");
 	if (stl_filename.isEmpty()) {
 		PRINTF("No filename specified. %s export aborted.", stl_mode ? "STL" : "OFF");
@@ -1282,19 +1402,23 @@ void MainWindow::actionExportSTLorOFF(bool)
 
 	QProgressDialog *pd = new QProgressDialog(
 			stl_mode ? "Exporting object to STL file..." : "Exporting object to OFF file...",
-			QString(), 0, this->root_N->p3.number_of_facets() + 1);
+			QString(), 0, this->root_N->p3->number_of_facets() + 1);
 	pd->setValue(0);
 	pd->setAutoClose(false);
 	pd->show();
 	QApplication::processEvents();
 
-	if (stl_mode)
-		export_stl(this->root_N, stl_filename, pd);
-	else
-		export_off(this->root_N, stl_filename, pd);
+	std::ofstream fstream(stl_filename.toUtf8());
+	if (!fstream.is_open()) {
+		PRINTA("Can't open file \"%1\" for export", stl_filename);
+	}
+	else {
+		if (stl_mode) export_stl(this->root_N, fstream, pd);
+		else export_off(this->root_N, fstream, pd);
+		fstream.close();
 
-	PRINTF("%s export finished.", stl_mode ? "STL" : "OFF");
-
+		PRINTF("%s export finished.", stl_mode ? "STL" : "OFF");
+	}
 	delete pd;
 
 	clearCurrentOutput();
@@ -1328,16 +1452,25 @@ void MainWindow::actionExportDXF()
 		return;
 	}
 
-	QString stl_filename = QFileDialog::getSaveFileName(this,
-			"Export DXF File", "", "DXF Files (*.dxf)");
-	if (stl_filename.isEmpty()) {
+	QString dxf_filename = QFileDialog::getSaveFileName(this,
+			"Export DXF File", 
+			this->fileName.isEmpty() ? "Untitled.dxf" : QFileInfo(this->fileName).baseName()+".dxf",
+			"DXF Files (*.dxf)");
+	if (dxf_filename.isEmpty()) {
 		PRINTF("No filename specified. DXF export aborted.");
 		clearCurrentOutput();
 		return;
 	}
 
-	export_dxf(this->root_N, stl_filename, NULL);
-	PRINTF("DXF export finished.");
+	std::ofstream fstream(dxf_filename.toUtf8());
+	if (!fstream.is_open()) {
+		PRINTA("Can't open file \"%s\" for export", dxf_filename);
+	}
+	else {
+		export_dxf(this->root_N, fstream, NULL);
+		fstream.close();
+		PRINTF("DXF export finished.");
+	}
 
 	clearCurrentOutput();
 #endif /* ENABLE_CGAL */
@@ -1345,7 +1478,7 @@ void MainWindow::actionExportDXF()
 
 void MainWindow::actionExportImage()
 {
-	QImage img = screen->grabFrameBuffer();
+	QImage img = this->glview->grabFrameBuffer();
 	setCurrentOutput();
 
 	QString img_filename = QFileDialog::getSaveFileName(this,
@@ -1363,12 +1496,13 @@ void MainWindow::actionExportImage()
 
 void MainWindow::actionFlushCaches()
 {
-	PolySet::ps_cache.clear();
+	PolySetCache::instance()->clear();
 #ifdef ENABLE_CGAL
-	AbstractNode::cgal_nef_cache.clear();
+	CGALCache::instance()->clear();
 #endif
 	dxf_dim_cache.clear();
 	dxf_cross_cache.clear();
+	Module::libs_cache.clear();
 }
 
 void MainWindow::viewModeActionsUncheck()
@@ -1383,48 +1517,16 @@ void MainWindow::viewModeActionsUncheck()
 
 #ifdef ENABLE_OPENCSG
 
-static void renderGLThrownTogether(void *vp);
-
-static void renderGLviaOpenCSG(void *vp)
-{
-	MainWindow *m = (MainWindow*)vp;
-	if (!m->enableOpenCSG) {
-		renderGLThrownTogether(vp);
-		return;
-	}
-	static int glew_initialized = 0;
-	if (!glew_initialized) {
-		glew_initialized = 1;
-		glewInit();
-	}
-#ifdef ENABLE_MDI
-	OpenCSG::setContext(m->screen->opencsg_id);
-#endif
-	if (m->root_chain) {
-		GLint *shaderinfo = m->screen->shaderinfo;
-		if (!shaderinfo[0])
-			shaderinfo = NULL;
-		renderCSGChainviaOpenCSG(m->root_chain, m->viewActionShowEdges->isChecked() ? shaderinfo : NULL, false, false);
-		if (m->background_chain) {
-			renderCSGChainviaOpenCSG(m->background_chain, m->viewActionShowEdges->isChecked() ? shaderinfo : NULL, false, true);
-		}
-		if (m->highlights_chain) {
-			renderCSGChainviaOpenCSG(m->highlights_chain, m->viewActionShowEdges->isChecked() ? shaderinfo : NULL, true, false);
-		}
-	}
-}
-
 /*!
 	Go to the OpenCSG view mode.
 	Falls back to thrown together mode if OpenCSG is not available
 */
 void MainWindow::viewModeOpenCSG()
 {
-	if (screen->hasOpenCSGSupport()) {
+	if (this->glview->hasOpenCSGSupport()) {
 		viewModeActionsUncheck();
 		viewActionOpenCSG->setChecked(true);
-		screen->setRenderFunc(renderGLviaOpenCSG, this);
-		screen->updateGL();
+		this->glview->setRenderer(this->opencsgRenderer ? (Renderer *)this->opencsgRenderer : (Renderer *)this->thrownTogetherRenderer);
 	} else {
 		viewModeThrownTogether();
 	}
@@ -1434,241 +1536,54 @@ void MainWindow::viewModeOpenCSG()
 
 #ifdef ENABLE_CGAL
 
-static void renderGLviaCGAL(void *vp)
-{
-	MainWindow *m = (MainWindow*)vp;
-	if (m->recreate_cgal_ogl_p) {
-		m->recreate_cgal_ogl_p = false;
-		Polyhedron *p = (Polyhedron*)m->cgal_ogl_p;
-		delete p;
-		m->cgal_ogl_p = NULL;
-		if (m->cgal_ogl_ps)
-			m->cgal_ogl_ps->unlink();
-		m->cgal_ogl_ps = NULL;
-	}
-	if (!m->root_N) return;
-	if (m->root_N->dim == 2)
-	{
-		if (m->cgal_ogl_ps == NULL) {
-			DxfData dd(*m->root_N);
-			m->cgal_ogl_ps = new PolySet();
-			m->cgal_ogl_ps->is2d = true;
-			dxf_tesselate(m->cgal_ogl_ps, &dd, 0, true, false, 0);
-		}
-
-		// Draw 2D polygons
-		glDisable(GL_LIGHTING);
-		const QColor &col = Preferences::inst()->color(Preferences::CGAL_FACE_2D_COLOR);
-		glColor3f(col.redF(), col.greenF(), col.blueF());
-
-		for (int i=0; i < m->cgal_ogl_ps->polygons.size(); i++) {
-			glBegin(GL_POLYGON);
-			for (int j=0; j < m->cgal_ogl_ps->polygons[i].size(); j++) {
-				PolySet::Point p = m->cgal_ogl_ps->polygons[i][j];
-				glVertex3d(p.x, p.y, -0.1);
-			}
-			glEnd();
-		}
-
-		typedef CGAL_Nef_polyhedron2::Explorer Explorer;
-		typedef Explorer::Face_const_iterator fci_t;
-		typedef Explorer::Halfedge_around_face_const_circulator heafcc_t;
-		typedef Explorer::Point Point;
-		Explorer E = m->root_N->p2.explorer();
-		
-		// Draw 2D edges
-		glDisable(GL_DEPTH_TEST);
-		glDisable(GL_LIGHTING);
-		glLineWidth(2);
-		const QColor &col2 = Preferences::inst()->color(Preferences::CGAL_EDGE_2D_COLOR);
-		glColor3f(col2.redF(), col2.greenF(), col2.blueF());
-
-		// Extract the boundary, including inner boundaries of the polygons
-		for (fci_t fit = E.faces_begin(), facesend = E.faces_end(); fit != facesend; ++fit)
-		{
-			bool fset = false;
-			double fx = 0.0, fy = 0.0;
-			heafcc_t fcirc(E.halfedge(fit)), fend(fcirc);
-			CGAL_For_all(fcirc, fend) {
-				if(E.is_standard(E.target(fcirc))) {
-					Point p = E.point(E.target(fcirc));
-					double x = to_double(p.x()), y = to_double(p.y());
-					if (!fset) {
-						glBegin(GL_LINE_STRIP);
-						fx = x, fy = y;
-						fset = true;
-					}
-					glVertex3d(x, y, -0.1);
-				}
-			}
-			if (fset) {
-				glVertex3d(fx, fy, -0.1);
-				glEnd();
-			}
-		}
-
-		glEnable(GL_DEPTH_TEST);
-	}
-	else if (m->root_N->dim == 3)
-	{
-		Polyhedron *p = (Polyhedron*)m->cgal_ogl_p;
-		if (!p) {
-			Nef3_Converter<CGAL_Nef_polyhedron3>::setColor(Polyhedron::CGAL_NEF3_MARKED_FACET_COLOR,
-																										 Preferences::inst()->color(Preferences::CGAL_FACE_BACK_COLOR).red(),
-																										 Preferences::inst()->color(Preferences::CGAL_FACE_BACK_COLOR).green(),
-																										 Preferences::inst()->color(Preferences::CGAL_FACE_BACK_COLOR).blue());
-			Nef3_Converter<CGAL_Nef_polyhedron3>::setColor(Polyhedron::CGAL_NEF3_UNMARKED_FACET_COLOR,
-																										 Preferences::inst()->color(Preferences::CGAL_FACE_FRONT_COLOR).red(),
-																										 Preferences::inst()->color(Preferences::CGAL_FACE_FRONT_COLOR).green(),
-																										 Preferences::inst()->color(Preferences::CGAL_FACE_FRONT_COLOR).blue());
-			m->cgal_ogl_p = p = new Polyhedron();
-			Nef3_Converter<CGAL_Nef_polyhedron3>::convert_to_OGLPolyhedron(m->root_N->p3, p);
-			p->init();
-		}
-		if (m->viewActionCGALSurfaces->isChecked())
-			p->set_style(SNC_BOUNDARY);
-		if (m->viewActionCGALGrid->isChecked())
-			p->set_style(SNC_SKELETON);
-#if 0
-		p->draw();
-#else
-		if (p->style == SNC_BOUNDARY) {
-			glCallList(p->object_list_+2);
-			if (m->viewActionShowEdges->isChecked()) {
-				glDisable(GL_LIGHTING);
-				glCallList(p->object_list_+1);
-				glCallList(p->object_list_);
-			}
-		} else {
-			glDisable(GL_LIGHTING);
-			glCallList(p->object_list_+1);
-			glCallList(p->object_list_);
-		}
-#endif
-	}
-}
-
 void MainWindow::viewModeCGALSurface()
 {
 	viewModeActionsUncheck();
 	viewActionCGALSurfaces->setChecked(true);
-	screen->setRenderFunc(renderGLviaCGAL, this);
-	screen->updateGL();
+	this->glview->setShowFaces(true);
+	this->glview->setRenderer(this->cgalRenderer);
+	this->glview->updateGL();
 }
 
 void MainWindow::viewModeCGALGrid()
 {
 	viewModeActionsUncheck();
 	viewActionCGALGrid->setChecked(true);
-	screen->setRenderFunc(renderGLviaCGAL, this);
-	screen->updateGL();
+	this->glview->setShowFaces(false);
+	this->glview->setRenderer(this->cgalRenderer);
 }
 
 #endif /* ENABLE_CGAL */
-
-static void renderGLThrownTogetherChain(MainWindow *m, CSGChain *chain, bool highlight, bool background, bool fberror)
-{
-	glDepthFunc(GL_LEQUAL);
-	QHash<QPair<PolySet*,double*>,int> polySetVisitMark;
-	bool showEdges = m->viewActionShowEdges->isChecked();
-	for (int i = 0; i < chain->polysets.size(); i++) {
-		if (polySetVisitMark[QPair<PolySet*,double*>(chain->polysets[i], chain->matrices[i])]++ > 0)
-			continue;
-		double *m = chain->matrices[i];
-		glPushMatrix();
-		glMultMatrixd(m);
-		int csgmode = chain->types[i] == CSGTerm::TYPE_DIFFERENCE ? PolySet::CSGMODE_DIFFERENCE : PolySet::CSGMODE_NORMAL;
-		if (highlight) {
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_HIGHLIGHT, PolySet::csgmode_e(csgmode + 20), m);
-			if (showEdges) {
-				glDisable(GL_LIGHTING);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_HIGHLIGHT, PolySet::csgmode_e(csgmode + 20));
-				glEnable(GL_LIGHTING);
-			}
-		} else if (background) {
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_BACKGROUND, PolySet::csgmode_e(csgmode + 10), m);
-			if (showEdges) {
-				glDisable(GL_LIGHTING);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_BACKGROUND, PolySet::csgmode_e(csgmode + 10));
-				glEnable(GL_LIGHTING);
-			}
-		} else if (fberror) {
-			if (highlight) {
-				chain->polysets[i]->render_surface(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode + 20), m);
-			} else if (background) {
-				chain->polysets[i]->render_surface(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode + 10), m);
-			} else {
-				chain->polysets[i]->render_surface(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode), m);
-			}
-		} else if (m[16] >= 0 || m[17] >= 0 || m[18] >= 0 || m[19] >= 0) {
-			glColor4d(m[16], m[17], m[18], m[19]);
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode), m);
-			if (showEdges) {
-				glDisable(GL_LIGHTING);
-				glColor4d((m[16]+1)/2, (m[17]+1)/2, (m[18]+1)/2, 1.0);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode));
-				glEnable(GL_LIGHTING);
-			}
-		} else if (chain->types[i] == CSGTerm::TYPE_DIFFERENCE) {
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_CUTOUT, PolySet::csgmode_e(csgmode), m);
-			if (showEdges) {
-				glDisable(GL_LIGHTING);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_CUTOUT, PolySet::csgmode_e(csgmode));
-				glEnable(GL_LIGHTING);
-			}
-		} else {
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_MATERIAL, PolySet::csgmode_e(csgmode), m);
-			if (showEdges) {
-				glDisable(GL_LIGHTING);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_MATERIAL, PolySet::csgmode_e(csgmode));
-				glEnable(GL_LIGHTING);
-			}
-		}
-		glPopMatrix();
-	}
-}
-
-static void renderGLThrownTogether(void *vp)
-{
-	MainWindow *m = (MainWindow*)vp;
-	if (m->root_chain) {
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
-		renderGLThrownTogetherChain(m, m->root_chain, false, false, false);
-		glCullFace(GL_FRONT);
-		glColor3ub(255, 0, 255);
-		renderGLThrownTogetherChain(m, m->root_chain, false, false, true);
-		glDisable(GL_CULL_FACE);
-	}
-	if (m->background_chain)
-		renderGLThrownTogetherChain(m, m->background_chain, false, true, false);
-	if (m->highlights_chain)
-		renderGLThrownTogetherChain(m, m->highlights_chain, true, false, false);
-}
 
 void MainWindow::viewModeThrownTogether()
 {
 	viewModeActionsUncheck();
 	viewActionThrownTogether->setChecked(true);
-	screen->setRenderFunc(renderGLThrownTogether, this);
-	screen->updateGL();
+	this->glview->setRenderer(this->thrownTogetherRenderer);
 }
 
 void MainWindow::viewModeShowEdges()
 {
-	screen->updateGL();
+	QSettings settings;
+	settings.setValue("view/showEdges",viewActionShowEdges->isChecked());
+	this->glview->setShowEdges(viewActionShowEdges->isChecked());
+	this->glview->updateGL();
 }
 
 void MainWindow::viewModeShowAxes()
 {
-	screen->setShowAxes(viewActionShowAxes->isChecked());
-	screen->updateGL();
+	QSettings settings;
+	settings.setValue("view/showAxes",viewActionShowAxes->isChecked());
+	this->glview->setShowAxes(viewActionShowAxes->isChecked());
+	this->glview->updateGL();
 }
 
 void MainWindow::viewModeShowCrosshairs()
 {
-	screen->setShowCrosshairs(viewActionShowCrosshairs->isChecked());
-	screen->updateGL();
+	QSettings settings;
+	settings.setValue("view/showCrosshairs",viewActionShowCrosshairs->isChecked());
+	this->glview->setShowCrosshairs(viewActionShowCrosshairs->isChecked());
+	this->glview->updateGL();
 }
 
 void MainWindow::viewModeAnimate()
@@ -1706,90 +1621,97 @@ void MainWindow::animateUpdate()
 
 void MainWindow::viewAngleTop()
 {
-	screen->object_rot_x = 90;
-	screen->object_rot_y = 0;
-	screen->object_rot_z = 0;
-	screen->updateGL();
+	this->glview->object_rot_x = 90;
+	this->glview->object_rot_y = 0;
+	this->glview->object_rot_z = 0;
+	this->glview->updateGL();
 }
 
 void MainWindow::viewAngleBottom()
 {
-	screen->object_rot_x = 270;
-	screen->object_rot_y = 0;
-	screen->object_rot_z = 0;
-	screen->updateGL();
+	this->glview->object_rot_x = 270;
+	this->glview->object_rot_y = 0;
+	this->glview->object_rot_z = 0;
+	this->glview->updateGL();
 }
 
 void MainWindow::viewAngleLeft()
 {
-	screen->object_rot_x = 0;
-	screen->object_rot_y = 0;
-	screen->object_rot_z = 90;
-	screen->updateGL();
+	this->glview->object_rot_x = 0;
+	this->glview->object_rot_y = 0;
+	this->glview->object_rot_z = 90;
+	this->glview->updateGL();
 }
 
 void MainWindow::viewAngleRight()
 {
-	screen->object_rot_x = 0;
-	screen->object_rot_y = 0;
-	screen->object_rot_z = 270;
-	screen->updateGL();
+	this->glview->object_rot_x = 0;
+	this->glview->object_rot_y = 0;
+	this->glview->object_rot_z = 270;
+	this->glview->updateGL();
 }
 
 void MainWindow::viewAngleFront()
 {
-	screen->object_rot_x = 0;
-	screen->object_rot_y = 0;
-	screen->object_rot_z = 0;
-	screen->updateGL();
+	this->glview->object_rot_x = 0;
+	this->glview->object_rot_y = 0;
+	this->glview->object_rot_z = 0;
+	this->glview->updateGL();
 }
 
 void MainWindow::viewAngleBack()
 {
-	screen->object_rot_x = 0;
-	screen->object_rot_y = 0;
-	screen->object_rot_z = 180;
-	screen->updateGL();
+	this->glview->object_rot_x = 0;
+	this->glview->object_rot_y = 0;
+	this->glview->object_rot_z = 180;
+	this->glview->updateGL();
 }
 
 void MainWindow::viewAngleDiagonal()
 {
-	screen->object_rot_x = 35;
-	screen->object_rot_y = 0;
-	screen->object_rot_z = 25;
-	screen->updateGL();
+	this->glview->object_rot_x = 35;
+	this->glview->object_rot_y = 0;
+	this->glview->object_rot_z = -25;
+	this->glview->updateGL();
 }
 
 void MainWindow::viewCenter()
 {
-	screen->object_trans_x = 0;
-	screen->object_trans_y = 0;
-	screen->object_trans_z = 0;
-	screen->updateGL();
+	this->glview->object_trans_x = 0;
+	this->glview->object_trans_y = 0;
+	this->glview->object_trans_z = 0;
+	this->glview->updateGL();
 }
 
 void MainWindow::viewPerspective()
 {
+	QSettings settings;
+	settings.setValue("view/orthogonalProjection",false);
 	viewActionPerspective->setChecked(true);
 	viewActionOrthogonal->setChecked(false);
-	screen->setOrthoMode(false);
-	screen->updateGL();
+	this->glview->setOrthoMode(false);
+	this->glview->updateGL();
 }
 
 void MainWindow::viewOrthogonal()
 {
+	QSettings settings;
+	settings.setValue("view/orthogonalProjection",true);
 	viewActionPerspective->setChecked(false);
 	viewActionOrthogonal->setChecked(true);
-	screen->setOrthoMode(true);
-	screen->updateGL();
+	this->glview->setOrthoMode(true);
+	this->glview->updateGL();
 }
 
 void MainWindow::hideConsole()
 {
+	QSettings settings;
 	if (viewActionHide->isChecked()) {
 		console->hide();
+		settings.setValue("view/hideConsole",true);
 	} else {
 		console->show();
+		settings.setValue("view/hideConsole",false);
 	}
 }
 
@@ -1806,7 +1728,7 @@ void MainWindow::dropEvent(QDropEvent *event)
 	for (int i = 0; i < urls.size(); i++) {
 		if (urls[i].scheme() != "file")
 			continue;
-		openFile(urls[i].path());
+		openFile(urls[i].toLocalFile());
 	}
 	clearCurrentOutput();
 }
@@ -1856,6 +1778,11 @@ MainWindow::maybeSave()
 void MainWindow::closeEvent(QCloseEvent *event)
 {
 	if (maybeSave()) {
+		QSettings settings;
+		settings.setValue("window/size", size());
+		settings.setValue("window/position", pos());
+		settings_setValueList("window/splitter1sizes",splitter1->sizes());
+		settings_setValueList("window/splitter2sizes",splitter2->sizes());
 		event->accept();
 	} else {
 		event->ignore();

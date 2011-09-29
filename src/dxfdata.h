@@ -1,19 +1,16 @@
 #ifndef DXFDATA_H_
 #define DXFDATA_H_
 
-#include <QList>
-#include <QString>
+#include <vector>
+#include <Eigen/Dense>
+
+using Eigen::Vector2d;
 
 class DxfData
 {
 public:
-	struct Point {
-		double x, y;
-		Point() : x(0), y(0) { }
-		Point(double x, double y) : x(x), y(y) { }
-	};
 	struct Path {
-		QList<Point*> points;
+		std::vector<int> indices; // indices into DxfData::points
 		bool is_closed, is_inner;
 		Path() : is_closed(false), is_inner(false) { }
 	};
@@ -22,7 +19,7 @@ public:
 		double coords[7][2];
 		double angle;
 		double length;
-		QString name;
+		std::string name;
 		Dim() {
 			for (int i = 0; i < 7; i++)
 			for (int j = 0; j < 2; j++)
@@ -33,19 +30,17 @@ public:
 		}
 	};
 
-	QList<Point> points;
-	QList<Path> paths;
-	QList<Dim> dims;
+	std::vector<Vector2d, Eigen::aligned_allocator<Vector2d> > points;
+	std::vector<Path> paths;
+	std::vector<Dim> dims;
 
 	DxfData();
-	DxfData(double fn, double fs, double fa, QString filename, QString layername = QString(), double xorigin = 0.0, double yorigin = 0.0, double scale = 1.0);
-#ifdef ENABLE_CGAL
-	DxfData(const struct CGAL_Nef_polyhedron &N);
-#endif
+	DxfData(double fn, double fs, double fa, 
+					const std::string &filename, const std::string &layername = "",
+					double xorigin = 0.0, double yorigin = 0.0, double scale = 1.0);
 
-	Point *addPoint(double x, double y);
+	int addPoint(double x, double y);
 
-private:
 	void fixup_path_direction();
 };
 

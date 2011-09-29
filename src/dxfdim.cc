@@ -33,25 +33,25 @@
 #include "context.h"
 
 #include "mathc99.h"
-#include <QHash>
 #include <QDateTime>
 #include <QFileInfo>
+#include <sstream>
 
-QHash<QString,Value> dxf_dim_cache;
-QHash<QString,Value> dxf_cross_cache;
+boost::unordered_map<std::string,Value> dxf_dim_cache;
+boost::unordered_map<std::string,Value> dxf_cross_cache;
 
-Value builtin_dxf_dim(const Context *ctx, const QVector<QString> &argnames, const QVector<Value> &args)
+Value builtin_dxf_dim(const Context *ctx, const std::vector<std::string> &argnames, const std::vector<Value> &args)
 {
-	QString filename;
-	QString layername;
-	QString name;
+	std::string filename;
+	std::string layername;
+	std::string name;
 	double xorigin = 0;
 	double yorigin = 0;
 	double scale = 1;
 
-	for (int i = 0; i < argnames.count() && i < args.count(); i++) {
+	for (size_t i = 0; i < argnames.size() && i < args.size(); i++) {
 		if (argnames[i] == "file")
-			filename = ctx->get_absolute_path(args[i].text);
+			filename = ctx->getAbsolutePath(args[i].text);
 		if (argnames[i] == "layer")
 			layername = args[i].text;
 		if (argnames[i] == "origin")
@@ -62,19 +62,21 @@ Value builtin_dxf_dim(const Context *ctx, const QVector<QString> &argnames, cons
 			name = args[i].text;
 	}
 
-	QFileInfo fileInfo(filename);
+	QFileInfo fileInfo(QString::fromStdString(filename));
 
-	QString key = filename + "|" + layername + "|" + name + "|" + QString::number(xorigin) + "|" + QString::number(yorigin) +
-			"|" + QString::number(scale) + "|" + QString::number(fileInfo.lastModified().toTime_t()) + "|" + QString::number(fileInfo.size());
-
-	if (dxf_dim_cache.contains(key))
-		return dxf_dim_cache[key];
+	std::stringstream keystream;
+	keystream << filename << "|" << layername << "|" << name << "|" << xorigin
+						<< "|" << yorigin <<"|" << scale << "|" << fileInfo.lastModified().toTime_t() 
+						<< "|" << fileInfo.size();
+	std::string key = keystream.str();
+	if (dxf_dim_cache.find(key) != dxf_dim_cache.end())
+		return dxf_dim_cache.find(key)->second;
 
 	DxfData dxf(36, 0, 0, filename, layername, xorigin, yorigin, scale);
 
-	for (int i = 0; i < dxf.dims.count(); i++)
+	for (size_t i = 0; i < dxf.dims.size(); i++)
 	{
-		if (!name.isNull() && dxf.dims[i].name != name)
+		if (!name.empty() && dxf.dims[i].name != name)
 			continue;
 
 		DxfData::Dim *d = &dxf.dims[i];
@@ -114,26 +116,26 @@ Value builtin_dxf_dim(const Context *ctx, const QVector<QString> &argnames, cons
 			return dxf_dim_cache[key] = Value((d->type & 64) ? d->coords[3][0] : d->coords[3][1]);
 		}
 
-		PRINTA("WARNING: Dimension `%1' in `%2', layer `%3' has unsupported type!", name, filename, layername);
+		PRINTF("WARNING: Dimension `%s' in `%s', layer `%s' has unsupported type!", name.c_str(), filename.c_str(), layername.c_str());
 		return Value();
 	}
 
-	PRINTA("WARNING: Can't find dimension `%1' in `%2', layer `%3'!", name, filename, layername);
+	PRINTF("WARNING: Can't find dimension `%s' in `%s', layer `%s'!", name.c_str(), filename.c_str(), layername.c_str());
 
 	return Value();
 }
 
-Value builtin_dxf_cross(const Context *ctx, const QVector<QString> &argnames, const QVector<Value> &args)
+Value builtin_dxf_cross(const Context *ctx, const std::vector<std::string> &argnames, const std::vector<Value> &args)
 {
-	QString filename;
-	QString layername;
+	std::string filename;
+	std::string layername;
 	double xorigin = 0;
 	double yorigin = 0;
 	double scale = 1;
 
-	for (int i = 0; i < argnames.count() && i < args.count(); i++) {
+	for (size_t i = 0; i < argnames.size() && i < args.size(); i++) {
 		if (argnames[i] == "file")
-			filename = ctx->get_absolute_path(args[i].text);
+			filename = ctx->getAbsolutePath(args[i].text);
 		if (argnames[i] == "layer")
 			layername = args[i].text;
 		if (argnames[i] == "origin")
@@ -142,25 +144,28 @@ Value builtin_dxf_cross(const Context *ctx, const QVector<QString> &argnames, co
 			args[i].getnum(scale);
 	}
 
-	QFileInfo fileInfo(filename);
+	QFileInfo fileInfo(QString::fromStdString(filename));
 
-	QString key = filename + "|" + layername + "|" + QString::number(xorigin) + "|" + QString::number(yorigin) +
-			"|" + QString::number(scale) + "|" + QString::number(fileInfo.lastModified().toTime_t()) + "|" + QString::number(fileInfo.size());
+	std::stringstream keystream;
+	keystream << filename << "|" << layername << "|" << xorigin << "|" << yorigin
+						<< "|" << scale << "|" << fileInfo.lastModified().toTime_t()
+						<< "|" << fileInfo.size();
+	std::string key = keystream.str();
 
-	if (dxf_cross_cache.contains(key))
-		return dxf_cross_cache[key];
+	if (dxf_cross_cache.find(key) != dxf_cross_cache.end())
+		return dxf_cross_cache.find(key)->second;
 
 	DxfData dxf(36, 0, 0, filename, layername, xorigin, yorigin, scale);
 
 	double coords[4][2];
 
-	for (int i = 0, j = 0; i < dxf.paths.count(); i++) {
-		if (dxf.paths[i].points.count() != 2)
+	for (size_t i = 0, j = 0; i < dxf.paths.size(); i++) {
+		if (dxf.paths[i].indices.size() != 2)
 			continue;
-		coords[j][0] = dxf.paths[i].points[0]->x;
-		coords[j++][1] = dxf.paths[i].points[0]->y;
-		coords[j][0] = dxf.paths[i].points[1]->x;
-		coords[j++][1] = dxf.paths[i].points[1]->y;
+		coords[j][0] = dxf.points[dxf.paths[i].indices[0]][0];
+		coords[j++][1] = dxf.points[dxf.paths[i].indices[0]][1];
+		coords[j][0] = dxf.points[dxf.paths[i].indices[1]][0];
+		coords[j++][1] = dxf.points[dxf.paths[i].indices[1]][1];
 
 		if (j == 4) {
 			double x1 = coords[0][0], y1 = coords[0][1];
@@ -176,13 +181,13 @@ Value builtin_dxf_cross(const Context *ctx, const QVector<QString> &argnames, co
 			double y = y1 + ua*(y2 - y1);
 			Value ret;
 			ret.type = Value::VECTOR;
-			ret.vec.append(new Value(x));
-			ret.vec.append(new Value(y));
+			ret.append(new Value(x));
+			ret.append(new Value(y));
 			return dxf_cross_cache[key] = ret;
 		}
 	}
 
-	PRINTA("WARNING: Can't find cross in `%1', layer `%2'!", filename, layername);
+	PRINTF("WARNING: Can't find cross in `%s', layer `%s'!", filename.c_str(), layername.c_str());
 
 	return Value();
 }

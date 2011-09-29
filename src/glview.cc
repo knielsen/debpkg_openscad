@@ -26,55 +26,73 @@
 
 #include "GLView.h"
 #include "Preferences.h"
+#include "renderer.h"
 
 #include <QApplication>
 #include <QWheelEvent>
+#include <QCheckBox>
+#include <QDialogButtonBox>
 #include <QMouseEvent>
 #include <QMessageBox>
+#include <QPushButton>
+#include <QSettings>
 #include <QTimer>
+#include <QTextEdit>
+#include <QVBoxLayout>
 #include "mathc99.h"
 #include <stdio.h>
 
+#ifdef ENABLE_OPENCSG
+#  include <opencsg.h>
+#endif
+
 #define FAR_FAR_AWAY 100000.0
 
-GLView::GLView(QWidget *parent) : QGLWidget(parent)
+GLView::GLView(QWidget *parent) : QGLWidget(parent), renderer(NULL)
 {
-	viewer_distance = 500;
-	object_rot_x = 35;
-	object_rot_y = 0;
-	object_rot_z = 25;
-	object_trans_x = 0;
-	object_trans_y = 0;
-	object_trans_z = 0;
+	init();
+}
 
-	mouse_drag_active = false;
-	last_mouse_x = 0;
-	last_mouse_y = 0;
+GLView::GLView(const QGLFormat & format, QWidget *parent) : QGLWidget(format, parent)
+{
+	init();
+}
 
-	orthomode = false;
-	showaxes = false;
-	showcrosshairs = false;
+void GLView::init()
+{
+	this->viewer_distance = 500;
+	this->object_rot_x = 35;
+	this->object_rot_y = 0;
+	this->object_rot_z = -25;
+	this->object_trans_x = 0;
+	this->object_trans_y = 0;
+	this->object_trans_z = 0;
 
-	renderfunc = NULL;
-	renderfunc_vp = NULL;
+	this->mouse_drag_active = false;
+
+	this->showedges = false;
+	this->showfaces = true;
+	this->orthomode = false;
+	this->showaxes = false;
+	this->showcrosshairs = false;
 
 	for (int i = 0; i < 10; i++)
-		shaderinfo[i] = 0;
+		this->shaderinfo[i] = 0;
 
-	statusLabel = NULL;
+	this->statusLabel = NULL;
 
 	setMouseTracking(true);
 #ifdef ENABLE_OPENCSG
-	opencsg_support = true;
+	this->opencsg_support = true;
 	static int sId = 0;
-	opencsg_id = sId++;
+	this->opencsg_id = sId++;
 #endif
 }
 
-void GLView::setRenderFunc(void (*func)(void*), void *userdata)
+void GLView::setRenderer(Renderer *r)
 {
-	this->renderfunc = func;
-	this->renderfunc_vp = userdata;
+	this->renderer = r;
+	updateGL();
 }
 
 void GLView::initializeGL()
@@ -84,6 +102,22 @@ void GLView::initializeGL()
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0};
+	GLfloat light_position0[] = {-1.0, -1.0, +1.0, 0.0};
+	GLfloat light_position1[] = {+1.0, +1.0, -1.0, 0.0};
+
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+	glLightfv(GL_LIGHT0, GL_POSITION, light_position0);
+	glEnable(GL_LIGHT0);
+	glLightfv(GL_LIGHT1, GL_DIFFUSE, light_diffuse);
+	glLightfv(GL_LIGHT1, GL_POSITION, light_position1);
+	glEnable(GL_LIGHT1);
+	glEnable(GL_LIGHTING);
+	glEnable(GL_NORMALIZE);
+
+	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+	glEnable(GL_COLOR_MATERIAL);
 
 #ifdef ENABLE_OPENCSG
 	GLenum err = glewInit();
@@ -180,7 +214,10 @@ void GLView::initializeGL()
 		}
 	} else {
 		opencsg_support = false;
-		QTimer::singleShot(0, this, SLOT(display_opengl20_warning()));
+		QSettings settings;
+		if (settings.value("editor/opengl20_warning_show",true).toBool()) {
+			QTimer::singleShot(0, this, SLOT(display_opengl20_warning()));
+		}
 	}
 #endif /* ENABLE_OPENCSG */
 }
@@ -188,6 +225,9 @@ void GLView::initializeGL()
 #ifdef ENABLE_OPENCSG
 void GLView::display_opengl20_warning()
 {
+	// data
+	QString title = QString("GLEW: GL_VERSION_2_0 is not supported!");
+
 	QString rendererinfo;
 	rendererinfo.sprintf("GLEW version %s\n"
 											 "%s (%s)\n"
@@ -196,11 +236,43 @@ void GLView::display_opengl20_warning()
 											 glGetString(GL_RENDERER), glGetString(GL_VENDOR),
 											 glGetString(GL_VERSION));
 
-	QMessageBox::warning(NULL, "GLEW: GL_VERSION_2_0 is not supported!",
-			QString("Warning: No support for OpenGL 2.0 found! OpenCSG View has been disabled.\n\n"
+	QString message = QString("Warning: No support for OpenGL 2.0 found! OpenCSG View has been disabled.\n\n"
 			"It is highly recommended to use OpenSCAD on a system with OpenGL 2.0 "
 			"support. Please check if OpenGL 2.0 drivers are available for your "	
-			"graphics hardware.\n\n%1").arg(rendererinfo));
+			"graphics hardware. Your renderer information is as follows:\n\n%1").arg(rendererinfo);
+
+	QString note = QString("Uncheck to hide this message in the future");
+
+	// presentation
+	QDialog *dialog = new QDialog(this);
+	dialog->setSizeGripEnabled(true);
+	dialog->setWindowTitle(title);
+	dialog->resize(500,300);
+
+	QVBoxLayout *layout = new QVBoxLayout(dialog);
+	dialog->setLayout(layout);
+
+	QTextEdit *textEdit = new QTextEdit(dialog);
+	textEdit->setPlainText(message);
+	layout->addWidget(textEdit);
+
+	QCheckBox *checkbox = new QCheckBox(note,dialog);
+	checkbox->setCheckState(Qt::Checked);
+	layout->addWidget(checkbox);
+
+	QDialogButtonBox *buttonbox =
+		new QDialogButtonBox(	QDialogButtonBox::Ok, Qt::Horizontal,dialog);
+	layout->addWidget(buttonbox);
+	buttonbox->button(QDialogButtonBox::Ok)->setFocus();
+	buttonbox->button(QDialogButtonBox::Ok)->setDefault(true);
+
+	// action
+	connect(buttonbox, SIGNAL(accepted()), dialog, SLOT(accept()));
+	connect(checkbox, SIGNAL(clicked(bool)),
+		Preferences::inst()->OpenGL20WarningCheckbox, SLOT(setChecked(bool)));
+	connect(checkbox, SIGNAL(clicked(bool)),
+		Preferences::inst(), SLOT(OpenGL20WarningChanged(bool)));
+	dialog->exec();
 }
 #endif
 
@@ -212,43 +284,47 @@ void GLView::resizeGL(int w, int h)
 #endif
 	glViewport(0, 0, w, h);
 	w_h_ratio = sqrt((double)w / (double)h);
+
+	setupPerspective();
+}
+
+void GLView::setupPerspective()
+{
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glFrustum(-w_h_ratio, +w_h_ratio, -(1/w_h_ratio), +(1/w_h_ratio), +10.0, +FAR_FAR_AWAY);
+}
+
+void GLView::setupOrtho(double distance, bool offset)
+{
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	if(offset)
+		glTranslated(-0.8, -0.8, 0);
+	double l = distance/10;
+	glOrtho(-w_h_ratio*l, +w_h_ratio*l,
+			-(1/w_h_ratio)*l, +(1/w_h_ratio)*l,
+			-FAR_FAR_AWAY, +FAR_FAR_AWAY);
 }
 
 void GLView::paintGL()
 {
+	glEnable(GL_LIGHTING);
+
+	if (orthomode)
+		setupOrtho(viewer_distance);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
 	const QColor &bgcol = Preferences::inst()->color(Preferences::BACKGROUND_COLOR);
 	glClearColor(bgcol.redF(), bgcol.greenF(), bgcol.blueF(), 0.0);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	if (orthomode)
-		glOrtho(-w_h_ratio*viewer_distance/10, +w_h_ratio*viewer_distance/10,
-				-(1/w_h_ratio)*viewer_distance/10, +(1/w_h_ratio)*viewer_distance/10,
-				-FAR_FAR_AWAY, +FAR_FAR_AWAY);
-	else
-		glFrustum(-w_h_ratio, +w_h_ratio, -(1/w_h_ratio), +(1/w_h_ratio), +10.0, +FAR_FAR_AWAY);
 	gluLookAt(0.0, -viewer_distance, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
 
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0};
-	GLfloat light_position0[] = {-1.0, -1.0, +1.0, 0.0};
-	GLfloat light_position1[] = {+1.0, +1.0, -1.0, 0.0};
-
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-	glLightfv(GL_LIGHT0, GL_POSITION, light_position0);
-	glEnable(GL_LIGHT0);
-	glLightfv(GL_LIGHT1, GL_DIFFUSE, light_diffuse);
-	glLightfv(GL_LIGHT1, GL_POSITION, light_position1);
-	glEnable(GL_LIGHT1);
-	glEnable(GL_LIGHTING);
-	glEnable(GL_NORMALIZE);
-
-	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glEnable(GL_COLOR_MATERIAL);
+	glTranslated(object_trans_x, object_trans_y, object_trans_z);
 
 	glRotated(object_rot_x, 1.0, 0.0, 0.0);
 	glRotated(object_rot_y, 0.0, 1.0, 0.0);
@@ -271,8 +347,6 @@ void GLView::paintGL()
 		glEnd();
 	}
 
-	glTranslated(object_trans_x, object_trans_y, object_trans_z);
-
 	// Large gray axis cross inline with the model
   // FIXME: This is always gray - adjust color to keep contrast with background
 	if (showaxes)
@@ -280,12 +354,13 @@ void GLView::paintGL()
 		glLineWidth(1);
 		glColor3d(0.5, 0.5, 0.5);
 		glBegin(GL_LINES);
-		glVertex3d(-viewer_distance/10, 0, 0);
-		glVertex3d(+viewer_distance/10, 0, 0);
-		glVertex3d(0, -viewer_distance/10, 0);
-		glVertex3d(0, +viewer_distance/10, 0);
-		glVertex3d(0, 0, -viewer_distance/10);
-		glVertex3d(0, 0, +viewer_distance/10);
+		double l = viewer_distance/10;
+		glVertex3d(-l, 0, 0);
+		glVertex3d(+l, 0, 0);
+		glVertex3d(0, -l, 0);
+		glVertex3d(0, +l, 0);
+		glVertex3d(0, 0, -l);
+		glVertex3d(0, 0, +l);
 		glEnd();
 	}
 
@@ -296,20 +371,21 @@ void GLView::paintGL()
 	glLineWidth(2);
 	glColor3d(1.0, 0.0, 0.0);
 
-	if (renderfunc)
-		renderfunc(renderfunc_vp);
+	if (this->renderer) {
+#if defined(ENABLE_MDI) && defined(ENABLE_OPENCSG)
+		// FIXME: This belongs in the OpenCSG renderer, but it doesn't know about this ID yet
+		OpenCSG::setContext(this->opencsg_id);
+#endif
+		this->renderer->draw(showfaces, showedges);
+	}
 
 	// Small axis cross in the lower left corner
 	if (showaxes)
 	{
 		glDepthFunc(GL_ALWAYS);
 
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		glTranslated(-0.8, -0.8, 0);
-		glOrtho(-w_h_ratio*1000/10, +w_h_ratio*1000/10,
-				-(1/w_h_ratio)*1000/10, +(1/w_h_ratio)*1000/10,
-				-FAR_FAR_AWAY, +FAR_FAR_AWAY);
+		setupOrtho(1000,true);
+
 		gluLookAt(0.0, -1000, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
 
 		glMatrixMode(GL_MODELVIEW);
@@ -374,6 +450,10 @@ void GLView::paintGL()
 		glVertex3d(zlabel_x-3, zlabel_y+3, 0); glVertex3d(zlabel_x+3, zlabel_y+3, 0);
 		glVertex3d(zlabel_x-3, zlabel_y-3, 0); glVertex3d(zlabel_x+3, zlabel_y+3, 0);
 		glEnd();
+
+		//Restore perspective for next paint
+		if(!orthomode)
+			setupPerspective();
 	}
 
 	if (statusLabel) {
@@ -408,101 +488,48 @@ void GLView::wheelEvent(QWheelEvent *event)
 void GLView::mousePressEvent(QMouseEvent *event)
 {
 	mouse_drag_active = true;
-	last_mouse_x = event->globalX();
-	last_mouse_y = event->globalY();
+	last_mouse = event->globalPos();
 	grabMouse();
 	setFocus();
 }
 
-static void mat_id(double *trg)
-{
-	for (int i = 0; i < 16; i++)
-		trg[i] = i%5 == 0;
-}
 
-static void mat_mul(double *trg, const double *m1, const double *m2)
+void GLView::normalizeAngle(GLdouble& angle)
 {
-	double m[16];
-	for (int x = 0; x < 4; x++)
-	for (int y = 0; y < 4; y++)
-	{
-		m[x+y*4] = 0;
-		for (int i = 0; i < 4; i++)
-			m[x+y*4] += m1[i+y*4] * m2[x+i*4];
-	}
-	for (int i = 0; i < 16; i++)
-		trg[i] = m[i];
-}
-
-static void mat_rot(double *trg, double angle, double x, double y, double z)
-{
-	double s = sin(M_PI*angle/180), c = cos(M_PI*angle/180);
-	double cc = 1 - c;
-	double m[16] = {
-		x*x*cc+c,	x*y*cc-z*s,	x*z*cc+y*s,	0,
-		y*x*cc+z*s,	y*y*cc+c,	y*z*cc-x*s,	0,
-		x*z*cc-y*s,	y*z*cc+x*s,	z*z*cc+c,	0,
-		0,		0,		0,		1
-	};
-	for (int i = 0; i < 16; i++)
-		trg[i] = m[i];
+	while(angle < 0)
+		angle += 360;
+	while(angle > 360)
+		angle -= 360;
 }
 
 void GLView::mouseMoveEvent(QMouseEvent *event)
 {
-	int this_mouse_x = event->globalX();
-	int this_mouse_y = event->globalY();
+	QPoint this_mouse = event->globalPos();
+	double dx = (this_mouse.x()-last_mouse.x()) * 0.7;
+	double dy = (this_mouse.y()-last_mouse.y()) * 0.7;
 	if (mouse_drag_active) {
 		if ((event->buttons() & Qt::LeftButton) != 0) {
-			object_rot_x += (this_mouse_y-last_mouse_y) * 0.7;
+			object_rot_x += dy;
 			if ((QApplication::keyboardModifiers() & Qt::ShiftModifier) != 0)
-				object_rot_y += (this_mouse_x-last_mouse_x) * 0.7;
+				object_rot_y += dx;
 			else
-				object_rot_z += (this_mouse_x-last_mouse_x) * 0.7;
-			while (object_rot_x < 0)
-				object_rot_x += 360;
-			while (object_rot_x >= 360)
-				object_rot_x -= 360;
-			while (object_rot_y < 0)
-				object_rot_y += 360;
-			while (object_rot_y >= 360)
-				object_rot_y -= 360;
-			while (object_rot_z < 0)
-				object_rot_z += 360;
-			while (object_rot_z >= 360)
-				object_rot_z -= 360;
+				object_rot_z += dx;
+
+			normalizeAngle(object_rot_x);
+			normalizeAngle(object_rot_y);
+			normalizeAngle(object_rot_z);
 		} else {
-			double mx = +(this_mouse_x-last_mouse_x) * viewer_distance/1000;
-			double my = -(this_mouse_y-last_mouse_y) * viewer_distance/1000;
-			double rx[16], ry[16], rz[16], tm[16];
-			mat_rot(rx, -object_rot_x, 1.0, 0.0, 0.0);
-			mat_rot(ry, -object_rot_y, 0.0, 1.0, 0.0);
-			mat_rot(rz, -object_rot_z, 0.0, 0.0, 1.0);
-			mat_id(tm);
-			mat_mul(tm, rx, tm);
-			mat_mul(tm, ry, tm);
-			mat_mul(tm, rz, tm);
-			double vec[16] = {
-				0,	0,	0,	mx,
-				0,	0,	0,	0,
-				0,	0,	0,	my,
-				0,	0,	0,	1
-			};
 			if ((QApplication::keyboardModifiers() & Qt::ShiftModifier) != 0) {
-				vec[3] = 0;
-				vec[7] = my;
-				vec[11] = 0;
+				viewer_distance += (GLdouble)dy;
+			} else {
+				object_trans_x += dx;
+				object_trans_z -= dy;
 			}
-			mat_mul(tm, tm, vec);
-			object_trans_x += tm[3];
-			object_trans_y += tm[7];
-			object_trans_z += tm[11];
 		}
 		updateGL();
 		emit doAnimateUpdate();
 	}
-	last_mouse_x = this_mouse_x;
-	last_mouse_y = this_mouse_y;
+	last_mouse = this_mouse;
 }
 
 void GLView::mouseReleaseEvent(QMouseEvent*)
@@ -510,4 +537,3 @@ void GLView::mouseReleaseEvent(QMouseEvent*)
 	mouse_drag_active = false;
 	releaseMouse();
 }
-

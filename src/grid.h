@@ -1,6 +1,7 @@
 #ifndef GRID_H_
 #define GRID_H_
 
+#include <QHash>
 #include "mathc99.h"
 #ifdef WIN32
 typedef __int64 int64_t;
@@ -8,7 +9,6 @@ typedef __int64 int64_t;
 #include <stdint.h>
 #endif
 #include <stdlib.h>
-#include <QHash>
 
 const double GRID_COARSE = 0.001;
 const double GRID_FINE   = 0.000001;

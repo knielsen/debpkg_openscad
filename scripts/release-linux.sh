@@ -1,8 +1,8 @@
 #!/bin/bash
 # WARNING: This script might only work with the authors setup...
 
-#VERSION=`date "+%Y.%m.%d"`
-VERSION=2011.06
+VERSION=`date "+%Y.%m.%d"`
+#VERSION=2011.06
 
 set -ex
 
@@ -87,6 +87,6 @@ chmod 755 -R release/
 cp examples/* release/examples/
 chmod 644 -R release/examples/*
 
-cp libraries/* release/libraries/
-chmod 644 -R release/libraries/*
-
+cp -R libraries/* release/libraries/
+chmod -R u=rwx,go=r,+X release/libraries/*
+rm -rf `find release/libraries -name ".git"`

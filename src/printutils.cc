@@ -18,8 +18,7 @@ void print_messages_push()
 
 void print_messages_pop()
 {
-	QString msg = print_messages_stack.last();
-	print_messages_stack.removeLast();
+	QString msg = print_messages_stack.takeLast();
 	if (print_messages_stack.size() > 0 && !msg.isNull()) {
 		if (!print_messages_stack.last().isEmpty())
 			print_messages_stack.last() += "\n";
@@ -48,4 +47,9 @@ void PRINT_NOCACHE(const QString &msg)
 	} else {
 		outputhandler(msg, outputhandler_data);
 	}
+}
+
+std::ostream &operator<<(std::ostream &os, const QFileInfo &fi) {
+	os << std::hex << (fi.exists()?fi.lastModified().toTime_t():0) << "." << fi.size();
+	return os; 
 }

@@ -1,7 +1,7 @@
 #!/bin/sh
 
-#VERSION=`date "+%Y.%m.%d"`
-VERSION=2011.06
+VERSION=`date "+%Y.%m.%d"`
+#VERSION=2011.06
 
 # This is the same location as DEPLOYDIR in macosx-build-dependencies.sh
 export MACOSX_DEPLOY_DIR=$PWD/../libraries/install
@@ -20,3 +20,6 @@ cp OpenSCAD-$VERSION.dmg ~/Dropbox/Public
 ln -sf OpenSCAD-$VERSION.dmg ~/Dropbox/Public/OpenSCAD-latest.dmg
 
 echo "Upload in progress..."
+
+# Update snapshot filename on wab page
+`dirname $0`/update-web.sh OpenSCAD-$VERSION.dmg

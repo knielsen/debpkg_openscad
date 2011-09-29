@@ -37,20 +37,20 @@
 	without tesselating. Vertex ordering of the resulting polygons
 	will follow the paths' is_inner flag.
 */
-void dxf_border_to_ps(PolySet *ps, DxfData *dxf)
+void dxf_border_to_ps(PolySet *ps, const DxfData &dxf)
 {
-	for (int i = 0; i < dxf->paths.count(); i++) {
-		const DxfData::Path &pt = dxf->paths[i];
-		if (!pt.is_closed)
+	for (size_t i = 0; i < dxf.paths.size(); i++) {
+		const DxfData::Path &path = dxf.paths[i];
+		if (!path.is_closed)
 			continue;
-		ps->borders.append(PolySet::Polygon());
-		for (int j = 1; j < pt.points.count(); j++) {
-			double x = pt.points[j]->x, y = pt.points[j]->y, z = 0.0;
+		ps->borders.push_back(PolySet::Polygon());
+		for (size_t j = 1; j < path.indices.size(); j++) {
+			double x = dxf.points[path.indices[j]][0], y = dxf.points[path.indices[j]][1], z = 0.0;
 			ps->grid.align(x, y, z);
-			if (pt.is_inner) {
-				ps->borders.last().append(PolySet::Point(x, y, z));
+			if (path.is_inner) {
+				ps->borders.back().push_back(Vector3d(x, y, z));
 			} else {
-				ps->borders.last().insert(0, PolySet::Point(x, y, z));
+				ps->borders.back().insert(ps->borders.back().begin(), Vector3d(x, y, z));
 			}
 		}
 	}

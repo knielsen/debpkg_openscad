@@ -24,6 +24,7 @@
  *
  */
 
+#include "export.h"
 #include "printutils.h"
 #include "polyset.h"
 #include "dxfdata.h"
@@ -33,51 +34,17 @@
 #include <errno.h>
 
 #ifdef ENABLE_CGAL
+#include "CGAL_Nef_polyhedron.h"
 #include "cgal.h"
 
-void cgal_nef3_to_polyset(PolySet *ps, CGAL_Nef_polyhedron *root_N)
-{
-	CGAL_Polyhedron P;
-	root_N->p3.convert_to_Polyhedron(P);
-
-	typedef CGAL_Polyhedron::Vertex                                 Vertex;
-	typedef CGAL_Polyhedron::Vertex_const_iterator                  VCI;
-	typedef CGAL_Polyhedron::Facet_const_iterator                   FCI;
-	typedef CGAL_Polyhedron::Halfedge_around_facet_const_circulator HFCC;
-
-	for (FCI fi = P.facets_begin(); fi != P.facets_end(); ++fi) {
-		HFCC hc = fi->facet_begin();
-		HFCC hc_end = hc;
-		Vertex v1, v2, v3;
-		v1 = *VCI((hc++)->vertex());
-		v3 = *VCI((hc++)->vertex());
-		do {
-			v2 = v3;
-			v3 = *VCI((hc++)->vertex());
-			double x1 = CGAL::to_double(v1.point().x());
-			double y1 = CGAL::to_double(v1.point().y());
-			double z1 = CGAL::to_double(v1.point().z());
-			double x2 = CGAL::to_double(v2.point().x());
-			double y2 = CGAL::to_double(v2.point().y());
-			double z2 = CGAL::to_double(v2.point().z());
-			double x3 = CGAL::to_double(v3.point().x());
-			double y3 = CGAL::to_double(v3.point().y());
-			double z3 = CGAL::to_double(v3.point().z());
-			ps->append_poly();
-			ps->append_vertex(x1, y1, z1);
-			ps->append_vertex(x2, y2, z2);
-			ps->append_vertex(x3, y3, z3);
-		} while (hc != hc_end);
-	}
-}
-
 /*!
-	Saves the current 3D CGAL Nef polyhedron as STL to the given absolute filename.
+	Saves the current 3D CGAL Nef polyhedron as STL to the given file.
+	The file must be open.
  */
-void export_stl(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *pd)
+void export_stl(CGAL_Nef_polyhedron *root_N, std::ostream &output, QProgressDialog *pd)
 {
 	CGAL_Polyhedron P;
-	root_N->p3.convert_to_Polyhedron(P);
+	root_N->p3->convert_to_Polyhedron(P);
 
 	typedef CGAL_Polyhedron::Vertex                                 Vertex;
 	typedef CGAL_Polyhedron::Vertex_const_iterator                  VCI;
@@ -86,14 +53,7 @@ void export_stl(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *
 
 	setlocale(LC_NUMERIC, "C"); // Ensure radix is . (not ,) in output
 
-	FILE *f = fopen(filename.toUtf8().data(), "w");
-	if (!f) {
-		PRINTA("Can't open STL file \"%1\" for STL export: %2", 
-					 filename, QString(strerror(errno)));
-		set_output_handler(NULL, NULL);
-		return;
-	}
-	fprintf(f, "solid OpenSCAD_Model\n");
+	output << "solid OpenSCAD_Model\n";
 
 	int facet_count = 0;
 	for (FCI fi = P.facets_begin(); fi != P.facets_end(); ++fi) {
@@ -114,10 +74,15 @@ void export_stl(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *
 			double x3 = CGAL::to_double(v3.point().x());
 			double y3 = CGAL::to_double(v3.point().y());
 			double z3 = CGAL::to_double(v3.point().z());
-			QString vs1, vs2, vs3;
-			vs1.sprintf("%f %f %f", x1, y1, z1);
-			vs2.sprintf("%f %f %f", x2, y2, z2);
-			vs3.sprintf("%f %f %f", x3, y3, z3);
+			std::stringstream stream;
+			stream << x1 << " " << y1 << " " << z1;
+			std::string vs1 = stream.str();
+			stream.str("");
+			stream << x2 << " " << y2 << " " << z2;
+			std::string vs2 = stream.str();
+			stream.str("");
+			stream << x3 << " " << y3 << " " << z3;
+			std::string vs3 = stream.str();
 			if (vs1 != vs2 && vs1 != vs3 && vs2 != vs3) {
 				
 				double nx = (y1-y2)*(z1-z3) - (z1-z2)*(y1-y3);
@@ -127,14 +92,16 @@ void export_stl(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *
 				// Avoid generating normals for polygons with zero area
 				double eps = 0.000001;
 				if (nlength < eps) nlength = 1.0;
-				fprintf(f, "  facet normal %f %f %f\n",
-						nx / nlength, ny / nlength, nz  / nlength);
-				fprintf(f, "    outer loop\n");
-				fprintf(f, "      vertex %s\n", vs1.toAscii().data());
-				fprintf(f, "      vertex %s\n", vs2.toAscii().data());
-				fprintf(f, "      vertex %s\n", vs3.toAscii().data());
-				fprintf(f, "    endloop\n");
-				fprintf(f, "  endfacet\n");
+				output << "  facet normal " 
+							 << nx / nlength << " " 
+							 << ny / nlength << " " 
+							 << nz / nlength << "\n";
+				output << "    outer loop\n";
+				output << "      vertex " << vs1 << "\n";
+				output << "      vertex " << vs2 << "\n";
+				output << "      vertex " << vs3 << "\n";
+				output << "    endloop\n";
+				output << "  endfacet\n";
 			}
 		} while (hc != hc_end);
 		if (pd) {
@@ -143,84 +110,78 @@ void export_stl(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *
 		}
 	}
 
-	fprintf(f, "endsolid OpenSCAD_Model\n");
-	fclose(f);
+	output << "endsolid OpenSCAD_Model\n";
 	setlocale(LC_NUMERIC, "");      // Set default locale
 }
 
-void export_off(CGAL_Nef_polyhedron*, QString, QProgressDialog*)
+void export_off(CGAL_Nef_polyhedron *root_N, std::ostream &output, QProgressDialog*)
 {
-	PRINTF("WARNING: OFF import is not implemented yet.");
+	CGAL_Polyhedron P;
+	root_N->p3->convert_to_Polyhedron(P);
+	output << P;
 }
 
 /*!
 	Saves the current 2D CGAL Nef polyhedron as DXF to the given absolute filename.
  */
-void export_dxf(CGAL_Nef_polyhedron *root_N, QString filename, QProgressDialog *)
+void export_dxf(CGAL_Nef_polyhedron *root_N, std::ostream &output, QProgressDialog *)
 {
-	FILE *f = fopen(filename.toUtf8().data(), "w");
-	if (!f) {
-		PRINTA("Can't open DXF file \"%1\" for DXF export: %2", 
-					 filename, QString(strerror(errno)));
-		set_output_handler(NULL, NULL);
-		return;
-	}
-
 	setlocale(LC_NUMERIC, "C"); // Ensure radix is . (not ,) in output
 	// Some importers (e.g. Inkscape) needs a BLOCKS section to be present
-	fprintf(f, "  0\n"
-					"SECTION\n"
-					"  2\n"
-					"BLOCKS\n"
-					"  0\n"
-					"ENDSEC\n");
+	output << "  0\n"
+				 <<	"SECTION\n"
+				 <<	"  2\n"
+				 <<	"BLOCKS\n"
+				 <<	"  0\n"
+				 << "ENDSEC\n"
+				 << "  0\n"
+				 << "SECTION\n"
+				 << "  2\n"
+				 << "ENTITIES\n";
 
-	fprintf(f, "  0\n"
-					"SECTION\n"
-					"  2\n"
-					"ENTITIES\n");
-
-	DxfData dd(*root_N);
-	for (int i=0; i<dd.paths.size(); i++)
+	DxfData *dd =root_N->convertToDxfData();
+	for (size_t i=0; i<dd->paths.size(); i++)
 	{
-		for (int j=1; j<dd.paths[i].points.size(); j++) {
-			DxfData::Point *p1 = dd.paths[i].points[j-1];
-			DxfData::Point *p2 = dd.paths[i].points[j];
-			double x1 = p1->x;
-			double y1 = p1->y;
-			double x2 = p2->x;
-			double y2 = p2->y;
-			fprintf(f, "  0\n");
-			fprintf(f, "LINE\n");
+		for (size_t j=1; j<dd->paths[i].indices.size(); j++) {
+			const Vector2d &p1 = dd->points[dd->paths[i].indices[j-1]];
+			const Vector2d &p2 = dd->points[dd->paths[i].indices[j]];
+			double x1 = p1[0];
+			double y1 = p1[1];
+			double x2 = p2[0];
+			double y2 = p2[1];
+			output << "  0\n"
+						 << "LINE\n";
 			// Some importers (e.g. Inkscape) needs a layer to be specified
-			fprintf(f, "  8\n");
-			fprintf(f, "0\n");
-			fprintf(f, " 10\n");
-			fprintf(f, "%f\n", x1);
-			fprintf(f, " 11\n");
-			fprintf(f, "%f\n", x2);
-			fprintf(f, " 20\n");
-			fprintf(f, "%f\n", y1);
-			fprintf(f, " 21\n");
-			fprintf(f, "%f\n", y2);
+			output << "  8\n"
+						 << "0\n"
+						 << " 10\n"
+						 << x1 << "\n"
+						 << " 11\n"
+						 << x2 << "\n"
+						 << " 20\n"
+						 << y1 << "\n"
+						 << " 21\n"
+						 << y2 << "\n";
 		}
 	}
+	
+	output << "  0\n"
+				 << "ENDSEC\n";
 
-	fprintf(f, "  0\n");
-	fprintf(f, "ENDSEC\n");
 	// Some importers (e.g. Inkscape) needs an OBJECTS section with a DICTIONARY entry
-	fprintf(f, "  0\n"
-					"SECTION\n"
-					"  2\n"
-					"OBJECTS\n"
-					"  0\n"
-					"DICTIONARY\n"
-					"  0\n"
-					"ENDSEC\n");
-	fprintf(f, "  0\n");
-	fprintf(f, "EOF\n");
+	output << "  0\n"
+				 << "SECTION\n"
+				 << "  2\n"
+				 << "OBJECTS\n"
+				 << "  0\n"
+				 << "DICTIONARY\n"
+				 << "  0\n"
+				 << "ENDSEC\n";
 
-	fclose(f);
+	output << "  0\n"
+				 <<"EOF\n";
+
+	delete dd;
 	setlocale(LC_NUMERIC, "");      // Set default locale
 }
 

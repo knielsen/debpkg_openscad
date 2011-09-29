@@ -24,8 +24,8 @@
  *
  */
 
+#include "transformnode.h"
 #include "module.h"
-#include "node.h"
 #include "context.h"
 #include "dxfdata.h"
 #include "csgterm.h"
@@ -33,14 +33,19 @@
 #include "dxftess.h"
 #include "builtin.h"
 #include "printutils.h"
+#include "visitor.h"
+#include <sstream>
+#include <vector>
+#include <assert.h>
+#include <boost/assign/std/vector.hpp>
+using namespace boost::assign; // bring 'operator+=()' into scope
 
 enum transform_type_e {
 	SCALE,
 	ROTATE,
 	MIRROR,
 	TRANSLATE,
-	MULTMATRIX,
-	COLOR
+	MULTMATRIX
 };
 
 class TransformModule : public AbstractModule
@@ -51,68 +56,55 @@ public:
 	virtual AbstractNode *evaluate(const Context *ctx, const ModuleInstantiation *inst) const;
 };
 
-class TransformNode : public AbstractNode
-{
-public:
-	double m[20];
-	TransformNode(const ModuleInstantiation *mi) : AbstractNode(mi) { }
-#ifdef ENABLE_CGAL
-	virtual CGAL_Nef_polyhedron render_cgal_nef_polyhedron() const;
-#endif
-	virtual CSGTerm *render_csg_term(double m[20], QVector<CSGTerm*> *highlights, QVector<CSGTerm*> *background) const;
-	virtual QString dump(QString indent) const;
-};
-
 AbstractNode *TransformModule::evaluate(const Context *ctx, const ModuleInstantiation *inst) const
 {
 	TransformNode *node = new TransformNode(inst);
 
 	for (int i = 0; i < 16; i++)
-		node->m[i] = i % 5 == 0 ? 1.0 : 0.0;
-	for (int i = 16; i < 20; i++)
-		node->m[i] = -1;
+		node->matrix[i] = i % 5 == 0 ? 1.0 : 0.0;
 
-	QVector<QString> argnames;
-	QVector<Expression*> argexpr;
+	std::vector<std::string> argnames;
+	std::vector<Expression*> argexpr;
 
-	if (type == SCALE) {
-		argnames = QVector<QString>() << "v";
-	}
-	if (type == ROTATE) {
-		argnames = QVector<QString>() << "a" << "v";
-	}
-	if (type == MIRROR) {
-		argnames = QVector<QString>() << "v";
-	}
-	if (type == TRANSLATE) {
-		argnames = QVector<QString>() << "v";
-	}
-	if (type == MULTMATRIX) {
-		argnames = QVector<QString>() << "m";
-	}
-	if (type == COLOR) {
-		argnames = QVector<QString>() << "c";
+	switch (this->type) {
+	case SCALE:
+		argnames += "v";
+		break;
+	case ROTATE:
+		argnames += "a", "v";
+		break;
+	case MIRROR:
+		argnames += "v";
+		break;
+	case TRANSLATE:
+		argnames += "v";
+		break;
+	case MULTMATRIX:
+		argnames += "m";
+		break;
+	default:
+		assert(false);
 	}
 
 	Context c(ctx);
 	c.args(argnames, argexpr, inst->argnames, inst->argvalues);
 
-	if (type == SCALE)
+	if (this->type == SCALE)
 	{
 		Value v = c.lookup_variable("v");
-		v.getnum(node->m[0]);
-		v.getnum(node->m[5]);
-		v.getnum(node->m[10]);
-		v.getv3(node->m[0], node->m[5], node->m[10]);
-		if (node->m[10] <= 0)
-			node->m[10] = 1;
+		v.getnum(node->matrix[0]);
+		v.getnum(node->matrix[5]);
+		v.getnum(node->matrix[10]);
+		v.getv3(node->matrix[0], node->matrix[5], node->matrix[10]);
+		if (node->matrix[10] <= 0)
+			node->matrix[10] = 1;
 	}
-	if (type == ROTATE)
+	else if (this->type == ROTATE)
 	{
 		Value val_a = c.lookup_variable("a");
 		if (val_a.type == Value::VECTOR)
 		{
-			for (int i = 0; i < 3 && i < val_a.vec.size(); i++) {
+			for (size_t i = 0; i < 3 && i < val_a.vec.size(); i++) {
 				double a;
 				val_a.vec[i]->getnum(a);
 				double c = cos(a*M_PI/180.0);
@@ -139,10 +131,10 @@ AbstractNode *TransformModule::evaluate(const Context *ctx, const ModuleInstanti
 				{
 					m[x+y*4] = 0;
 					for (int i = 0; i < 4; i++)
-						m[x+y*4] += node->m[i+y*4] * mr[x+i*4];
+						m[x+y*4] += node->matrix[i+y*4] * mr[x+i*4];
 				}
 				for (int i = 0; i < 16; i++)
-					node->m[i] = m[i];
+					node->matrix[i] = m[i];
 			}
 		}
 		else
@@ -164,21 +156,21 @@ AbstractNode *TransformModule::evaluate(const Context *ctx, const ModuleInstanti
 				double c = cos(a*M_PI/180.0);
 				double s = sin(a*M_PI/180.0);
 
-				node->m[ 0] = x*x*(1-c)+c;
-				node->m[ 1] = y*x*(1-c)+z*s;
-				node->m[ 2] = z*x*(1-c)-y*s;
+				node->matrix[ 0] = x*x*(1-c)+c;
+				node->matrix[ 1] = y*x*(1-c)+z*s;
+				node->matrix[ 2] = z*x*(1-c)-y*s;
 
-				node->m[ 4] = x*y*(1-c)-z*s;
-				node->m[ 5] = y*y*(1-c)+c;
-				node->m[ 6] = z*y*(1-c)+x*s;
+				node->matrix[ 4] = x*y*(1-c)-z*s;
+				node->matrix[ 5] = y*y*(1-c)+c;
+				node->matrix[ 6] = z*y*(1-c)+x*s;
 
-				node->m[ 8] = x*z*(1-c)+y*s;
-				node->m[ 9] = y*z*(1-c)-x*s;
-				node->m[10] = z*z*(1-c)+c;
+				node->matrix[ 8] = x*z*(1-c)+y*s;
+				node->matrix[ 9] = y*z*(1-c)-x*s;
+				node->matrix[10] = z*z*(1-c)+c;
 			}
 		}
 	}
-	if (type == MIRROR)
+	else if (this->type == MIRROR)
 	{
 		Value val_v = c.lookup_variable("v");
 		double x = 1, y = 0, z = 0;
@@ -192,181 +184,65 @@ AbstractNode *TransformModule::evaluate(const Context *ctx, const ModuleInstanti
 
 		if (x != 0.0 || y != 0.0 || z != 0.0)
 		{
-			node->m[ 0] = 1-2*x*x;
-			node->m[ 1] = -2*y*x;
-			node->m[ 2] = -2*z*x;
+			node->matrix[ 0] = 1-2*x*x;
+			node->matrix[ 1] = -2*y*x;
+			node->matrix[ 2] = -2*z*x;
 
-			node->m[ 4] = -2*x*y;
-			node->m[ 5] = 1-2*y*y;
-			node->m[ 6] = -2*z*y;
+			node->matrix[ 4] = -2*x*y;
+			node->matrix[ 5] = 1-2*y*y;
+			node->matrix[ 6] = -2*z*y;
 
-			node->m[ 8] = -2*x*z;
-			node->m[ 9] = -2*y*z;
-			node->m[10] = 1-2*z*z;
+			node->matrix[ 8] = -2*x*z;
+			node->matrix[ 9] = -2*y*z;
+			node->matrix[10] = 1-2*z*z;
 		}
 	}
-	if (type == TRANSLATE)
+	else if (this->type == TRANSLATE)
 	{
 		Value v = c.lookup_variable("v");
-		v.getv3(node->m[12], node->m[13], node->m[14]);
+		v.getv3(node->matrix[12], node->matrix[13], node->matrix[14]);
 	}
-	if (type == MULTMATRIX)
+	else if (this->type == MULTMATRIX)
 	{
 		Value v = c.lookup_variable("m");
 		if (v.type == Value::VECTOR) {
 			for (int i = 0; i < 16; i++) {
-				int x = i / 4, y = i % 4;
+				size_t x = i / 4, y = i % 4;
 				if (y < v.vec.size() && v.vec[y]->type == Value::VECTOR && x < v.vec[y]->vec.size())
-					v.vec[y]->vec[x]->getnum(node->m[i]);
+					v.vec[y]->vec[x]->getnum(node->matrix[i]);
 			}
 		}
 	}
-	if (type == COLOR)
-	{
-		Value v = c.lookup_variable("c");
-		if (v.type == Value::VECTOR) {
-			for (int i = 0; i < 4; i++)
-				node->m[16+i] = i < v.vec.size() ? v.vec[i]->num : 1.0;
-		}
-	}
 
-	foreach (ModuleInstantiation *v, inst->children) {
-		AbstractNode *n = v->evaluate(inst->ctx);
-		if (n != NULL)
-			node->children.append(n);
-	}
+	std::vector<AbstractNode *> evaluatednodes = inst->evaluateChildren();
+	node->children.insert(node->children.end(), evaluatednodes.begin(), evaluatednodes.end());
 
 	return node;
 }
 
-#ifdef ENABLE_CGAL
-
-CGAL_Nef_polyhedron TransformNode::render_cgal_nef_polyhedron() const
+std::string TransformNode::toString() const
 {
-	QString cache_id = mk_cache_id();
-	if (cgal_nef_cache.contains(cache_id)) {
-		progress_report();
-		PRINT(cgal_nef_cache[cache_id]->msg);
-		return cgal_nef_cache[cache_id]->N;
-	}
+	std::stringstream stream;
 
-	print_messages_push();
-
-	bool first = true;
-	CGAL_Nef_polyhedron N;
-
-	foreach (AbstractNode *v, children) {
-		if (v->modinst->tag_background)
-			continue;
-		if (first) {
-			N = v->render_cgal_nef_polyhedron();
-			if (N.dim != 0)
-				first = false;
-		} else if (N.dim == 2) {
-			N.p2 += v->render_cgal_nef_polyhedron().p2;
-		} else if (N.dim == 3) {
-			N.p3 += v->render_cgal_nef_polyhedron().p3;
+	stream << "multmatrix([";
+	for (int j=0;j<4;j++) {
+		stream << "[";
+		for (int i=0;i<4;i++) {
+			// FIXME: The 0 test is to avoid a leading minus before a single 0 (cosmetics)
+			stream << ((this->matrix[i*4+j]==0)?0:this->matrix[i*4+j]);
+			if (i != 3) stream << ", ";
 		}
-		v->progress_report();
+		stream << "]";
+		if (j != 3) stream << ", ";
 	}
+	stream << "])";
 
-	if (N.dim == 2)
-	{
-		// Unfortunately CGAL provides no transform method for CGAL_Nef_polyhedron2
-		// objects. So we convert in to our internal 2d data format, transform it,
-		// tesselate it and create a new CGAL_Nef_polyhedron2 from it.. What a hack!
-		
-		CGAL_Aff_transformation2 t(
-				m[0], m[4], m[12],
-				m[1], m[5], m[13], m[15]);
-
-		DxfData dd(N);
-		for (int i=0; i < dd.points.size(); i++) {
-			CGAL_Kernel2::Point_2 p = CGAL_Kernel2::Point_2(dd.points[i].x, dd.points[i].y);
-			p = t.transform(p);
-			dd.points[i].x = to_double(p.x());
-			dd.points[i].y = to_double(p.y());
-		}
-
-		PolySet ps;
-		ps.is2d = true;
-		dxf_tesselate(&ps, &dd, 0, true, false, 0);
-
-		N = ps.render_cgal_nef_polyhedron();
-		ps.refcount = 0;
-	}
-	if (N.dim == 3) {
-		CGAL_Aff_transformation t(
-				m[0], m[4], m[ 8], m[12],
-				m[1], m[5], m[ 9], m[13],
-				m[2], m[6], m[10], m[14], m[15]);
-		N.p3.transform(t);
-	}
-
-	cgal_nef_cache.insert(cache_id, new cgal_nef_cache_entry(N), N.weight());
-	print_messages_pop();
-	progress_report();
-
-	return N;
+	return stream.str();
 }
 
-#endif /* ENABLE_CGAL */
-
-CSGTerm *TransformNode::render_csg_term(double c[20], QVector<CSGTerm*> *highlights, QVector<CSGTerm*> *background) const
+std::string TransformNode::name() const
 {
-	double x[20];
-
-	for (int i = 0; i < 16; i++)
-	{
-		int c_row = i%4;
-		int m_col = i/4;
-		x[i] = 0;
-		for (int j = 0; j < 4; j++)
-			x[i] += c[c_row + j*4] * m[m_col*4 + j];
-	}
-
-	for (int i = 16; i < 20; i++)
-		x[i] = m[i] < 0 ? c[i] : m[i];
-
-	CSGTerm *t1 = NULL;
-	foreach(AbstractNode *v, children)
-	{
-		CSGTerm *t2 = v->render_csg_term(x, highlights, background);
-		if (t2 && !t1) {
-			t1 = t2;
-		} else if (t2 && t1) {
-			t1 = new CSGTerm(CSGTerm::TYPE_UNION, t1, t2);
-		}
-	}
-	if (t1 && modinst->tag_highlight && highlights)
-		highlights->append(t1->link());
-	if (t1 && modinst->tag_background && background) {
-		background->append(t1);
-		return NULL;
-	}
-	return t1;
-}
-
-QString TransformNode::dump(QString indent) const
-{
-	if (dump_cache.isEmpty()) {
-		QString text;
-		if (m[16] >= 0 || m[17] >= 0 || m[18] >= 0 || m[19] >= 0)
-			text.sprintf("n%d: color([%g, %g, %g, %g])", idx,
-					m[16], m[17], m[18], m[19]);
-		else
-			text.sprintf("n%d: multmatrix([[%g, %g, %g, %g], [%g, %g, %g, %g], "
-					"[%g, %g, %g, %g], [%g, %g, %g, %g]])", idx,
-					m[0], m[4], m[ 8], m[12],
-					m[1], m[5], m[ 9], m[13],
-					m[2], m[6], m[10], m[14],
-					m[3], m[7], m[11], m[15]);
-		text = indent + text + " {\n";
-		foreach (AbstractNode *v, children)
-			text += v->dump(indent + QString("\t"));
-		((AbstractNode*)this)->dump_cache = text + indent + "}\n";
-	}
-	return dump_cache;
+	return "transform";
 }
 
 void register_builtin_transform()
@@ -376,6 +252,4 @@ void register_builtin_transform()
 	builtin_modules["mirror"] = new TransformModule(MIRROR);
 	builtin_modules["translate"] = new TransformModule(TRANSLATE);
 	builtin_modules["multmatrix"] = new TransformModule(MULTMATRIX);
-	builtin_modules["color"] = new TransformModule(COLOR);
 }
-

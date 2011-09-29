@@ -24,20 +24,22 @@
  *
  */
 
+#include "dxfrotextrudenode.h"
 #include "module.h"
-#include "node.h"
 #include "context.h"
 #include "printutils.h"
 #include "builtin.h"
 #include "polyset.h"
 #include "dxfdata.h"
 #include "progress.h"
+#include "visitor.h"
+#include "PolySetEvaluator.h"
 #include "openscad.h" // get_fragments_from_r()
 
-#include <QTime>
-#include <QApplication>
-#include <QProgressDialog>
-#include <QDateTime>
+#include <sstream>
+#include <boost/assign/std/vector.hpp>
+using namespace boost::assign; // bring 'operator+=()' into scope
+
 #include <QFileInfo>
 
 class DxfRotateExtrudeModule : public AbstractModule
@@ -47,28 +49,13 @@ public:
 	virtual AbstractNode *evaluate(const Context *ctx, const ModuleInstantiation *inst) const;
 };
 
-class DxfRotateExtrudeNode : public AbstractPolyNode
-{
-public:
-	int convexity;
-	double fn, fs, fa;
-	double origin_x, origin_y, scale;
-	QString filename, layername;
-	DxfRotateExtrudeNode(const ModuleInstantiation *mi) : AbstractPolyNode(mi) {
-		convexity = 0;
-		fn = fs = fa = 0;
-		origin_x = origin_y = scale = 0;
-	}
-	virtual PolySet *render_polyset(render_mode_e mode) const;
-	virtual QString dump(QString indent) const;
-};
-
 AbstractNode *DxfRotateExtrudeModule::evaluate(const Context *ctx, const ModuleInstantiation *inst) const
 {
 	DxfRotateExtrudeNode *node = new DxfRotateExtrudeNode(inst);
 
-	QVector<QString> argnames = QVector<QString>() << "file" << "layer" << "origin" << "scale";
-	QVector<Expression*> argexpr;
+	std::vector<std::string> argnames;
+	argnames += "file", "layer", "origin", "scale";
+	std::vector<Expression*> argexpr;
 
 	Context c(ctx);
 	c.args(argnames, argexpr, inst->argnames, inst->argvalues);
@@ -83,10 +70,10 @@ AbstractNode *DxfRotateExtrudeModule::evaluate(const Context *ctx, const ModuleI
 	Value origin = c.lookup_variable("origin", true);
 	Value scale = c.lookup_variable("scale", true);
 
-	if(!file.text.isNull())
-		node->filename = c.get_absolute_path(file.text);
-	else
-		node->filename = file.text;
+	if (!file.text.empty()) {
+		PRINTF("DEPRECATED: Support for reading files in rotate_extrude will be removed in future releases. Use a child import() instead.");
+		node->filename = c.getAbsolutePath(file.text);
+	}
 
 	node->layername = layer.text;
 	node->convexity = (int)convexity.num;
@@ -99,12 +86,9 @@ AbstractNode *DxfRotateExtrudeModule::evaluate(const Context *ctx, const ModuleI
 	if (node->scale <= 0)
 		node->scale = 1;
 
-	if (node->filename.isEmpty()) {
-		foreach (ModuleInstantiation *v, inst->children) {
-			AbstractNode *n = v->evaluate(inst->ctx);
-			if (n)
-				node->children.append(n);
-		}
+	if (node->filename.empty()) {
+		std::vector<AbstractNode *> evaluatednodes = inst->evaluateChildren();
+		node->children.insert(node->children.end(), evaluatednodes.begin(), evaluatednodes.end());
 	}
 
 	return node;
@@ -116,131 +100,38 @@ void register_builtin_dxf_rotate_extrude()
 	builtin_modules["rotate_extrude"] = new DxfRotateExtrudeModule();
 }
 
-PolySet *DxfRotateExtrudeNode::render_polyset(render_mode_e) const
+PolySet *DxfRotateExtrudeNode::evaluate_polyset(PolySetEvaluator *evaluator) const
 {
-	QString key = mk_cache_id();
-	if (PolySet::ps_cache.contains(key)) {
-		PRINT(PolySet::ps_cache[key]->msg);
-		return PolySet::ps_cache[key]->ps->link();
+	if (!evaluator) {
+		PRINTF("WARNING: No suitable PolySetEvaluator found for %s module!", this->name().c_str());
+		return NULL;
 	}
 
 	print_messages_push();
-	DxfData *dxf;
 
-	if (filename.isEmpty())
-	{
-#ifdef ENABLE_CGAL
-		CGAL_Nef_polyhedron N;
-		N.dim = 2;
-		foreach(AbstractNode * v, children) {
-			if (v->modinst->tag_background)
-				continue;
-			N.p2 += v->render_cgal_nef_polyhedron().p2;
-		}
-		dxf = new DxfData(N);
-
-#else // ENABLE_CGAL
-		PRINT("WARNING: Found rotate_extrude() statement without dxf file but compiled without CGAL support!");
-		dxf = new DxfData();
-#endif // ENABLE_CGAL
-	} else {
-		dxf = new DxfData(fn, fs, fa, filename, layername, origin_x, origin_y, scale);
-	}
-
-	PolySet *ps = new PolySet();
-	ps->convexity = convexity;
-
-	for (int i = 0; i < dxf->paths.count(); i++)
-	{
-		double max_x = 0;
-		for (int j = 0; j < dxf->paths[i].points.count(); j++) {
-			max_x = fmax(max_x, dxf->paths[i].points[j]->x);
-		}
-
-		int fragments = get_fragments_from_r(max_x, fn, fs, fa);
-
-        double ***points;
-        points = new double**[fragments];
-        for (int j=0; j < fragments; j++) {
-            points[j] = new double*[dxf->paths[i].points.count()];
-            for (int k=0; k < dxf->paths[i].points.count(); k++)
-                points[j][k] = new double[3];
-        }
-
-		for (int j = 0; j < fragments; j++) {
-			double a = (j*2*M_PI) / fragments;
-			for (int k = 0; k < dxf->paths[i].points.count(); k++) {
-				if (dxf->paths[i].points[k]->x == 0) {
-					points[j][k][0] = 0;
-					points[j][k][1] = 0;
-				} else {
-					points[j][k][0] = dxf->paths[i].points[k]->x * sin(a);
-					points[j][k][1] = dxf->paths[i].points[k]->x * cos(a);
-				}
-				points[j][k][2] = dxf->paths[i].points[k]->y;
-			}
-		}
-
-		for (int j = 0; j < fragments; j++) {
-			int j1 = j + 1 < fragments ? j + 1 : 0;
-			for (int k = 0; k < dxf->paths[i].points.count(); k++) {
-				int k1 = k + 1 < dxf->paths[i].points.count() ? k + 1 : 0;
-				if (points[j][k][0] != points[j1][k][0] ||
-						points[j][k][1] != points[j1][k][1] ||
-						points[j][k][2] != points[j1][k][2]) {
-					ps->append_poly();
-					ps->append_vertex(points[j ][k ][0],
-							points[j ][k ][1], points[j ][k ][2]);
-					ps->append_vertex(points[j1][k ][0],
-							points[j1][k ][1], points[j1][k ][2]);
-					ps->append_vertex(points[j ][k1][0],
-							points[j ][k1][1], points[j ][k1][2]);
-				}
-				if (points[j][k1][0] != points[j1][k1][0] ||
-						points[j][k1][1] != points[j1][k1][1] ||
-						points[j][k1][2] != points[j1][k1][2]) {
-					ps->append_poly();
-					ps->append_vertex(points[j ][k1][0],
-							points[j ][k1][1], points[j ][k1][2]);
-					ps->append_vertex(points[j1][k ][0],
-							points[j1][k ][1], points[j1][k ][2]);
-					ps->append_vertex(points[j1][k1][0],
-							points[j1][k1][1], points[j1][k1][2]);
-				}
-			}
-		}
-
-        for (int j=0; j < fragments; j++) {
-            for (int k=0; k < dxf->paths[i].points.count(); k++)
-                delete[] points[j][k];
-            delete[] points[j];
-        }
-        delete[] points;
-	}
-
-	PolySet::ps_cache.insert(key, new PolySet::ps_cache_entry(ps->link()));
+	PolySet *ps = evaluator->evaluatePolySet(*this);
+	
 	print_messages_pop();
-	delete dxf;
 
 	return ps;
 }
 
-QString DxfRotateExtrudeNode::dump(QString indent) const
+std::string DxfRotateExtrudeNode::toString() const
 {
-	if (dump_cache.isEmpty()) {
-		QString text;
-		QFileInfo fileInfo(filename);
-		text.sprintf("rotate_extrude(file = \"%s\", cache = \"%x.%x\", layer = \"%s\", "
-				"origin = [ %g %g ], scale = %g, convexity = %d, "
-				"$fn = %g, $fa = %g, $fs = %g) {\n",
-				filename.toAscii().data(), (int)fileInfo.lastModified().toTime_t(),
-				(int)fileInfo.size(),layername.toAscii().data(), origin_x, origin_y, 
-				scale, convexity, fn, fa, fs);
-		foreach (AbstractNode *v, children)
-			text += v->dump(indent + QString("\t"));
-		text += indent + "}\n";
-		((AbstractNode*)this)->dump_cache = indent + QString("n%1: ").arg(idx) + text;
-	}
-	return dump_cache;
-}
+	std::stringstream stream;
 
+	stream << this->name() << "(";
+	if (!this->filename.empty()) { // Ignore deprecated parameters if empty 
+		stream <<
+			"file = \"" << this->filename << "\", "
+			"cache = \"" << QFileInfo(QString::fromStdString(this->filename)) << "\", "
+			"layer = \"" << this->layername << "\", "
+			"origin = [ " << std::dec << this->origin_x << " " << this->origin_y << " ], "
+			"scale = " << this->scale << ", ";
+	}
+	stream <<
+		"convexity = " << this->convexity << ", "
+		"$fn = " << this->fn << ", $fa = " << this->fa << ", $fs = " << this->fs << ")";
+
+	return stream.str();
+}

@@ -7,7 +7,9 @@
 #include "context.h"
 #include "module.h"
 #include "polyset.h"
+#include "Tree.h"
 #include <QPointer>
+#include <vector>
 
 class MainWindow : public QMainWindow, public Ui::MainWindow
 {
@@ -32,23 +34,25 @@ public:
 	ModuleInstantiation root_inst;    // Top level instance
 	AbstractNode *absolute_root_node; // Result of tree evaluation
 	AbstractNode *root_node;          // Root if the root modifier (!) is used
+	Tree tree;
 
 	class CSGTerm *root_raw_term;           // Result of CSG term rendering
 	CSGTerm *root_norm_term;          // Normalized CSG products
 	class CSGChain *root_chain;
 #ifdef ENABLE_CGAL
 	class CGAL_Nef_polyhedron *root_N;
-	bool recreate_cgal_ogl_p;
-	void *cgal_ogl_p;
-	PolySet *cgal_ogl_ps;
+	class CGALRenderer *cgalRenderer;
 #endif
+#ifdef ENABLE_OPENCSG
+	class OpenCSGRenderer *opencsgRenderer;
+#endif
+	class ThrownTogetherRenderer *thrownTogetherRenderer;
 
-	QVector<CSGTerm*> highlight_terms;
+	std::vector<CSGTerm*> highlight_terms;
 	CSGChain *highlights_chain;
-	QVector<CSGTerm*> background_terms;
+	std::vector<CSGTerm*> background_terms;
 	CSGChain *background_chain;
 	QString last_compiled_doc;
-	bool enableOpenCSG;
 
 	static const int maxRecentFiles = 10;
 	QAction *actionRecentFile[maxRecentFiles];
@@ -76,15 +80,19 @@ private:
 	void compileCSG(bool procevents);
 	bool maybeSave();
 	bool checkModified();
+	QString dumpCSGTree(AbstractNode *root);
 	static void consoleOutput(const QString &msg, void *userdata) {
 		static_cast<MainWindow*>(userdata)->console->append(msg);
 	}
+	void loadViewSettings();
+	void loadDesignSettings();
 
 private slots:
 	void actionNew();
 	void actionOpen();
 	void actionOpenRecent();
 	void actionOpenExample();
+	void updateRecentFiles();
 	void clearRecentFiles();
 	void updateRecentFileActions();
 	void actionSave();
@@ -152,6 +160,21 @@ public slots:
 	void actionReloadCompile();
 	void checkAutoReload();
 	void autoReloadSet(bool);
+};
+
+class GuiLocker
+{
+public:
+	GuiLocker() {
+		gui_locked++;
+	}
+	~GuiLocker() {
+		gui_locked--;
+	}
+	static bool isLocked() { return gui_locked > 0; }
+
+private:
+	static unsigned int gui_locked;
 };
 
 #endif
