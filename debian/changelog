@@ -1,3 +1,9 @@
+openscad (2011.09~git20110929-2) UNRELEASED; urgency=low
+
+  * More precise eigen dependency
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 30 Sep 2011 22:40:26 +0200
+
 openscad (2011.09~git20110929-1) experimental; urgency=low
 
   * Imported changes from upstream git
