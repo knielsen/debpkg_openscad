@@ -11,6 +11,8 @@ Vcs-git: git://gitorious.org/openscad-debian/openscad.git/
 Package: openscad
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: openscad-mcad
+Suggests: meshlab, geomview, qcad
 Description: script file based graphical CAD environment
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
  aspects rather than artistic ones.
