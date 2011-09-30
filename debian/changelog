@@ -10,8 +10,9 @@ openscad (2011.09~git20110929-1) experimental; urgency=low
   * Copyright clarifications
   * Suggest editors / viewers for typical import and export formats
   * Recommend openscad-mcad (standard library)
+  * Added README.source concerning how to obtain the source package
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 30 Sep 2011 02:19:37 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 30 Sep 2011 03:08:01 +0200
 
 openscad (2011.06-2) unstable; urgency=low
 
