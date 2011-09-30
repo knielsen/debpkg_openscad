@@ -7,8 +7,9 @@ openscad (2011.09~git20110929-1) experimental; urgency=low
     - more flexible if statement
     - much refactoring ("visitor branch")
     - bugfixes
+  * Copyright clarifications
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 30 Sep 2011 01:38:00 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 30 Sep 2011 01:43:24 +0200
 
 openscad (2011.06-2) unstable; urgency=low
 

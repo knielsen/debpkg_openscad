@@ -5,23 +5,10 @@ Source: http://opencsg.org/
 Copyright: © 2009-2011 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
 License: GPL-2+ with CGAL exception
 
-Files: libraries/boxes.scad
-Copyright: © 2010 Marius Kintel
-License: BSD
-
-Files: libraries/shapes.scad
-Copyright: © 2009 Catarina Mota
-License: GPL-2+
-
-Files: src/CGAL_renderer.h
+Files: src/OGL_helper.h
 Copyright: © 1997-2002 Max-Planck-Institute Saarbruecken (Germany)
 License: QPL
-FIXME: as this is in the source tarball, i should make a dfsg-free package or ask upstream not to ship it (seems not to be used at all)
-
-Files: src/qtcolorbutton/*
-Copyright: © 2009 Nokia Corporation and/or its subsidiary(-ies)
-License: Qt-Commercial or LGPL-2.1+ with Nokia exception or GPL-3+
-FIXME: technically this looks like a gpl violation (no CGAL exception here); again, this is not used
+FIXME: original author has been contacted for gpl dual-licensing (this contains patches for openscad)
 
 Files: scripts/googlecode_upload.py
 Copyright: 2006-2007 Google Inc.
@@ -93,12 +80,12 @@ License: GPL-3+
  ensure the GNU General Public License version 3.0 requirements will be
  met: http://www.gnu.org/copyleft/gpl.html.
 
-License: BSD
- FIXME: no detailed description given
-
 License: QPL
  FIXME: we can't ship this in this tarball anyway w/o making it nonfree
 
 License: Apache
  Licensed under the terms of the Apache Software License 2.0:
  http://www.apache.org/licenses/LICENSE-2.0
+ .
+ A copy of the Apache 2.0 License can be found in
+ /usr/share/common-licenses/Apache-2.0.
