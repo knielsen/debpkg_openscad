@@ -16,7 +16,7 @@ override_dh_auto_install:
 	# built from a git checkout with submodules or from a tarball). mcad
 	# gets its own package.
 	rm -rf debian/openscad/usr/share/openscad/libraries/MCAD/
-	rmdir debian/openscad/usr/share/openscad/libraries
+	rmdir debian/openscad/usr/share/openscad/libraries || true
 
 override_dh_clean:
 	dh_clean
