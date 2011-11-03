@@ -13,8 +13,9 @@ openscad (2011.10~.03-git3bc03713-1) UNRELEASED; urgency=low
   * Copyright file adaptions to new files
   * Use debian/clean instead of override_dh_auto_clean
   * Run test suite after building
+  * Updated man page
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Thu, 03 Nov 2011 17:23:12 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Thu, 03 Nov 2011 17:45:48 +0100
 
 openscad (2011.09~git20110929-1) experimental; urgency=low
 

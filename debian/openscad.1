@@ -1,4 +1,4 @@
-.TH OPENSCAD 1 "2010-06-20"
+.TH OPENSCAD 1 "2011-11-03"
 .\" Please adjust this date whenever revising the manpage.
 .SH NAME
 openscad \- script file based graphical CAD environment
@@ -18,9 +18,10 @@ the OpenSCAD user manual at http://en.wikibooks.org/wiki/OpenSCAD_User_Manual.
 .SH OPTIONS
 
 .TP
-\fB\-s\fP \fIfile.stl\fP, \fB-o\fP \fIfile.off\fP, \fB-x\fP \fIfile.dxf\fP
-Export the given file as STL, OFF or DXF, respectively. If any of these options
-is given, the GUI will not be started.
+\fB-o\fP \fIoutputfile\fP
+Export the given file to \fIoutputfile\fP in STL, OFF, DXF or CSG format,
+depending on file extension of \fIoutputfile\fP (which has to be lower case).
+If this option is given, the GUI will not be started.
 .TP
 \fB\-d\fP \fIfile.deps\fP
 If the \fB-d\fP option is given, all files accessed while exporting are written
@@ -40,7 +41,7 @@ More than one \fB-D\fP options can be given.
 .B \-v, \-\-version
 Show version of program.
 .SH AUTHOR
-OpenSCAD was written by Clifford Wolf.
+OpenSCAD was written by Clifford Wolf, Marius Kintel, and others.
 .PP
 This manual page was written by chrysn <chrysn@fsfe.org>,
 for the Debian project (and may be used by others).
