@@ -20,11 +20,12 @@ override_dh_auto_install:
 
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
-	mkdir tests/build
+	mkdir -p tests/build
 	cd tests/build && cmake -DGLEW_DIR=/usr/include/GL -DGLEW_LIBRARY=/usr/lib/x86_64-linux-gnu/libGLEW.so ..
+	cd tests/build && make
 	# FIXME: ignoring the tests is not a nice thing to do, but it seems
 	# they are too much under construction atm
-	cd tests/build && make test || "Not failing just because some tests went wrong..."
+	cd tests/build && make test || echo "Not failing just because some tests went wrong..."
 else
 	@echo "Skipping test suite as requested in DEB_BUILD_OPTIONS"
 endif

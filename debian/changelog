@@ -1,4 +1,4 @@
-openscad (2011.10~.03-git3bc03713-1) UNRELEASED; urgency=low
+openscad (2011.11~.03-git3bc03713-1) UNRELEASED; urgency=low
 
   * More precise eigen dependency
   * Changed version format to better reflect how upstream calls unreleased
