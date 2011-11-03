@@ -11,8 +11,10 @@ openscad (2011.10~.03-git3bc03713-1) UNRELEASED; urgency=low
     - bugfixes
   * Dropped openscad.pro patch (now takes PREFIX=/usr)
   * Copyright file adaptions to new files
+  * Package cleanup:
+    - use debian/clean instead of override_dh_auto_clean
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Thu, 03 Nov 2011 17:02:15 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Thu, 03 Nov 2011 17:19:38 +0100
 
 openscad (2011.09~git20110929-1) experimental; urgency=low
 
