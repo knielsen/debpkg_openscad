@@ -1,8 +1,18 @@
-openscad (2011.09~git20110929-2) UNRELEASED; urgency=low
+openscad (2011.10~.03-git3bc03713-1) UNRELEASED; urgency=low
 
   * More precise eigen dependency
+  * Changed version format to better reflect how upstream calls unreleased
+    builds
+  * Imported changes from ustream git
+    - string comparison
+    - version()/version_num() functions
+    - new PI constant
+    - standard shortcuts for save and reload
+    - bugfixes
+  * Dropped openscad.pro patch (now takes PREFIX=/usr)
+  * Copyright file adaptions to new files
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 30 Sep 2011 22:40:26 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Thu, 03 Nov 2011 17:02:15 +0100
 
 openscad (2011.09~git20110929-1) experimental; urgency=low
 
