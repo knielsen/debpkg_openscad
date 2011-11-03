@@ -6,9 +6,7 @@
 #include "openscad.h"
 #include "context.h"
 #include "module.h"
-#include "polyset.h"
 #include "Tree.h"
-#include <QPointer>
 #include <vector>
 
 class MainWindow : public QMainWindow, public Ui::MainWindow
@@ -81,8 +79,8 @@ private:
 	bool maybeSave();
 	bool checkModified();
 	QString dumpCSGTree(AbstractNode *root);
-	static void consoleOutput(const QString &msg, void *userdata) {
-		static_cast<MainWindow*>(userdata)->console->append(msg);
+	static void consoleOutput(const std::string &msg, void *userdata) {
+		static_cast<MainWindow*>(userdata)->console->append(QString::fromStdString(msg));
 	}
 	void loadViewSettings();
 	void loadDesignSettings();
@@ -117,6 +115,7 @@ private slots:
 	void actionExportSTL();
 	void actionExportOFF();
 	void actionExportDXF();
+	void actionExportCSG();
 	void actionExportImage();
 	void actionFlushCaches();
 

@@ -27,17 +27,6 @@
 #ifndef OPENSCAD_H
 #define OPENSCAD_H
 
-#ifdef ENABLE_OPENCSG
-// this must be included before the GL headers
-#  include <GL/glew.h>
-#endif
-
-// for win32 and maybe others..
-#ifndef M_PI
-#  define M_PI 3.14159265358979323846
-#endif
-
-
 extern class AbstractModule *parse(const char *text, const char *path, int debug);
 extern int get_fragments_from_r(double r, double fn, double fs, double fa);
 

@@ -33,13 +33,10 @@
 #include "polyset.h"
 #include "csgterm.h"
 #include "highlighter.h"
-#include "grid.h"
-#include "dxfdata.h"
-#include "dxfdim.h"
 #include "export.h"
 #include "builtin.h"
-#include "dxftess.h"
 #include "progress.h"
+#include "dxfdim.h"
 #ifdef ENABLE_OPENCSG
 #include "CSGTermEvaluator.h"
 #include "OpenCSGRenderer.h"
@@ -102,8 +99,7 @@ unsigned int GuiLocker::gui_locked = 0;
 #define QUOTED(x__) QUOTE(x__)
 
 static char helptitle[] =
-	"OpenSCAD " QUOTED(OPENSCAD_VERSION) " (www.openscad.org)\n"
-	"Visitor refactored version\n";
+	"OpenSCAD " QUOTED(OPENSCAD_VERSION) " (www.openscad.org)\n\n";
 static char copyrighttext[] =
 	"Copyright (C) 2009-2011 Marius Kintel <marius@kintel.net> and Clifford Wolf <clifford@clifford.at>\n"
 	"\n"
@@ -222,8 +218,12 @@ MainWindow::MainWindow(const QString &filename)
 	connect(this->fileActionReload, SIGNAL(triggered()), this, SLOT(actionReload()));
 	connect(this->fileActionQuit, SIGNAL(triggered()), this, SLOT(quit()));
 #ifndef __APPLE__
-	this->fileActionSave->setShortcut(QKeySequence(Qt::Key_F2));
-	this->fileActionReload->setShortcut(QKeySequence(Qt::Key_F3));
+	QList<QKeySequence> shortcuts = this->fileActionSave->shortcuts();
+	shortcuts.push_back(QKeySequence(Qt::Key_F2));
+	this->fileActionSave->setShortcuts(shortcuts);
+	shortcuts = this->fileActionReload->shortcuts();
+	shortcuts.push_back(QKeySequence(Qt::Key_F3));
+	this->fileActionReload->setShortcuts(shortcuts);
 #endif
 	// Open Recent
 	for (int i = 0;i<maxRecentFiles; i++) {
@@ -287,6 +287,7 @@ MainWindow::MainWindow(const QString &filename)
 	connect(this->designActionExportSTL, SIGNAL(triggered()), this, SLOT(actionExportSTL()));
 	connect(this->designActionExportOFF, SIGNAL(triggered()), this, SLOT(actionExportOFF()));
 	connect(this->designActionExportDXF, SIGNAL(triggered()), this, SLOT(actionExportDXF()));
+	connect(this->designActionExportCSG, SIGNAL(triggered()), this, SLOT(actionExportCSG()));
 	connect(this->designActionExportImage, SIGNAL(triggered()), this, SLOT(actionExportImage()));
 	connect(this->designActionFlushCaches, SIGNAL(triggered()), this, SLOT(actionFlushCaches()));
 
@@ -875,7 +876,6 @@ void MainWindow::compileCSG(bool procevents)
 		this->thrownTogetherRenderer = new ThrownTogetherRenderer(this->root_chain, 
 																															this->highlights_chain, 
 																															this->background_chain);
-		
 		PRINT("CSG generation finished.");
 		int s = t.elapsed() / 1000;
 		PRINTF("Total rendering time: %d hours, %d minutes, %d seconds", s / (60*60), (s / 60) % 60, s % 60);
@@ -1074,12 +1074,14 @@ void MainWindow::pasteViewportRotation()
 
 void MainWindow::checkAutoReload()
 {
-	QString new_stinfo;
-	QFileInfo finfo(this->fileName);
-	new_stinfo = QString::number(finfo.size()) + QString::number(finfo.lastModified().toTime_t());
-	if (new_stinfo != autoReloadInfo)
-		actionReloadCompile();
-	autoReloadInfo = new_stinfo;
+	if (!this->fileName.isEmpty()) {
+		QString new_stinfo;
+		QFileInfo finfo(this->fileName);
+		new_stinfo = QString::number(finfo.size()) + QString::number(finfo.lastModified().toTime_t());
+		if (new_stinfo != autoReloadInfo)
+			actionReloadCompile();
+		autoReloadInfo = new_stinfo;
+	}
 }
 
 void MainWindow::autoReloadSet(bool on)
@@ -1474,6 +1476,38 @@ void MainWindow::actionExportDXF()
 
 	clearCurrentOutput();
 #endif /* ENABLE_CGAL */
+}
+
+void MainWindow::actionExportCSG()
+{
+	setCurrentOutput();
+
+	if (!this->root_node) {
+		PRINT("Nothing to export. Please try compiling first...");
+		clearCurrentOutput();
+		return;
+	}
+
+	QString csg_filename = QFileDialog::getSaveFileName(this, "Export CSG File", 
+																											this->fileName.isEmpty() ? "Untitled.csg" : QFileInfo(this->fileName).baseName()+".csg",
+																											"CSG Files (*.csg)");
+	if (csg_filename.isEmpty()) {
+		PRINTF("No filename specified. CSG export aborted.");
+		clearCurrentOutput();
+		return;
+	}
+
+	std::ofstream fstream(csg_filename.toUtf8());
+	if (!fstream.is_open()) {
+		PRINTA("Can't open file \"%s\" for export", csg_filename);
+	}
+	else {
+		fstream << this->tree.getString(*this->root_node) << "\n";
+		fstream.close();
+		PRINTF("CSG export finished.");
+	}
+
+	clearCurrentOutput();
 }
 
 void MainWindow::actionExportImage()

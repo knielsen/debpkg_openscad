@@ -3,7 +3,6 @@
 
 #include "myqhash.h"
 #include "visitor.h"
-#include "Tree.h"
 #include "CGAL_Nef_polyhedron.h"
 #include "PolySetCGALEvaluator.h"
 
@@ -11,16 +10,11 @@
 #include <map>
 #include <list>
 
-using std::string;
-using std::map;
-using std::list;
-using std::pair;
-
 class CGALEvaluator : public Visitor
 {
 public:
 	enum CsgOp {CGE_UNION, CGE_INTERSECTION, CGE_DIFFERENCE, CGE_MINKOWSKI};
-	CGALEvaluator(const Tree &tree) : tree(tree), psevaluator(*this) {}
+	CGALEvaluator(const class Tree &tree) : tree(tree), psevaluator(*this) {}
   virtual ~CGALEvaluator() {}
 
   virtual Response visit(State &state, const AbstractNode &node);
@@ -36,15 +30,16 @@ public:
 	const Tree &getTree() const { return this->tree; }
 
 private:
-  void addToParent(const State &state, const AbstractNode &node);
+  void addToParent(const State &state, const AbstractNode &node, const CGAL_Nef_polyhedron &N);
   bool isCached(const AbstractNode &node) const;
 	void process(CGAL_Nef_polyhedron &target, const CGAL_Nef_polyhedron &src, CGALEvaluator::CsgOp op);
 	CGAL_Nef_polyhedron applyToChildren(const AbstractNode &node, CGALEvaluator::CsgOp op);
 	CGAL_Nef_polyhedron applyHull(const CgaladvNode &node);
 
-  string currindent;
-  typedef list<pair<const AbstractNode *, string> > ChildList;
-  map<int, ChildList> visitedchildren;
+	std::string currindent;
+  typedef std::pair<const AbstractNode *, CGAL_Nef_polyhedron> ChildItem;
+  typedef std::list<ChildItem> ChildList;
+	std::map<int, ChildList> visitedchildren;
 
 	const Tree &tree;
 public:

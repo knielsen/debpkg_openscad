@@ -8,13 +8,34 @@
   }
 }
 
+# Populate VERSION, VERSION_YEAR, VERSION_MONTH, VERSION_DATE from system date
+include(version.pri)
+
+# for debugging link problems (use nmake -f Makefile.Release > log.txt)
 win32 {
-  isEmpty(VERSION) VERSION = $$system(date /t)
-} else {
-  isEmpty(VERSION) VERSION = $$system(date "+%Y.%m.%d")
+  # QMAKE_LFLAGS   += -VERBOSE
+}
+
+# cross compilation unix->win32
+
+CONFIG(mingw-cross-env) {
+  LIBS += mingw-cross-env/lib/libglew32s.a 
+  LIBS += mingw-cross-env/lib/libglut.a 
+  LIBS += mingw-cross-env/lib/libopengl32.a 
+  LIBS += mingw-cross-env/lib/libGLEW.a 
+  LIBS += mingw-cross-env/lib/libglaux.a 
+  LIBS += mingw-cross-env/lib/libglu32.a 
+  LIBS += mingw-cross-env/lib/libopencsg.a 
+  LIBS += mingw-cross-env/lib/libmpfr.a 
+  LIBS += mingw-cross-env/lib/libCGAL.a
+  QMAKE_CXXFLAGS += -fpermissive
 }
 
 #configure lex / yacc
+unix:freebsd-g++ {
+  QMAKE_LEX = /usr/local/bin/flex
+  QMAKE_YACC = /usr/local/bin/bison
+}
 win32 {
   include(flex.pri)
   include(bison.pri)
@@ -31,12 +52,28 @@ win32 {
     INCLUDEPATH += $$(MPFRDIR)
 }
 
-DEFINES += OPENSCAD_VERSION=$$VERSION
+DEFINES += OPENSCAD_VERSION=$$VERSION OPENSCAD_YEAR=$$VERSION_YEAR OPENSCAD_MONTH=$$VERSION_MONTH
+!isEmpty(VERSION_DAY): DEFINES += OPENSCAD_DAY=$$VERSION_DAY
 win32:DEFINES += _USE_MATH_DEFINES NOMINMAX _CRT_SECURE_NO_WARNINGS YY_NO_UNISTD_H
 
-#disable warning about too long decorated names
-win32:QMAKE_CXXFLAGS += -wd4503
+# disable MSVC warnings that are of very low importance
+win32:*msvc* {
+  # disable warning about too long decorated names
+  QMAKE_CXXFLAGS += -wd4503
+  # CGAL casting int to bool
+  QMAKE_CXXFLAGS += -wd4800
+  # CGAL's unreferenced formal parameters
+  QMAKE_CXXFLAGS += -wd4100
+  # lexer uses strdup() & other POSIX stuff
+  QMAKE_CXXFLAGS += -D_CRT_NONSTDC_NO_DEPRECATE
+}
 
+# disable Eigen SIMD optimizations for non-Mac OSX
+!macx {
+  !freebsd-g++ {
+    QMAKE_CXXFLAGS += -DEIGEN_DONT_ALIGN
+  }
+}
 
 TEMPLATE = app
 RESOURCES = openscad.qrc
@@ -139,8 +176,8 @@ HEADERS += src/renderer.h \
            src/module.h \
            src/node.h \
            src/csgnode.h \
-           src/dxflinextrudenode.h \
-           src/dxfrotextrudenode.h \
+           src/linearextrudenode.h \
+           src/rotateextrudenode.h \
            src/projectionnode.h \
            src/cgaladvnode.h \
            src/importnode.h \
@@ -166,6 +203,8 @@ HEADERS += src/renderer.h \
            src/Tree.h \
            src/mathc99.h \
            src/memory.h \
+           src/linalg.h \
+           src/system-gl.h \
            src/stl-utils.h
 
 SOURCES += src/openscad.cc \
@@ -197,8 +236,8 @@ SOURCES += src/openscad.cc \
            src/dxftess-glu.cc \
            src/dxftess-cgal.cc \
            src/dxfdim.cc \
-           src/dxflinextrude.cc \
-           src/dxfrotextrude.cc \
+           src/linearextrude.cc \
+           src/rotateextrude.cc \
            src/highlighter.cc \
            src/printutils.cc \
            src/Preferences.cc \
@@ -240,13 +279,15 @@ macx {
   SOURCES += src/AppleEvents.cc
 }
 
-target.path = /usr/bin/
+isEmpty(PREFIX):PREFIX = /usr/local
+
+target.path = $$PREFIX/bin/
 INSTALLS += target
 
-examples.path = /usr/share/openscad/examples/
+examples.path = $$PREFIX/share/openscad/examples/
 examples.files = examples/*
 INSTALLS += examples
 
-libraries.path = /usr/share/openscad/libraries/
+libraries.path = $$PREFIX/share/openscad/libraries/
 libraries.files = libraries/*
 INSTALLS += libraries

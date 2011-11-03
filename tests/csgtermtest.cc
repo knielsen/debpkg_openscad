@@ -26,7 +26,6 @@
 #include "myqhash.h"
 #include "PolySetEvaluator.h"
 #include "CSGTermEvaluator.h"
-#include "CSGTextCache.h"
 #include "openscad.h"
 #include "handle_dep.h"
 #include "node.h"
@@ -42,10 +41,13 @@
 #include <QFile>
 #include <QDir>
 #include <QSet>
+#ifndef _MSC_VER
 #include <getopt.h>
+#endif
 #include <assert.h>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 
 using std::cout;
 
@@ -56,12 +58,13 @@ QString librarydir;
 
 int main(int argc, char **argv)
 {
-	if (argc != 2) {
-		fprintf(stderr, "Usage: %s <file.scad>\n", argv[0]);
+	if (argc != 3) {
+		fprintf(stderr, "Usage: %s <file.scad> <output.txt>\n", argv[0]);
 		exit(1);
 	}
 
 	const char *filename = argv[1];
+	const char *outfilename = argv[2];
 
 	int rc = 0;
 
@@ -111,7 +114,7 @@ int main(int argc, char **argv)
 
 	AbstractModule *root_module;
 	ModuleInstantiation root_inst;
-	AbstractNode *root_node;
+	const AbstractNode *root_node;
 
 	QFileInfo fileInfo(filename);
 	handle_dep(filename);
@@ -144,8 +147,8 @@ int main(int argc, char **argv)
 
 //	cout << tree.getString(*root_node) << "\n";
 
-	vector<CSGTerm*> highlights;
-	vector<CSGTerm*> background;
+	std::vector<CSGTerm*> highlights;
+	std::vector<CSGTerm*> background;
 	PolySetEvaluator psevaluator(tree);
 	CSGTermEvaluator evaluator(tree, &psevaluator);
 	CSGTerm *root_term = evaluator.evaluateCSGTerm(*root_node, highlights, background);
@@ -160,12 +163,15 @@ int main(int argc, char **argv)
 	// if (evaluator.background) cout << "Background terms: " << evaluator.background->size() << "\n";
 	// if (evaluator.highlights) cout << "Highlights terms: " << evaluator.highlights->size() << "\n";
 
+	std::ofstream outfile;
+	outfile.open(outfilename);
 	if (root_term) {
-		cout << root_term->dump() << "\n";
+		outfile << root_term->dump() << "\n";
 	}
 	else {
-		cout << "No top-level CSG object\n";
+		outfile << "No top-level CSG object\n";
 	}
+	outfile.close();
 
 	destroy_builtin_functions();
 	destroy_builtin_modules();

@@ -27,7 +27,6 @@
 #include "function.h"
 #include "expression.h"
 #include "context.h"
-#include "dxfdim.h"
 #include "builtin.h"
 #include <sstream>
 #include <ctime>
@@ -349,6 +348,33 @@ Value builtin_lookup(const Context *, const std::vector<std::string>&, const std
 	return Value(high_v * f + low_v * (1-f));
 }
 
+#define QUOTE(x__) # x__
+#define QUOTED(x__) QUOTE(x__)
+
+Value builtin_version(const Context *, const std::vector<std::string>&, const std::vector<Value> &)
+{
+	Value val;
+	val.type = Value::VECTOR;
+	val.append(new Value(double(OPENSCAD_YEAR)));
+	val.append(new Value(double(OPENSCAD_MONTH)));
+#ifdef OPENSCAD_DAY
+	val.append(new Value(double(OPENSCAD_DAY)));
+#endif
+	return val;
+}
+
+Value builtin_version_num(const Context *ctx, const std::vector<std::string>& call_argnames, const std::vector<Value> &args)
+{
+	Value val = (args.size() == 0) ? builtin_version(ctx, call_argnames, args) : args[0];
+	double y, m, d = 0;
+	if (!val.getv3(y, m, d)) {
+		if (!val.getv2(y, m)) {
+			return Value();
+		}
+	}
+	return Value(y * 10000 + m * 100 + d);
+}
+
 void initialize_builtin_functions()
 {
 	builtin_functions["abs"] = new BuiltinFunction(&builtin_abs);
@@ -373,6 +399,8 @@ void initialize_builtin_functions()
 	builtin_functions["ln"] = new BuiltinFunction(&builtin_ln);
 	builtin_functions["str"] = new BuiltinFunction(&builtin_str);
 	builtin_functions["lookup"] = new BuiltinFunction(&builtin_lookup);
+	builtin_functions["version"] = new BuiltinFunction(&builtin_version);
+	builtin_functions["version_num"] = new BuiltinFunction(&builtin_version_num);
 	initialize_builtin_dxf_dim();
 }
 
