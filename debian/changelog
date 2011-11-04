@@ -1,4 +1,10 @@
-openscad (2011.11~.03-git3bc03713-1) UNRELEASED; urgency=low
+openscad (2011.11~.03-git3bc03713-2) UNRELEASED; urgency=low
+
+  * Ship testing data in main package
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 04 Nov 2011 16:25:10 +0100
+
+openscad (2011.11~.03-git3bc03713-1) experimental; urgency=low
 
   * More precise eigen dependency
   * Changed version format to better reflect how upstream calls unreleased
@@ -16,7 +22,7 @@ openscad (2011.11~.03-git3bc03713-1) UNRELEASED; urgency=low
     - new build dependencies: python, cmake
   * Updated man page
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 04 Nov 2011 11:29:14 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 04 Nov 2011 16:25:00 +0100
 
 openscad (2011.09~git20110929-1) experimental; urgency=low
 
