@@ -5,9 +5,29 @@
 #include "polyset.h"
 #include "dxfdata.h"
 #include "dxftess.h"
-#include <CGAL/minkowski_sum_3.h>
-#include <CGAL/assertions_behaviour.h>
-#include <CGAL/exceptions.h>
+
+CGAL_Nef_polyhedron::CGAL_Nef_polyhedron(CGAL_Nef_polyhedron2 *p)
+{
+	if (p) {
+		dim = 2;
+		p2.reset(p);
+	}
+	else {
+		dim = 0;
+	}
+}
+
+CGAL_Nef_polyhedron::CGAL_Nef_polyhedron(CGAL_Nef_polyhedron3 *p)
+{
+	if (p) {
+		dim = 3;
+		p3.reset(p);
+	}
+	else {
+		dim = 0;
+	}
+}
+
 
 CGAL_Nef_polyhedron& CGAL_Nef_polyhedron::operator+=(const CGAL_Nef_polyhedron &other)
 {
@@ -34,15 +54,8 @@ extern CGAL_Nef_polyhedron2 minkowski2(const CGAL_Nef_polyhedron2 &a, const CGAL
 
 CGAL_Nef_polyhedron &CGAL_Nef_polyhedron::minkowski(const CGAL_Nef_polyhedron &other)
 {
-	CGAL::Failure_behaviour old_behaviour = CGAL::set_error_behaviour(CGAL::THROW_EXCEPTION);
-	try {
-		if (this->dim == 2) (*this->p2) = minkowski2(*this->p2, *other.p2);
-		else if (this->dim == 3) (*this->p3) = CGAL::minkowski_sum_3(*this->p3, *other.p3);
-	}
-	catch (CGAL::Assertion_exception e) {
-		PRINTF("CGAL error in minkowski %s", e.what());
-		CGAL::set_error_behaviour(old_behaviour);
-	}
+	if (this->dim == 2) (*this->p2) = minkowski2(*this->p2, *other.p2);
+	else if (this->dim == 3) (*this->p3) = CGAL::minkowski_sum_3(*this->p3, *other.p3);
 	return *this;
 }
 
@@ -58,6 +71,8 @@ int CGAL_Nef_polyhedron::weight() const
 
 	This method is not const since convert_to_Polyhedron() wasn't const
   in earlier versions of CGAL.
+
+	Note: Can return NULL if an error occurred
 */
 PolySet *CGAL_Nef_polyhedron::convertToPolyset()
 {
@@ -72,9 +87,16 @@ PolySet *CGAL_Nef_polyhedron::convertToPolyset()
 		delete dd;
 	}
 	else if (this->dim == 3) {
-		CGAL_Polyhedron P;
-		this->p3->convert_to_Polyhedron(P);
-		ps = createPolySetFromPolyhedron(P);
+		CGAL::Failure_behaviour old_behaviour = CGAL::set_error_behaviour(CGAL::THROW_EXCEPTION);
+		try {
+			CGAL_Polyhedron P;
+			this->p3->convert_to_Polyhedron(P);
+			ps = createPolySetFromPolyhedron(P);
+		}
+		catch (CGAL::Precondition_exception e) {
+			PRINTF("CGAL error in CGAL_Nef_polyhedron::convertToPolyset(): %s", e.what());
+		}
+		CGAL::set_error_behaviour(old_behaviour);
 	}
 	return ps;
 }

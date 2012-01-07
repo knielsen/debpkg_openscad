@@ -45,6 +45,7 @@
 #include "ProgressWidget.h"
 #endif
 #include "ThrownTogetherRenderer.h"
+#include "csgtermnormalizer.h"
 
 #include <QMenu>
 #include <QTime>
@@ -143,27 +144,11 @@ MainWindow::MainWindow(const QString &filename)
 {
 	setupUi(this);
 
-	root_ctx.functions_p = &builtin_functions;
-	root_ctx.modules_p = &builtin_modules;
-	root_ctx.set_variable("$fn", Value(0.0));
-	root_ctx.set_variable("$fs", Value(1.0));
-	root_ctx.set_variable("$fa", Value(12.0));
-	root_ctx.set_variable("$t", Value(0.0));
+	register_builtin(root_ctx);
 
-	root_ctx.set_constant("PI",Value(M_PI));
-
-	Value zero3;
-	zero3.type = Value::VECTOR;
-	zero3.append(new Value(0.0));
-	zero3.append(new Value(0.0));
-	zero3.append(new Value(0.0));
-	root_ctx.set_variable("$vpt", zero3);
-	root_ctx.set_variable("$vpr", zero3);
-
+	this->openglbox = NULL;
 	root_module = NULL;
 	absolute_root_node = NULL;
-	root_raw_term = NULL;
-	root_norm_term = NULL;
 	root_chain = NULL;
 #ifdef ENABLE_CGAL
 	this->root_N = NULL;
@@ -193,7 +178,7 @@ MainWindow::MainWindow(const QString &filename)
 	editor->setTabStopWidth(30);
 #endif
 	editor->setLineWrapping(true); // Not designable
-	setFont("", 0); // Init default font
+	setFont("", 12); // Init default font
 
 	this->glview->statusLabel = new QLabel(this);
 	statusBar()->addWidget(this->glview->statusLabel);
@@ -329,6 +314,7 @@ MainWindow::MainWindow(const QString &filename)
 	connect(this->helpActionAbout, SIGNAL(triggered()), this, SLOT(helpAbout()));
 	connect(this->helpActionHomepage, SIGNAL(triggered()), this, SLOT(helpHomepage()));
 	connect(this->helpActionManual, SIGNAL(triggered()), this, SLOT(helpManual()));
+	connect(this->helpActionOpenGLInfo, SIGNAL(triggered()), this, SLOT(helpOpenGL()));
 
 
 	console->setReadOnly(true);
@@ -448,7 +434,8 @@ static void report_func(const class AbstractNode*, void *vp, int mark)
 #ifdef USE_PROGRESSWIDGET
 	ProgressWidget *pw = static_cast<ProgressWidget*>(vp);
 	int v = (int)((mark*100.0) / progress_report_count);
-	pw->setValue(v < 100 ? v : 99);
+	int percent = v < 100 ? v : 99; 
+	if (percent > pw->value()) pw->setValue(percent);
 	QApplication::processEvents();
 	if (pw->wasCanceled()) throw ProgressCancelException();
 #else
@@ -596,7 +583,7 @@ void MainWindow::load()
 AbstractNode *MainWindow::find_root_tag(AbstractNode *n)
 {
 	BOOST_FOREACH (AbstractNode *v, n->children) {
-		if (v->modinst->tag_root) return v;
+		if (v->modinst->isRoot()) return v;
 		if (AbstractNode *vroot = find_root_tag(v)) return vroot;
 	}
 	return NULL;
@@ -633,30 +620,18 @@ void MainWindow::compile(bool procevents)
 		this->absolute_root_node = NULL;
 	}
 
-	if (this->root_raw_term) {
-		this->root_raw_term->unlink();
-		this->root_raw_term = NULL;
-	}
-
-	if (this->root_norm_term) {
-		this->root_norm_term->unlink();
-		this->root_norm_term = NULL;
-	}
+	this->root_raw_term.reset();
+	this->root_norm_term.reset();
 
 	if (this->root_chain) {
 		delete this->root_chain;
 		this->root_chain = NULL;
 	}
 
-	std::for_each(this->highlight_terms.begin(), this->highlight_terms.end(), 
-								bind(&CSGTerm::unlink, _1));
-
 	this->highlight_terms.clear();
 	delete this->highlights_chain;
 	this->highlights_chain = NULL;
 
-	std::for_each(this->background_terms.begin(), this->background_terms.end(), 
-								bind(&CSGTerm::unlink, _1));
 	this->background_terms.clear();
 	delete this->background_chain;
 	this->background_chain = NULL;
@@ -785,7 +760,7 @@ void MainWindow::compileCSG(bool procevents)
 		CGALEvaluator cgalevaluator(this->tree);
 		PolySetCGALEvaluator psevaluator(cgalevaluator);
 		CSGTermEvaluator csgrenderer(this->tree, &psevaluator);
-		root_raw_term = csgrenderer.evaluateCSGTerm(*root_node, highlight_terms, background_terms);
+		this->root_raw_term = csgrenderer.evaluateCSGTerm(*root_node, highlight_terms, background_terms);
 		if (!root_raw_term) {
 			PRINT("ERROR: CSG generation failed! (no top level object found)");
 			if (procevents)
@@ -808,21 +783,12 @@ void MainWindow::compileCSG(bool procevents)
 		if (procevents)
 			QApplication::processEvents();
 		
-		root_norm_term = root_raw_term->link();
-		
-		// CSG normalization
-		while (1) {
-			CSGTerm *n = root_norm_term->normalize();
-			root_norm_term->unlink();
-			if (root_norm_term == n)
-				break;
-			root_norm_term = n;
-		}
-		
-		assert(root_norm_term);
+		CSGTermNormalizer normalizer;
+		this->root_norm_term = normalizer.normalize(this->root_raw_term);
+		assert(this->root_norm_term);
 
 		root_chain = new CSGChain();
-		root_chain->import(root_norm_term);
+		root_chain->import(this->root_norm_term);
 		
 		if (highlight_terms.size() > 0)
 		{
@@ -832,13 +798,7 @@ void MainWindow::compileCSG(bool procevents)
 			
 			highlights_chain = new CSGChain();
 			for (unsigned int i = 0; i < highlight_terms.size(); i++) {
-				while (1) {
-					CSGTerm *n = highlight_terms[i]->normalize();
-					highlight_terms[i]->unlink();
-					if (highlight_terms[i] == n)
-						break;
-					highlight_terms[i] = n;
-				}
+				highlight_terms[i] = normalizer.normalize(highlight_terms[i]);
 				highlights_chain->import(highlight_terms[i]);
 			}
 		}
@@ -851,23 +811,17 @@ void MainWindow::compileCSG(bool procevents)
 			
 			background_chain = new CSGChain();
 			for (unsigned int i = 0; i < background_terms.size(); i++) {
-				while (1) {
-					CSGTerm *n = background_terms[i]->normalize();
-					background_terms[i]->unlink();
-					if (background_terms[i] == n)
-						break;
-					background_terms[i] = n;
-				}
+				background_terms[i] = normalizer.normalize(background_terms[i]);
 				background_chain->import(background_terms[i]);
 			}
 		}
 
 		if (root_chain->polysets.size() > 1000) {
-			PRINTF("WARNING: Normalized tree has %d elements!", root_chain->polysets.size());
+			PRINTF("WARNING: Normalized tree has %d elements!", int(root_chain->polysets.size()));
 			PRINTF("WARNING: OpenCSG rendering has been disabled.");
 		}
 		else {
-			PRINTF("Normalized CSG tree has %d elements", root_chain->polysets.size());
+			PRINTF("Normalized CSG tree has %d elements", int(root_chain->polysets.size()));
 			this->opencsgRenderer = new OpenCSGRenderer(this->root_chain, 
 																									this->highlights_chain, 
 																									this->background_chain, 
@@ -1536,7 +1490,7 @@ void MainWindow::actionFlushCaches()
 #endif
 	dxf_dim_cache.clear();
 	dxf_cross_cache.clear();
-	Module::libs_cache.clear();
+	Module::clear_library_cache();
 }
 
 void MainWindow::viewModeActionsUncheck()
@@ -1786,6 +1740,18 @@ MainWindow::helpManual()
 	QDesktopServices::openUrl(QUrl("http://en.wikibooks.org/wiki/OpenSCAD_User_Manual"));
 }
 
+void MainWindow::helpOpenGL()
+{
+	if (!this->openglbox) {
+		this->openglbox = new QMessageBox(QMessageBox::Information, 
+																			"OpenGL Info", "Detailed OpenGL Info",
+																			QMessageBox::Ok, this);
+		
+	}
+	this->openglbox->setDetailedText(this->glview->getRendererInfo());
+	this->openglbox->show();
+}
+
 /*!
 	FIXME: In MDI mode, should this be called on both reload functions?
  */
@@ -1833,8 +1799,9 @@ MainWindow::preferences()
 
 void MainWindow::setFont(const QString &family, uint size)
 {
-	QFont font(editor->font());
+	QFont font;
 	if (!family.isEmpty()) font.setFamily(family);
+	else font.setFixedPitch(true);
 	if (size > 0)	font.setPointSize(size);
 	font.setStyleHint(QFont::TypeWriter);
 	editor->setFont(font);
@@ -1856,3 +1823,4 @@ void MainWindow::clearCurrentOutput()
 {
 	set_output_handler(NULL, NULL);
 }
+

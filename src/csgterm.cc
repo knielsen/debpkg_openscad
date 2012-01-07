@@ -26,6 +26,7 @@
 
 #include "csgterm.h"
 #include "polyset.h"
+#include "linalg.h"
 #include <sstream>
 
 /*!
@@ -47,124 +48,94 @@
  */
 
 
-CSGTerm::CSGTerm(const shared_ptr<PolySet> &polyset, const Transform3d &matrix, const double color[4], const std::string &label)
-	: type(TYPE_PRIMITIVE), polyset(polyset), label(label), left(NULL), right(NULL)
+shared_ptr<CSGTerm> CSGTerm::createCSGTerm(type_e type, shared_ptr<CSGTerm> left, shared_ptr<CSGTerm> right)
 {
-	this->m = matrix;
-	for (int i = 0; i < 4; i++) this->color[i] = color[i];
-	refcounter = 1;
+	if (type != TYPE_PRIMITIVE) {
+		// In case we're creating a CSG terms from a pruned tree, left/right can be NULL
+		if (!right) {
+			if (type == TYPE_UNION || type == TYPE_DIFFERENCE) return left;
+			else return right;
+		}
+		if (!left) {
+			if (type == TYPE_UNION) return right;
+			else return left;
+		}
+	}
+
+  // Pruning the tree. For details, see:
+  // http://www.cc.gatech.edu/~turk/my_papers/pxpl_csg.pdf
+	const BoundingBox &leftbox = left->getBoundingBox();
+	const BoundingBox &rightbox = right->getBoundingBox();
+	if (type == TYPE_INTERSECTION) {
+		BoundingBox newbox(leftbox.min().cwise().max(rightbox.min()),
+											 leftbox.max().cwise().min(rightbox.max()));
+		if (newbox.isNull()) {
+			return shared_ptr<CSGTerm>(); // Prune entire product
+		}
+	}
+	else if (type == TYPE_DIFFERENCE) {
+		BoundingBox newbox(leftbox.min().cwise().max(rightbox.min()),
+											 leftbox.max().cwise().min(rightbox.max()));
+		if (newbox.isNull()) {
+			return left; // Prune the negative component
+		}
+	}
+
+	return shared_ptr<CSGTerm>(new CSGTerm(type, left, right));
+}
+
+shared_ptr<CSGTerm> CSGTerm::createCSGTerm(type_e type, CSGTerm *left, CSGTerm *right)
+{
+	return createCSGTerm(type, shared_ptr<CSGTerm>(left), shared_ptr<CSGTerm>(right));
+}
+
+CSGTerm::CSGTerm(const shared_ptr<PolySet> &polyset, const Transform3d &matrix, const Color4f &color, const std::string &label)
+	: type(TYPE_PRIMITIVE), polyset(polyset), label(label), m(matrix), color(color)
+{
+	initBoundingBox();
+}
+
+CSGTerm::CSGTerm(type_e type, shared_ptr<CSGTerm> left, shared_ptr<CSGTerm> right)
+	: type(type), left(left), right(right), m(Transform3d::Identity())
+{
+	initBoundingBox();
 }
 
 CSGTerm::CSGTerm(type_e type, CSGTerm *left, CSGTerm *right)
-	: type(type), left(left), right(right)
+	: type(type), left(left), right(right), m(Transform3d::Identity())
 {
-	refcounter = 1;
+	initBoundingBox();
 }
 
-CSGTerm *CSGTerm::normalize()
+CSGTerm::~CSGTerm()
 {
-	// This function implements the CSG normalization
-	// Reference: Florian Kirsch, Juergen Doeller,
-	// OpenCSG: A Library for Image-Based CSG Rendering,
-	// University of Potsdam, Hasso-Plattner-Institute, Germany
-	// http://www.opencsg.org/data/csg_freenix2005_paper.pdf
+}
 
-	if (type == TYPE_PRIMITIVE)
-		return link();
-
-	CSGTerm *t1, *t2, *x, *y;
-
-	x = left->normalize();
-	y = right->normalize();
-
-	if (x != left || y != right) {
-		t1 = new CSGTerm(type, x, y);
-	} else {
-		t1 = link();
-		x->unlink();
-		y->unlink();
+void CSGTerm::initBoundingBox()
+{
+	if (this->type == TYPE_PRIMITIVE) {
+		this->bbox = this->m * this->polyset->getBoundingBox();
 	}
-
-	while (1) {
-		t2 = t1->normalize_tail();
-		t1->unlink();
-		if (t1 == t2)
+	else {
+		const BoundingBox &leftbox = this->left->getBoundingBox();
+		const BoundingBox &rightbox = this->right->getBoundingBox();
+		switch (this->type) {
+		case TYPE_UNION:
+			this->bbox = this->m * BoundingBox(leftbox.min().cwise().min(rightbox.min()), 
+																				 leftbox.max().cwise().max(rightbox.max()));
 			break;
-		t1 = t2;
-	}
-
-	return t1;
-}
-
-CSGTerm *CSGTerm::normalize_tail()
-{
-	CSGTerm *x, *y, *z;
-
-	// Part A: The 'x . (y . z)' expressions
-
-	x = left;
-	y = right->left;
-	z = right->right;
-
-	// 1.  x - (y + z) -> (x - y) - z
-	if (type == TYPE_DIFFERENCE && right->type == TYPE_UNION)
-		return new CSGTerm(TYPE_DIFFERENCE, new CSGTerm(TYPE_DIFFERENCE, x->link(), y->link()), z->link());
-
-	// 2.  x * (y + z) -> (x * y) + (x * z)
-	if (type == TYPE_INTERSECTION && right->type == TYPE_UNION)
-		return new CSGTerm(TYPE_UNION, new CSGTerm(TYPE_INTERSECTION, x->link(), y->link()), new CSGTerm(TYPE_INTERSECTION, x->link(), z->link()));
-
-	// 3.  x - (y * z) -> (x - y) + (x - z)
-	if (type == TYPE_DIFFERENCE && right->type == TYPE_INTERSECTION)
-		return new CSGTerm(TYPE_UNION, new CSGTerm(TYPE_DIFFERENCE, x->link(), y->link()), new CSGTerm(TYPE_DIFFERENCE, x->link(), z->link()));
-
-	// 4.  x * (y * z) -> (x * y) * z
-	if (type == TYPE_INTERSECTION && right->type == TYPE_INTERSECTION)
-		return new CSGTerm(TYPE_INTERSECTION, new CSGTerm(TYPE_INTERSECTION, x->link(), y->link()), z->link());
-
-	// 5.  x - (y - z) -> (x - y) + (x * z)
-	if (type == TYPE_DIFFERENCE && right->type == TYPE_DIFFERENCE)
-		return new CSGTerm(TYPE_UNION, new CSGTerm(TYPE_DIFFERENCE, x->link(), y->link()), new CSGTerm(TYPE_INTERSECTION, x->link(), z->link()));
-
-	// 6.  x * (y - z) -> (x * y) - z
-	if (type == TYPE_INTERSECTION && right->type == TYPE_DIFFERENCE)
-		return new CSGTerm(TYPE_DIFFERENCE, new CSGTerm(TYPE_INTERSECTION, x->link(), y->link()), z->link());
-
-	// Part B: The '(x . y) . z' expressions
-
-	x = left->left;
-	y = left->right;
-	z = right;
-
-	// 7. (x - y) * z  -> (x * z) - y
-	if (left->type == TYPE_DIFFERENCE && type == TYPE_INTERSECTION)
-		return new CSGTerm(TYPE_DIFFERENCE, new CSGTerm(TYPE_INTERSECTION, x->link(), z->link()), y->link());
-
-	// 8. (x + y) - z  -> (x - z) + (y - z)
-	if (left->type == TYPE_UNION && type == TYPE_DIFFERENCE)
-		return new CSGTerm(TYPE_UNION, new CSGTerm(TYPE_DIFFERENCE, x->link(), z->link()), new CSGTerm(TYPE_DIFFERENCE, y->link(), z->link()));
-
-	// 9. (x + y) * z  -> (x * z) + (y * z)
-	if (left->type == TYPE_UNION && type == TYPE_INTERSECTION)
-		return new CSGTerm(TYPE_UNION, new CSGTerm(TYPE_INTERSECTION, x->link(), z->link()), new CSGTerm(TYPE_INTERSECTION, y->link(), z->link()));
-
-	return link();
-}
-
-CSGTerm *CSGTerm::link()
-{
-	refcounter++;
-	return this;
-}
-
-void CSGTerm::unlink()
-{
-	if (--refcounter <= 0) {
-		if (left)
-			left->unlink();
-		if (right)
-			right->unlink();
-		delete this;
+		case TYPE_INTERSECTION:
+			this->bbox = this->m * BoundingBox(leftbox.min().cwise().max(rightbox.min()),
+																				 leftbox.max().cwise().min(rightbox.max()));
+			break;
+		case TYPE_DIFFERENCE:
+			this->bbox = this->m * leftbox;
+			break;
+		case TYPE_PRIMITIVE:
+			break;
+		default:
+			assert(false);
+		}
 	}
 }
 
@@ -188,7 +159,7 @@ CSGChain::CSGChain()
 {
 }
 
-void CSGChain::add(const shared_ptr<PolySet> &polyset, const Transform3d &m, double *color, CSGTerm::type_e type, std::string label)
+void CSGChain::add(const shared_ptr<PolySet> &polyset, const Transform3d &m, const Color4f &color, CSGTerm::type_e type, std::string label)
 {
 	polysets.push_back(polyset);
 	matrices.push_back(m);
@@ -197,7 +168,7 @@ void CSGChain::add(const shared_ptr<PolySet> &polyset, const Transform3d &m, dou
 	labels.push_back(label);
 }
 
-void CSGChain::import(CSGTerm *term, CSGTerm::type_e type)
+void CSGChain::import(shared_ptr<CSGTerm> term, CSGTerm::type_e type)
 {
 	if (term->type == CSGTerm::TYPE_PRIMITIVE) {
 		add(term->polyset, term->m, term->color, type, term->label);
@@ -234,11 +205,7 @@ BoundingBox CSGChain::getBoundingBox() const
 		if (types[i] != CSGTerm::TYPE_DIFFERENCE) {
 			BoundingBox psbox = polysets[i]->getBoundingBox();
 			if (!psbox.isNull()) {
-				Eigen::Transform3d t;
-				// Column-major vs. Row-major
-				t = matrices[i];
-				bbox.extend(t * psbox.min());
-				bbox.extend(t * psbox.max());
+				bbox.extend(matrices[i] * psbox);
 			}
 		}
 	}

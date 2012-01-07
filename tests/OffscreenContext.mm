@@ -1,9 +1,12 @@
 #include "OffscreenContext.h"
 #include "imageutils.h"
 #include "fbo.h"
+#include <iostream>
+#include <sstream>
 
 #import <AppKit/AppKit.h>   // for NSOpenGL...
-
+#include <CoreServices/CoreServices.h>
+#include <sys/utsname.h>
 
 #define REPORTGLERROR(task) { GLenum tGLErr = glGetError(); if (tGLErr != GL_NO_ERROR) { std::cout << "OpenGL error " << tGLErr << " while " << task << "\n"; } }
 
@@ -16,6 +19,29 @@ struct OffscreenContext
   fbo_t *fbo;
 };
 
+std::string offscreen_context_getinfo(OffscreenContext *ctx)
+{
+  std::stringstream out;
+
+  struct utsname name;
+  uname(&name);
+
+  SInt32 majorVersion,minorVersion,bugFixVersion;
+  
+  Gestalt(gestaltSystemVersionMajor, &majorVersion);
+  Gestalt(gestaltSystemVersionMinor, &minorVersion);
+  Gestalt(gestaltSystemVersionBugFix, &bugFixVersion);
+
+  const char *arch = "unknown";
+  if (sizeof(int*) == 4) arch = "32-bit";
+  else if (sizeof(int*) == 8) arch = "64-bit";
+
+  out << "GL context creator: Cocoa / CGL\n"
+      << "PNG generator: Core Foundation\n"
+      << "OS info: Mac OS X " << majorVersion << "." << minorVersion << "." << bugFixVersion << " (" << name.machine << " kernel)\n"
+      << "Machine: " << arch << "\n";
+  return out.str();
+}
 
 OffscreenContext *create_offscreen_context(int w, int h)
 {
@@ -33,6 +59,7 @@ OffscreenContext *create_offscreen_context(int w, int h)
     NSOpenGLPFANoRecovery,
     NSOpenGLPFAAccelerated,
     NSOpenGLPFADepthSize, 24,
+    NSOpenGLPFAStencilSize, 8,
     (NSOpenGLPixelFormatAttribute) 0
   };
   NSOpenGLPixelFormat *pixFormat = [[[NSOpenGLPixelFormat alloc] initWithAttributes:attributes] autorelease];
@@ -46,24 +73,13 @@ OffscreenContext *create_offscreen_context(int w, int h)
 
   [ctx->openGLContext makeCurrentContext];
   
-  glewInit();
-#ifdef DEBUG
-  cout << "GLEW version " << glewGetString(GLEW_VERSION) << "\n";
-  cout << (const char *)glGetString(GL_RENDERER) << "(" << (const char *)glGetString(GL_VENDOR) << ")\n"
-       << "OpenGL version " << (const char *)glGetString(GL_VERSION) << "\n";
-  cout  << "Extensions: " << (const char *)glGetString(GL_EXTENSIONS) << "\n";
-  
-  
-  if (GLEW_ARB_framebuffer_object) {
-    cout << "ARB_FBO supported\n";
+  // glewInit must come after Context creation and before FBO calls.
+  GLenum err = glewInit();
+  if (GLEW_OK != err) {
+    std::cerr << "Unable to init GLEW: " << glewGetErrorString(err) << std::endl;
+    return NULL;
   }
-  if (GLEW_EXT_framebuffer_object) {
-    cout << "EXT_FBO supported\n";
-  }
-  if (GLEW_EXT_packed_depth_stencil) {
-    cout << "EXT_packed_depth_stencil\n";
-  }
-#endif
+  glew_dump();
 
   ctx->fbo = fbo_new();
   if (!fbo_init(ctx->fbo, w, h)) {
@@ -93,6 +109,7 @@ bool teardown_offscreen_context(OffscreenContext *ctx)
 */
 bool save_framebuffer(OffscreenContext *ctx, const char *filename)
 {
+  if (!ctx || !filename) return false;
   // Read pixels from OpenGL
   int samplesPerPixel = 4; // R, G, B and A
   int rowBytes = samplesPerPixel * ctx->width;

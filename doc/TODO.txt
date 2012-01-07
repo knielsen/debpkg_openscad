@@ -37,10 +37,6 @@ Using STL-imported models is tricky and triggers multiple issues:
      import_stl("adns2610_dev_circuit_inv.stl");
    }
 
-CRASH BUGS
-----------
-o Broken polyhedron() entities are not correctly detected and cause CGAL segfaults
-
 USER INTERFACE
 --------------
 o Preferences
@@ -52,6 +48,7 @@ o Preferences
   - OpenGL params
   - Default language feature settings
   - Make the library search path configurable?
+  - Turn on/off caching (advanced)
 o MDI
   - Think about how to do MDI the right way
   - Ctrl-W should close the current dialog, not the current main window
@@ -61,7 +58,6 @@ o MDI
   - currentPath is global but is used by each document, e.g. parser
     and handle_dep.
 o 3D View
-  - OpenGL 2.0 test: What, exactly, is needed from OpenGL 2.0? Can we use 1.x with extensions?
   - Improve mouse rotation/zoom/pan
   - Add modifier key combos to handle pan and zoom on 1 mouse button systems
   - Show grid
@@ -71,14 +67,12 @@ o 3D View
   - View All
   - Allow specifying viewpoint in the scad file
   - overlay indicator displaying current view mode
-  - OpenCSG rendering: Coincident surfaces causes z-buffer fighting. Is this somehow
-    avoidable tuning the depth tests in OpenCSG? 
-  - Make the 10.000 element OpenCSG limit configurable (Preferences) ?
   - Use OpenGL picking to facilitate ray-tracing like features like measuring
     thicknesses, distances, slot thicknesses etc.
-  - When specifying a transparency with the color() statement,
-    the object is not sorted and will be rendered wrongly
   - Add option to change lights, e.g. add an optional camera light
+  - 2D objects are rendered at z = -0.1 - why?
+  - Rewrite to use VBOs or smth. - avoid inline calculations
+  - Rewrite to a higher-level library (e.g. OSG)?
 o Editor wishlist
   - More infrastructure for external editor (allow communication from the outside)
   - Preferences GUI for the features below
@@ -96,6 +90,7 @@ o Editor wishlist
     in the source code in the 3D view
   - Tabbed editor for designs including other files
   - C-c/C-v should work on the focused widget, not always in the editor
+  - Auto-indent on enter and on tab
 o Error reporting/debugging
   - Provide better error messages when polygon ordering causes CGAL errors:
     o Supply syntax highlighting of the exact polygon indices which are 
@@ -103,6 +98,7 @@ o Error reporting/debugging
     o Provide some interaction for debug walk-through?
   - Provide visual highlighting of geometry corresponding to code
     -> could aid debugging a lot
+  - Optionally output console log to a file
 o Computation
   - Run CGAL rendering in a background thread
   - Enable viewing/editing while rendering
@@ -117,8 +113,19 @@ o Misc
   - If trying to export STL/DXF but source is newer than the CGAL rendering, ask
     for confirmation.
   - Go through keyboard shortcuts and make them more conformant to platform standards
+  - Show design info/stats (sizes, caches etc.)
 o Cmd-line
   - Add verbose option (PRINT command from mainwin.cc and progress output)
+
+OpenCSG-related
+---------------
+o OpenCSG rendering: Coincident surfaces causes z-buffer fighting. Is this somehow
+  avoidable tuning the depth tests in OpenCSG? 
+o Make the 10.000 element OpenCSG limit configurable (Preferences) ?
+o When specifying a transparency with the color() statement,
+  the object is not sorted and will be rendered wrongly
+o Bug: Using the background operator (%) on the only object in a scene triggers a
+  CSG error: No top level object found
 
 ENGINE
 ------
@@ -127,6 +134,7 @@ o Primitives
   - (TTF) Text
   - Image-based height field like http://www.thingiverse.com/thing:2078
   - mesh (coordinates and indices)
+  - polygon(): Allow omitting the paths parameter to create a single polygon from a list of vertices.
 o 2D Subsystem
   - Performance: Is it necessary to union children before extrusion
     when compiling? Can this be postponed to CGAL evaluation time?
@@ -134,7 +142,6 @@ o 2D Subsystem
 o Built-in modules
   - extrude*: Allow the base 2D primitive to have a Z value
   - rotate_extrude(): Allow for specification of start/stop/sweep angle?
-  - Convex hull of 3D objects
 o Advanced Transformations
   - Add statement for refinement via surface subdivision
   - Add statement for intersections in cartesian product of childs
@@ -147,7 +154,6 @@ o Language Frontend
   - Rethink for vs. intersection_for vs. group. Should for loops
     generate child lists instead, and make these passable to other
     modules or accessible by child()?
-  - constants: PI, OpenSCAD version
 o DXF Import/Export
   - Use dxflib from RibbonSoft for import/export? -> investigate
   - Import
@@ -160,13 +166,14 @@ o Mesh optimization on STL export
   - Remove super small triangles (all sides are short)
   - Replace super thin triangles (one h is short)
 o Misc
+  - center as default: Very often, center=true is used everywhere.
+    Make a global variable ($center?) control this to beautify code
+    and the avoid typical errors when forgetting to specify center
   - Go through default values of parameters (e.g. cube() has x,y,z=1 while linear_extrude() has height=100)
   - Add support for symbolic names to child() statement 
   - Add 'lines' object type for non-solid 2d drawings
   - Is there a reason why modules like echo, empty if, empty for loop returns an
     empty AbstractNode instead of being ignored?
-  - Bug: Using the background operator (%) on the only object in a scene triggers a
-    CSG error: No top level object found
   - Dependency tracking of libraries (USE'd modules) isn't implemented. See Mail from nophead 20110823.
 o Grammar
   - dim->name -> dim->label
@@ -186,6 +193,7 @@ IDEAS FOR LANGUAGE CHANGES
 --------------------------
 o More strict checking of module parameters to make e.g. this fail:
   module test(a,b) { a=1; b=2; echo(a,b,c); } test(c=3);
+  (also for built-in modules)
 
 CODE
 ----
@@ -212,6 +220,18 @@ BUILD SYSTEM
 o Fedora is reported to ship with byacc, which doesn't support bison extensions (e.g. %debuig). Look into this, either be yacc-compatible or force the build system to use bison.
 o We currently link in -lboost_thread. Should we always use -lboost_thread-mt under Linux or can we pick this up using qmake?
 
+INFRASTRUCTURE
+--------------
+o Use a logging framework to get debugging/info output more under control?
+  (check log4j, google project)
+
+DOCUMENTATION
+-------------
+o Auto-generate API documentation instead of, in addition to or combined with, the wikibooks docs.
+o Write checklists for typical extension work (add new module, add new function)
+  -> make sure new test files are added
+o Clarify include/use better in the wikibook docs (e.g. that use'd modules have to be self-contained)
+
 TESTING
 -------
 o Caching and MDI looks suspicious when the code relies on external resources
@@ -219,18 +239,32 @@ o Caching and MDI looks suspicious when the code relies on external resources
   -> we might get a false cache hit
 o Collect "all" available OpenSCAD scripts from the internets and run the integration
   tests on them all
-o dumptest tests:
-  - filename are dumped as absolute filenames - this will fail on other systems
-o Write a regression test for the hexagonal cylinder orientation issue
 
-INFRASTRUCTURE
+MISSING TESTS:
 --------------
-o Use a logging framework to get debugging/info output more under control?
-  (check log4j, google project)
-
-MISC
-----
-o Streamline the cmd-line interface a bit
-  - Implicit output file format
-o Write checklists for typical extension work (add new module, add new function)
-  -> make sure new test files are added
+o all functions
+o mirror
+o scale
+o open polyline from dxf using new method
+o linear_extrude DXF
+o rotate_extrude DXF
+o import_stl
+o import_off
+o import_*
+  - open polylines
+o include: test subdirs under librarydir (e.g. include <MCAD/gears.scad>)
+o use: Basically same tests as include. + use restrictions
+o include and use: remember filenames with space
+o variants of module transparent() { %child(); }
+o define modules
+o define functions
+o built-in variables and constants (builtin-tests.scad)
+o Caching
+  - Test that caching is actually performed (speedup + same results)
+  - Test the modifier characters correctly influence the cache (also when
+    added/removed)
+o other tests
+  - export
+  - cmd-line tests
+  - leaf nodes having children, e.g. cube() cylinder();
+  - dependency tracking

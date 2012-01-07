@@ -43,7 +43,6 @@
 #include <QRegExp>
 #include <QStringList>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <fstream>
 #include <sstream>
 #include <assert.h>
@@ -228,15 +227,10 @@ std::string ImportNode::toString() const
 {
 	std::stringstream stream;
 
-	struct stat st;
-	memset(&st, 0, sizeof(struct stat));
-	stat(this->filename.c_str(), &st);
-
 	stream << this->name();
-	stream << "(file = \"" << this->filename << "\", "
-		"cache = \"" << std::hex << (int)st.st_mtime << "." << (int)st.st_size << "\", "
-		"layer = \"" << this->layername << "\", "
-		"origin = [ " << std::dec << this->origin_x << " " << this->origin_y << " ], "
+	stream << "(file = " << this->filename << ", "
+		"layer = " << QuotedString(this->layername) << ", "
+		"origin = [" << std::dec << this->origin_x << ", " << this->origin_y << "], "
 		"scale = " << this->scale << ", "
 		"convexity = " << this->convexity << ", "
 		"$fn = " << this->fn << ", $fa = " << this->fa << ", $fs = " << this->fs << ")";
@@ -251,9 +245,8 @@ std::string ImportNode::name() const
 
 void register_builtin_import()
 {
-	builtin_modules["import_stl"] = new ImportModule(TYPE_STL);
-	builtin_modules["import_off"] = new ImportModule(TYPE_OFF);
-	builtin_modules["import_dxf"] = new ImportModule(TYPE_DXF);
-	builtin_modules["import"] = new ImportModule();
+	Builtins::init("import_stl", new ImportModule(TYPE_STL));
+	Builtins::init("import_off", new ImportModule(TYPE_OFF));
+	Builtins::init("import_dxf", new ImportModule(TYPE_DXF));
+	Builtins::init("import", new ImportModule());
 }
-

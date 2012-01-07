@@ -5,8 +5,8 @@
 #include "printutils.h"
 
 #include "cgal.h"
-#include <CGAL/assertions_behaviour.h>
-#include <CGAL/exceptions.h>
+
+#include <map>
 
 PolySet *createPolySetFromPolyhedron(const CGAL_Polyhedron &p)
 {
@@ -87,7 +87,7 @@ public:
 
 		for (size_t i = 0; i < ps.polygons.size(); i++) {
 			const PolySet::Polygon *poly = &ps.polygons[i];
-			QHash<int,int> fc;
+			std::map<int,int> fc;
 			bool facet_is_degenerated = false;
 			for (size_t j = 0; j < poly->size(); j++) {
 				const Vector3d &p = poly->at(j);
@@ -138,8 +138,10 @@ CGAL_Polyhedron *createPolyhedronFromPolySet(const PolySet &ps)
 	}
 	catch (CGAL::Assertion_exception e) {
 		PRINTF("CGAL error in CGAL_Build_PolySet: %s", e.what());
-		CGAL::set_error_behaviour(old_behaviour);
+		delete P;
+		P = NULL;
 	}
+	CGAL::set_error_behaviour(old_behaviour);
 	return P;
 }
 

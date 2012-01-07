@@ -92,12 +92,6 @@ AbstractNode *RotateExtrudeModule::evaluate(const Context *ctx, const ModuleInst
 	return node;
 }
 
-void register_builtin_dxf_rotate_extrude()
-{
-	builtin_modules["dxf_rotate_extrude"] = new RotateExtrudeModule();
-	builtin_modules["rotate_extrude"] = new RotateExtrudeModule();
-}
-
 PolySet *RotateExtrudeNode::evaluate_polyset(PolySetEvaluator *evaluator) const
 {
 	if (!evaluator) {
@@ -121,10 +115,9 @@ std::string RotateExtrudeNode::toString() const
 	stream << this->name() << "(";
 	if (!this->filename.empty()) { // Ignore deprecated parameters if empty 
 		stream <<
-			"file = \"" << this->filename << "\", "
-			"cache = \"" << QFileInfo(QString::fromStdString(this->filename)) << "\", "
-			"layer = \"" << this->layername << "\", "
-			"origin = [ " << std::dec << this->origin_x << " " << this->origin_y << " ], "
+			"file = " << this->filename << ", "
+			"layer = " << QuotedString(this->layername) << ", "
+			"origin = [" << std::dec << this->origin_x << ", " << this->origin_y << "], "
 			"scale = " << this->scale << ", ";
 	}
 	stream <<
@@ -132,4 +125,10 @@ std::string RotateExtrudeNode::toString() const
 		"$fn = " << this->fn << ", $fa = " << this->fa << ", $fs = " << this->fs << ")";
 
 	return stream.str();
+}
+
+void register_builtin_dxf_rotate_extrude()
+{
+	Builtins::init("dxf_rotate_extrude", new RotateExtrudeModule());
+	Builtins::init("rotate_extrude", new RotateExtrudeModule());
 }

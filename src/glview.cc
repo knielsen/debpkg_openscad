@@ -27,6 +27,8 @@
 #include "GLView.h"
 #include "Preferences.h"
 #include "renderer.h"
+#include "rendersettings.h"
+#include "linalg.h"
 
 #include <QApplication>
 #include <QWheelEvent>
@@ -39,11 +41,20 @@
 #include <QTimer>
 #include <QTextEdit>
 #include <QVBoxLayout>
+#include <QErrorMessage>
+#include "OpenCSGWarningDialog.h"
+
 #include "mathc99.h"
 #include <stdio.h>
 
 #ifdef ENABLE_OPENCSG
 #  include <opencsg.h>
+#endif
+
+#ifdef _WIN32
+#include <GL/wglew.h>
+#elif !defined(__APPLE__)
+#include <GL/glxew.h>
 #endif
 
 #define FAR_FAR_AWAY 100000.0
@@ -83,6 +94,8 @@ void GLView::init()
 
 	setMouseTracking(true);
 #ifdef ENABLE_OPENCSG
+	this->is_opencsg_capable = false;
+	this->has_shaders = false;
 	this->opencsg_support = true;
 	static int sId = 0;
 	this->opencsg_id = sId++;
@@ -92,7 +105,7 @@ void GLView::init()
 void GLView::setRenderer(Renderer *r)
 {
 	this->renderer = r;
-	updateGL();
+	if (r) updateGL(); // Let the last image stay, e.g. to avoid animation flickering
 }
 
 void GLView::initializeGL()
@@ -124,11 +137,85 @@ void GLView::initializeGL()
 	if (GLEW_OK != err) {
 		fprintf(stderr, "GLEW Error: %s\n", glewGetErrorString(err));
 	}
+
+	GLint rbits, gbits, bbits, abits, dbits, sbits;
+	glGetIntegerv(GL_RED_BITS, &rbits);
+	glGetIntegerv(GL_GREEN_BITS, &gbits);
+	glGetIntegerv(GL_BLUE_BITS, &bbits);
+	glGetIntegerv(GL_ALPHA_BITS, &abits);
+	glGetIntegerv(GL_DEPTH_BITS, &dbits);
+	glGetIntegerv(GL_STENCIL_BITS, &sbits);
+
+
+	this->rendererInfo.sprintf("GLEW version %s\n"
+														 "OpenGL version %s\n"
+														 "%s (%s)\n\n"
+														 "RGBA(%d%d%d%d), depth(%d), stencil(%d)\n"
+														 "Extensions:\n"
+														 "%s\n",
+														 glewGetString(GLEW_VERSION),
+														 glGetString(GL_RENDERER),
+														 glGetString(GL_VENDOR),
+														 glGetString(GL_VERSION),
+														 rbits, gbits, bbits, abits, dbits, sbits,
+														 glGetString(GL_EXTENSIONS));
+// FIXME: glGetString(GL_EXTENSIONS) is deprecated in OpenGL 3.0.
+// Use: glGetIntegerv(GL_NUM_EXTENSIONS, &NumberOfExtensions) and 
+// glGetStringi(GL_EXTENSIONS, i)
+
 	const char *openscad_disable_gl20_env = getenv("OPENSCAD_DISABLE_GL20");
-	if (openscad_disable_gl20_env && !strcmp(openscad_disable_gl20_env, "0"))
+	if (openscad_disable_gl20_env && !strcmp(openscad_disable_gl20_env, "0")) {
 		openscad_disable_gl20_env = NULL;
-	if (glewIsSupported("GL_VERSION_2_0") && openscad_disable_gl20_env == NULL)
-	{
+	}
+
+	// All OpenGL 2 contexts are OpenCSG capable
+	if (GLEW_VERSION_2_0) {
+		if (!openscad_disable_gl20_env) {
+			this->is_opencsg_capable = true;
+			this->has_shaders = true;
+		}
+	}
+	// If OpenGL < 2, check for extensions
+	else {
+		if (GLEW_ARB_framebuffer_object) this->is_opencsg_capable = true;
+		else if (GLEW_EXT_framebuffer_object && GLEW_EXT_packed_depth_stencil) {
+			this->is_opencsg_capable = true;
+		}
+#ifdef WIN32
+		else if (WGLEW_ARB_pbuffer && WGLEW_ARB_pixel_format) this->is_opencsg_capable = true;
+#elif !defined(__APPLE__)
+		else if (GLXEW_SGIX_pbuffer && GLXEW_SGIX_fbconfig) this->is_opencsg_capable = true;
+#endif
+	}
+
+	if (!GLEW_VERSION_2_0 || !this->is_opencsg_capable) {
+		if (Preferences::inst()->getValue("advanced/opencsg_show_warning").toBool()) {
+			QTimer::singleShot(0, this, SLOT(display_opencsg_warning()));
+		}
+	}
+	if (opencsg_support && this->has_shaders) {
+  /*
+		Uniforms:
+		  1 color1 - face color
+			2 color2 - edge color
+			7 xscale
+			8 yscale
+
+		Attributes:
+		  3 trig
+			4 pos_b
+			5 pos_c
+			6 mask
+
+		Other:
+		  9 width
+			10 height
+
+		Outputs:
+		  tp
+			tr
+			shading
+	 */
 		const char *vs_source =
 			"uniform float xscale, yscale;\n"
 			"attribute vec3 pos_b, pos_c;\n"
@@ -154,6 +241,11 @@ void GLView::initializeGL()
 			"  shading = abs(dot(normal, lightDir));\n"
 			"}\n";
 
+		/*
+			Inputs:
+			  tp && tr - if any components of tp < tr, use color2 (edge color)
+				shading  - multiplied by color1. color2 is is without lighting
+		 */
 		const char *fs_source =
 			"uniform vec4 color1, color2;\n"
 			"varying vec3 tp, tr, tmp;\n"
@@ -212,22 +304,26 @@ void GLView::initializeGL()
 				fprintf(stderr, "OpenGL Program Validation results:\n%.*s", loglen, logbuffer);
 			}
 		}
-	} else {
-		opencsg_support = false;
-		QSettings settings;
-		if (settings.value("editor/opengl20_warning_show",true).toBool()) {
-			QTimer::singleShot(0, this, SLOT(display_opengl20_warning()));
-		}
 	}
 #endif /* ENABLE_OPENCSG */
 }
 
 #ifdef ENABLE_OPENCSG
-void GLView::display_opengl20_warning()
+void GLView::display_opencsg_warning()
 {
-	// data
-	QString title = QString("GLEW: GL_VERSION_2_0 is not supported!");
+	OpenCSGWarningDialog *dialog = new OpenCSGWarningDialog(this);
 
+	QString message;
+	if (this->is_opencsg_capable) {
+		message += "Warning: You may experience OpenCSG rendering errors.\n\n";
+	}
+	else {
+		message += "Warning: Missing OpenGL capabilities for OpenCSG - OpenCSG has been disabled.\n\n";
+		dialog->enableOpenCSGBox->hide();
+	}
+	message += "It is highly recommended to use OpenSCAD on a system with "
+		"OpenGL 2.0 or later.\n"
+		"Your renderer information is as follows:\n";
 	QString rendererinfo;
 	rendererinfo.sprintf("GLEW version %s\n"
 											 "%s (%s)\n"
@@ -235,44 +331,13 @@ void GLView::display_opengl20_warning()
 											 glewGetString(GLEW_VERSION),
 											 glGetString(GL_RENDERER), glGetString(GL_VENDOR),
 											 glGetString(GL_VERSION));
+	message += rendererinfo;
 
-	QString message = QString("Warning: No support for OpenGL 2.0 found! OpenCSG View has been disabled.\n\n"
-			"It is highly recommended to use OpenSCAD on a system with OpenGL 2.0 "
-			"support. Please check if OpenGL 2.0 drivers are available for your "	
-			"graphics hardware. Your renderer information is as follows:\n\n%1").arg(rendererinfo);
-
-	QString note = QString("Uncheck to hide this message in the future");
-
-	// presentation
-	QDialog *dialog = new QDialog(this);
-	dialog->setSizeGripEnabled(true);
-	dialog->setWindowTitle(title);
-	dialog->resize(500,300);
-
-	QVBoxLayout *layout = new QVBoxLayout(dialog);
-	dialog->setLayout(layout);
-
-	QTextEdit *textEdit = new QTextEdit(dialog);
-	textEdit->setPlainText(message);
-	layout->addWidget(textEdit);
-
-	QCheckBox *checkbox = new QCheckBox(note,dialog);
-	checkbox->setCheckState(Qt::Checked);
-	layout->addWidget(checkbox);
-
-	QDialogButtonBox *buttonbox =
-		new QDialogButtonBox(	QDialogButtonBox::Ok, Qt::Horizontal,dialog);
-	layout->addWidget(buttonbox);
-	buttonbox->button(QDialogButtonBox::Ok)->setFocus();
-	buttonbox->button(QDialogButtonBox::Ok)->setDefault(true);
-
-	// action
-	connect(buttonbox, SIGNAL(accepted()), dialog, SLOT(accept()));
-	connect(checkbox, SIGNAL(clicked(bool)),
-		Preferences::inst()->OpenGL20WarningCheckbox, SLOT(setChecked(bool)));
-	connect(checkbox, SIGNAL(clicked(bool)),
-		Preferences::inst(), SLOT(OpenGL20WarningChanged(bool)));
+	dialog->setText(message);
+	dialog->enableOpenCSGBox->setChecked(Preferences::inst()->getValue("advanced/enable_opencsg_opengl1x").toBool());
 	dialog->exec();
+
+	opencsg_support = this->is_opencsg_capable && Preferences::inst()->getValue("advanced/enable_opencsg_opengl1x").toBool();
 }
 #endif
 
@@ -317,25 +382,25 @@ void GLView::paintGL()
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	const QColor &bgcol = Preferences::inst()->color(Preferences::BACKGROUND_COLOR);
+	const QColor &bgcol = RenderSettings::inst()->color(RenderSettings::BACKGROUND_COLOR);
 	glClearColor(bgcol.redF(), bgcol.greenF(), bgcol.blueF(), 0.0);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 	gluLookAt(0.0, -viewer_distance, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
 
-	glTranslated(object_trans_x, object_trans_y, object_trans_z);
-
 	glRotated(object_rot_x, 1.0, 0.0, 0.0);
 	glRotated(object_rot_y, 0.0, 1.0, 0.0);
 	glRotated(object_rot_z, 0.0, 0.0, 1.0);
+
+	glTranslated(object_trans_x, object_trans_y, object_trans_z);
 
   // FIXME: Crosshairs and axes are lighted, this doesn't make sense and causes them
   // to change color based on view orientation.
 	if (showcrosshairs)
 	{
 		glLineWidth(3);
-		const QColor &col = Preferences::inst()->color(Preferences::CROSSHAIR_COLOR);
+		const QColor &col = RenderSettings::inst()->color(RenderSettings::CROSSHAIR_COLOR);
 		glColor3f(col.redF(), col.greenF(), col.blueF());
 		glBegin(GL_LINES);
 		for (double xf = -1; xf <= +1; xf += 2)
@@ -435,9 +500,11 @@ void GLView::paintGL()
 
 		// FIXME: This was an attempt to keep contrast with background, but is suboptimal
 		// (e.g. nearly invisible against a gray background).
-		int r,g,b;
-		bgcol.getRgb(&r, &g, &b);
-		glColor3d((255.0-r)/255.0, (255.0-g)/255.0, (255.0-b)/255.0);
+//		int r,g,b;
+//		r=g=b=0;
+//		bgcol.getRgb(&r, &g, &b);
+//		glColor3f((255.0f-r)/255.0f, (255.0f-g)/255.0f, (255.0f-b)/255.0f);
+		glColor3f(0.0f, 0.0f, 0.0f);
 		glBegin(GL_LINES);
 		// X Label
 		glVertex3d(xlabel_x-3, xlabel_y-3, 0); glVertex3d(xlabel_x+3, xlabel_y+3, 0);
@@ -493,7 +560,6 @@ void GLView::mousePressEvent(QMouseEvent *event)
 	setFocus();
 }
 
-
 void GLView::normalizeAngle(GLdouble& angle)
 {
 	while(angle < 0)
@@ -508,7 +574,13 @@ void GLView::mouseMoveEvent(QMouseEvent *event)
 	double dx = (this_mouse.x()-last_mouse.x()) * 0.7;
 	double dy = (this_mouse.y()-last_mouse.y()) * 0.7;
 	if (mouse_drag_active) {
-		if ((event->buttons() & Qt::LeftButton) != 0) {
+		if (event->buttons() & Qt::LeftButton
+#ifdef Q_WS_MAC
+				&& !(event->modifiers() & Qt::MetaModifier)
+#endif
+			) {
+			// Left button rotates in xz, Shift-left rotates in xy
+			// On Mac, Ctrl-Left is handled as right button on other platforms
 			object_rot_x += dy;
 			if ((QApplication::keyboardModifiers() & Qt::ShiftModifier) != 0)
 				object_rot_y += dx;
@@ -519,11 +591,42 @@ void GLView::mouseMoveEvent(QMouseEvent *event)
 			normalizeAngle(object_rot_y);
 			normalizeAngle(object_rot_z);
 		} else {
+			// Right button pans
+			// Shift-right zooms
 			if ((QApplication::keyboardModifiers() & Qt::ShiftModifier) != 0) {
 				viewer_distance += (GLdouble)dy;
 			} else {
-				object_trans_x += dx;
-				object_trans_z -= dy;
+
+      double mx = +(dx) * viewer_distance/1000;
+      double my = -(dy) * viewer_distance/1000;
+
+			Matrix3d aax, aay, aaz, tm3;
+			aax = Eigen::AngleAxisd(-(object_rot_x/180) * M_PI, Vector3d::UnitX());
+			aay = Eigen::AngleAxisd(-(object_rot_y/180) * M_PI, Vector3d::UnitY());
+			aaz = Eigen::AngleAxisd(-(object_rot_z/180) * M_PI, Vector3d::UnitZ());
+			tm3 = Matrix3d::Identity();
+			tm3 = aaz * (aay * (aax * tm3));
+
+			Matrix4d tm;
+			tm = Matrix4d::Identity();
+			for (int i=0;i<3;i++) for (int j=0;j<3;j++) tm(j,i)=tm3(j,i);
+
+			Matrix4d vec;
+			vec <<
+        0,  0,  0,  mx,
+        0,  0,  0,  0,
+        0,  0,  0,  my,
+        0,  0,  0,  1
+			;
+			if ((QApplication::keyboardModifiers() & Qt::ShiftModifier) != 0) {
+        vec(0,3) = 0;
+        vec(1,3) = my;
+        vec(2,3) = 0;
+      }
+      tm = tm * vec;
+      object_trans_x += tm(0,3);
+      object_trans_y += tm(1,3);
+      object_trans_z += tm(2,3);
 			}
 		}
 		updateGL();

@@ -45,6 +45,7 @@ Context::Context(const Context *parent, const Module *library)
 	ctx_stack.push_back(this);
 	if (parent) document_path = parent->document_path;
 	if (library) {
+		// FIXME: Don't access module members directly
 		this->functions_p = &library->functions;
 		this->modules_p = &library->modules;
 		this->usedlibs_p = &library->usedlibs;
@@ -148,35 +149,24 @@ Value Context::evaluate_function(const std::string &name,
 
 AbstractNode *Context::evaluate_module(const ModuleInstantiation &inst) const
 {
-	if (this->modules_p && this->modules_p->find(inst.modname) != this->modules_p->end()) {
-		AbstractModule *m = this->modules_p->find(inst.modname)->second;
-		if (m == builtin_modules["dxf_linear_extrude"]) {
-			PRINTF("DEPRECATED: The dxf_linear_extrude() module will be removed in future releases. Use a linear_extrude() instead.");
-		}
-		else if (m == builtin_modules["dxf_rotate_extrude"]) {
-			PRINTF("DEPRECATED: The dxf_rotate_extrude() module will be removed in future releases. Use a rotate_extrude() instead.");
-		}
-		else if (m == builtin_modules["import_stl"]) {
-			PRINTF("DEPRECATED: The import_stl() module will be removed in future releases. Use import() instead.");
-		}
-		else if (m == builtin_modules["import_dxf"]) {
-			PRINTF("DEPRECATED: The import_dxf() module will be removed in future releases. Use import() instead.");
-		}
-		else if (m == builtin_modules["import_off"]) {
-			PRINTF("DEPRECATED: The import_off() module will be removed in future releases. Use import() instead.");
+	if (this->modules_p && this->modules_p->find(inst.name()) != this->modules_p->end()) {
+		AbstractModule *m = this->modules_p->find(inst.name())->second;
+		std::string replacement = Builtins::instance()->isDeprecated(inst.name());
+		if (!replacement.empty()) {
+			PRINTF("DEPRECATED: The %s() module will be removed in future releases. Use %s() instead.", inst.name().c_str(), replacement.c_str());
 		}
 		return m->evaluate(this, &inst);
 	}
 	if (this->usedlibs_p) {
 		BOOST_FOREACH(const ModuleContainer::value_type &m, *this->usedlibs_p) {
-			if (m.second->modules.find(inst.modname) != m.second->modules.end()) {
+			if (m.second->modules.find(inst.name()) != m.second->modules.end()) {
 				Context ctx(this->parent, m.second);
-				return m.second->modules[inst.modname]->evaluate(&ctx, &inst);
+				return m.second->modules[inst.name()]->evaluate(&ctx, &inst);
 			}
 		}
 	}
 	if (this->parent) return this->parent->evaluate_module(inst);
-	PRINTF("WARNING: Ignoring unknown module '%s'.", inst.modname.c_str());
+	PRINTF("WARNING: Ignoring unknown module '%s'.", inst.name().c_str());
 	return NULL;
 }
 
@@ -192,4 +182,24 @@ std::string Context::getAbsolutePath(const std::string &filename) const
 	else {
 		return filename;
 	}
+}
+
+void register_builtin(Context &ctx)
+{
+	ctx.functions_p = &Builtins::instance()->functions();
+	ctx.modules_p = &Builtins::instance()->modules();
+	ctx.set_variable("$fn", Value(0.0));
+	ctx.set_variable("$fs", Value(2.0));
+	ctx.set_variable("$fa", Value(12.0));
+	ctx.set_variable("$t", Value(0.0));
+	
+	Value zero3;
+	zero3.type = Value::VECTOR;
+	zero3.append(new Value(0.0));
+	zero3.append(new Value(0.0));
+	zero3.append(new Value(0.0));
+	ctx.set_variable("$vpt", zero3);
+	ctx.set_variable("$vpr", zero3);
+
+	ctx.set_constant("PI",Value(M_PI));
 }

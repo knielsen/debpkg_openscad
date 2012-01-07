@@ -58,7 +58,7 @@ public:
 	virtual std::string toString() const;
 	virtual std::string name() const { return "surface"; }
 
-	std::string filename;
+	Filename filename;
 	bool center;
 	int convexity;
 	virtual PolySet *evaluate_polyset(class PolySetEvaluator *) const;
@@ -90,11 +90,6 @@ AbstractNode *SurfaceModule::evaluate(const Context *ctx, const ModuleInstantiat
 	}
 
 	return node;
-}
-
-void register_builtin_surface()
-{
-	builtin_modules["surface"] = new SurfaceModule();
 }
 
 PolySet *SurfaceNode::evaluate_polyset(class PolySetEvaluator *) const
@@ -134,8 +129,8 @@ PolySet *SurfaceNode::evaluate_polyset(class PolySetEvaluator *) const
 
 	p->convexity = convexity;
 
-	double ox = center ? -columns/2.0 : 0;
-	double oy = center ? -lines/2.0 : 0;
+	double ox = center ? -(columns-1)/2.0 : 0;
+	double oy = center ? -(lines-1)/2.0 : 0;
 
 	for (int i = 1; i < lines; i++)
 	for (int j = 1; j < columns; j++)
@@ -214,8 +209,13 @@ std::string SurfaceNode::toString() const
 {
 	std::stringstream stream;
 
-	stream << this->name() << "(file = \"" << this->filename
-				 << "\", center = " << (this->center ? "true" : "false") << ")";
+	stream << this->name() << "(file = " << this->filename << ", "
+		"center = " << (this->center ? "true" : "false") << ")";
 
 	return stream.str();
+}
+
+void register_builtin_surface()
+{
+	Builtins::init("surface", new SurfaceModule());
 }

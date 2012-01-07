@@ -24,8 +24,8 @@
  *
  */
 
+#include "tests-common.h"
 #include "openscad.h"
-#include "handle_dep.h"
 #include "node.h"
 #include "module.h"
 #include "context.h"
@@ -59,6 +59,10 @@ static void outfile_handler(const std::string &msg, void *userdata) {
 
 int main(int argc, char **argv)
 {
+#ifdef WIN32
+  _set_output_format(_TWO_DIGIT_EXPONENT);
+#endif
+
 	if (argc != 3) {
 		fprintf(stderr, "Usage: %s <file.scad> <output.txt>\n", argv[0]);
 		exit(1);
@@ -76,8 +80,7 @@ int main(int argc, char **argv)
 	}
 	set_output_handler(&outfile_handler, &ofile);
 
-	initialize_builtin_functions();
-	initialize_builtin_modules();
+	Builtins::instance()->initialize();
 
 	QApplication app(argc, argv, false);
 	QDir original_path = QDir::current();
@@ -104,56 +107,27 @@ int main(int argc, char **argv)
 	}
 
 	Context root_ctx;
-	root_ctx.functions_p = &builtin_functions;
-	root_ctx.modules_p = &builtin_modules;
-	root_ctx.set_variable("$fn", Value(0.0));
-	root_ctx.set_variable("$fs", Value(1.0));
-	root_ctx.set_variable("$fa", Value(12.0));
-	root_ctx.set_variable("$t", Value(0.0));
-
-	Value zero3;
-	zero3.type = Value::VECTOR;
-	zero3.append(new Value(0.0));
-	zero3.append(new Value(0.0));
-	zero3.append(new Value(0.0));
-	root_ctx.set_variable("$vpt", zero3);
-	root_ctx.set_variable("$vpr", zero3);
-
+	register_builtin(root_ctx);
 
 	AbstractModule *root_module;
 	ModuleInstantiation root_inst;
 	AbstractNode *root_node;
 
-	QFileInfo fileInfo(filename);
-	handle_dep(filename);
-	FILE *fp = fopen(filename, "rt");
-	if (!fp) {
-		fprintf(stderr, "Can't open input file `%s'!\n", filename);
+	root_module = parsefile(filename);
+	if (!root_module) {
 		exit(1);
-	} else {
-		std::stringstream text;
-		char buffer[513];
-		int ret;
-		while ((ret = fread(buffer, 1, 512, fp)) > 0) {
-			buffer[ret] = 0;
-			text << buffer;
-		}
-		fclose(fp);
-		text << commandline_commands;
-		root_module = parse(text.str().c_str(), fileInfo.absolutePath().toLocal8Bit(), false);
-		if (!root_module) {
-			exit(1);
-		}
 	}
 
+	QFileInfo fileInfo(filename);
 	QDir::setCurrent(fileInfo.absolutePath());
 
 	AbstractNode::resetIndexCounter();
 	root_node = root_module->evaluate(&root_ctx, &root_inst);
 
-	destroy_builtin_functions();
-	destroy_builtin_modules();
+	delete root_node;
+	delete root_module;
 
+	Builtins::instance(true);
 	ofile.close();
 	return rc;
 }

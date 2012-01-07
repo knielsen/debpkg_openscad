@@ -30,6 +30,8 @@
 
 #include "system-gl.h"
 
+#include <boost/unordered_map.hpp>
+
 ThrownTogetherRenderer::ThrownTogetherRenderer(CSGChain *root_chain, 
 																							 CSGChain *highlights_chain,
 																							 CSGChain *background_chain)
@@ -38,7 +40,7 @@ ThrownTogetherRenderer::ThrownTogetherRenderer(CSGChain *root_chain,
 {
 }
 
-void ThrownTogetherRenderer::draw(bool showfaces, bool showedges) const
+void ThrownTogetherRenderer::draw(bool /*showfaces*/, bool showedges) const
 {
 	if (this->root_chain) {
 		glEnable(GL_CULL_FACE);
@@ -60,59 +62,56 @@ void ThrownTogetherRenderer::renderCSGChain(CSGChain *chain, bool highlight,
 																						bool fberror) const
 {
 	glDepthFunc(GL_LEQUAL);
-	QHash<QPair<PolySet*,Transform3d*>,int> polySetVisitMark;
+	boost::unordered_map<std::pair<PolySet*,Transform3d*>,int> polySetVisitMark;
 	for (size_t i = 0; i < chain->polysets.size(); i++) {
-		if (polySetVisitMark[QPair<PolySet*,Transform3d*>(chain->polysets[i].get(), &chain->matrices[i])]++ > 0)
+		if (polySetVisitMark[std::make_pair(chain->polysets[i].get(), &chain->matrices[i])]++ > 0)
 			continue;
 		const Transform3d &m = chain->matrices[i];
-		double *c = chain->colors[i];
+		const Color4f &c = chain->colors[i];
 		glPushMatrix();
 		glMultMatrixd(m.data());
-		int csgmode = chain->types[i] == CSGTerm::TYPE_DIFFERENCE ? PolySet::CSGMODE_DIFFERENCE : PolySet::CSGMODE_NORMAL;
+		PolySet::csgmode_e csgmode  = chain->types[i] == CSGTerm::TYPE_DIFFERENCE ? PolySet::CSGMODE_DIFFERENCE : PolySet::CSGMODE_NORMAL;
 		if (highlight) {
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_HIGHLIGHT, PolySet::csgmode_e(csgmode + 20), m);
+			csgmode = PolySet::csgmode_e(csgmode + 20);
+			setColor(COLORMODE_HIGHLIGHT);
+			chain->polysets[i]->render_surface(csgmode, m);
 			if (showedges) {
-				glDisable(GL_LIGHTING);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_HIGHLIGHT, PolySet::csgmode_e(csgmode + 20));
-				glEnable(GL_LIGHTING);
+				setColor(COLORMODE_HIGHLIGHT_EDGES);
+				chain->polysets[i]->render_edges(csgmode);
 			}
 		} else if (background) {
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_BACKGROUND, PolySet::csgmode_e(csgmode + 10), m);
+			csgmode = PolySet::csgmode_e(csgmode + 10);
+			setColor(COLORMODE_BACKGROUND);
+			chain->polysets[i]->render_surface(csgmode, m);
 			if (showedges) {
-				glDisable(GL_LIGHTING);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_BACKGROUND, PolySet::csgmode_e(csgmode + 10));
-				glEnable(GL_LIGHTING);
+				setColor(COLORMODE_BACKGROUND_EDGES);
+				chain->polysets[i]->render_edges(csgmode);
 			}
 		} else if (fberror) {
-			if (highlight) {
-				chain->polysets[i]->render_surface(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode + 20), m);
-			} else if (background) {
-				chain->polysets[i]->render_surface(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode + 10), m);
-			} else {
-				chain->polysets[i]->render_surface(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode), m);
-			}
-		} else if (c[0] >= 0 || c[1] >= 0 || c[2] >= 0) {
-			glColor4dv(c);
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode), m);
+			if (highlight) csgmode = PolySet::csgmode_e(csgmode + 20);
+			else if (background) csgmode = PolySet::csgmode_e(csgmode + 10);
+			else csgmode = PolySet::csgmode_e(csgmode);
+			chain->polysets[i]->render_surface(csgmode, m);
+		} else if (c[0] >= 0 || c[1] >= 0 || c[2] >= 0 || c[3] >= 0) {
+			setColor(c.data());
+			chain->polysets[i]->render_surface(csgmode, m);
 			if (showedges) {
-				glDisable(GL_LIGHTING);
-				glColor4d((c[0]+1)/2, (c[1]+1)/2, (c[2]+1)/2, 1.0);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_NONE, PolySet::csgmode_e(csgmode));
-				glEnable(GL_LIGHTING);
+				glColor4f((c[0]+1)/2, (c[1]+1)/2, (c[2]+1)/2, 1.0);
+				chain->polysets[i]->render_edges(csgmode);
 			}
 		} else if (chain->types[i] == CSGTerm::TYPE_DIFFERENCE) {
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_CUTOUT, PolySet::csgmode_e(csgmode), m);
+			setColor(COLORMODE_CUTOUT);
+			chain->polysets[i]->render_surface(csgmode, m);
 			if (showedges) {
-				glDisable(GL_LIGHTING);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_CUTOUT, PolySet::csgmode_e(csgmode));
-				glEnable(GL_LIGHTING);
+				setColor(COLORMODE_CUTOUT_EDGES);
+				chain->polysets[i]->render_edges(csgmode);
 			}
 		} else {
-			chain->polysets[i]->render_surface(PolySet::COLORMODE_MATERIAL, PolySet::csgmode_e(csgmode), m);
+			setColor(COLORMODE_MATERIAL);
+			chain->polysets[i]->render_surface(csgmode, m);
 			if (showedges) {
-				glDisable(GL_LIGHTING);
-				chain->polysets[i]->render_edges(PolySet::COLORMODE_MATERIAL, PolySet::csgmode_e(csgmode));
-				glEnable(GL_LIGHTING);
+				setColor(COLORMODE_MATERIAL_EDGES);
+				chain->polysets[i]->render_edges(csgmode);
 			}
 		}
 		glPopMatrix();

@@ -26,6 +26,7 @@ import re
 import getopt
 import shutil
 import platform
+import string
 
 def initialize_environment():
     if not options.generate: options.generate = bool(os.getenv("TEST_GENERATE"))
@@ -35,6 +36,7 @@ def init_expected_filename(testname, cmd):
     global expecteddir, expectedfilename
     expecteddir = os.path.join(options.regressiondir, os.path.split(cmd)[1])
     expectedfilename = os.path.join(expecteddir, testname + "-expected." + options.suffix)
+    expectedfilename = os.path.normpath( expectedfilename )
 
 def verify_test(testname, cmd):
     global expectedfilename
@@ -47,14 +49,16 @@ def verify_test(testname, cmd):
 def execute_and_redirect(cmd, params, outfile):
     retval = -1
     try:
-        proc = subprocess.Popen([cmd] + params, stdout=outfile)
+        proc = subprocess.Popen([cmd] + params, stdout=outfile, stderr=subprocess.STDOUT)
+        out = proc.communicate()[0]
         retval = proc.wait()
     except:
         print >> sys.stderr, "Error running subprocess: ", sys.exc_info()[1]
         print >> sys.stderr, " cmd:", cmd
         print >> sys.stderr, " params:", params
         print >> sys.stderr, " outfile:", outfile
-    return retval
+    if outfile == subprocess.PIPE: return (retval, out)
+    else: return retval
 
 def get_normalized_text(filename):
     text = open(filename).read()
@@ -64,19 +68,51 @@ def compare_text(expected, actual):
     return get_normalized_text(expected) == get_normalized_text(actual)
 
 def compare_default(resultfilename):
+    print >> sys.stderr, 'diff text compare: '
+    print >> sys.stderr, ' expected textfile: ', expectedfilename
+    print >> sys.stderr, ' actual textfile: ', resultfilename
     if not compare_text(expectedfilename, resultfilename): 
         execute_and_redirect("diff", [expectedfilename, resultfilename], sys.stderr)
         return False
     return True
 
 def compare_png(resultfilename):
+    compare_method = 'pixel'
+    #args = [expectedfilename, resultfilename, "-alpha", "Off", "-compose", "difference", "-composite", "-threshold", "10%", "-blur", "2", "-threshold", "30%", "-format", "%[fx:w*h*mean]", "info:"]
+    args = [expectedfilename, resultfilename, "-alpha", "Off", "-compose", "difference", "-composite", "-threshold", "10%", "-morphology", "Erode", "Square", "-format", "%[fx:w*h*mean]", "info:"]
+
+    # for systems with older imagemagick that doesnt support '-morphology'
+    # http://www.imagemagick.org/Usage/morphology/#alturnative
+    if options.comparator == 'old':
+      args = [expectedfilename, resultfilename, "-alpha", "Off", "-compose", "difference", "-composite", "-threshold", "10%", "-gaussian-blur","3x65535", "-threshold", "99.99%", "-format", "%[fx:w*h*mean]", "info:"]
+
+    if options.comparator == 'ncc':
+      # for systems where imagemagick crashes when using the above comparators
+      args = [expectedfilename, resultfilename, "-alpha", "Off", "-compose", "difference", "-metric", "NCC", "tmp.png"]
+      options.convert_exec = 'compare'
+      compare_method = 'NCC'
+
+    msg = 'ImageMagick image comparison: '  + options.convert_exec + ' '+ ' '.join(args[2:])
+    msg += '\n expected image: ' + expectedfilename + '\n'
+    print >> sys.stderr, msg
     if not resultfilename:
-        print >> sys.stderr, "Error: OpenSCAD did not generate an image"
+        print >> sys.stderr, "Error: OpenSCAD did not generate an image to test"
         return False
-    print >> sys.stderr, 'Yee image compare: ', expectedfilename, ' ', resultfilename
-    if execute_and_redirect("./yee_compare", [expectedfilename, resultfilename, "-downsample", "2", "-threshold", "300"], sys.stderr) != 0:
-        return False
-    return True
+    print >> sys.stderr, ' actual image: ', resultfilename
+
+    (retval, output) = execute_and_redirect(options.convert_exec, args, subprocess.PIPE)
+    print "Imagemagick return", retval, "output:", output
+    if retval == 0:
+	if compare_method=='pixel':
+            pixelerr = int(float(output.strip()))
+            if pixelerr < 32: return True
+            else: print >> sys.stderr, pixelerr, ' pixel errors'
+	elif compare_method=='NCC':
+            thresh = 0.95
+            ncc_err = float(output.strip())
+            if ncc_err > thresh or ncc_err==0.0: return True
+            else: print >> sys.stderr, ncc_err, ' Images differ: NCC comparison < ', thresh
+    return False
 
 def compare_with_expected(resultfilename):
     if not options.generate:
@@ -129,11 +165,12 @@ def usage():
     print >> sys.stderr, "  -g, --generate        Generate expected output for the given tests"
     print >> sys.stderr, "  -s, --suffix=<suffix> Write -expected and -actual files with the given suffix instead of .txt"
     print >> sys.stderr, "  -t, --test=<name>     Specify test name instead of deducting it from the argument"
+    print >> sys.stderr, "  -c, --convexec=<name> Path to ImageMagick 'convert' executable"
 
 if __name__ == '__main__':
     # Handle command-line arguments
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gs:t:", ["generate", "suffix=", "test="])
+        opts, args = getopt.getopt(sys.argv[1:], "gs:c:t:m:", ["generate", "convexec=", "suffix=", "test=", "comparator="])
     except getopt.GetoptError, err:
         usage()
         sys.exit(2)
@@ -151,6 +188,10 @@ if __name__ == '__main__':
             else: options.suffix = a
         elif o in ("-t", "--test"):
             options.testname = a
+        elif o in ("-c", "--convexec"): 
+            options.convert_exec = os.path.normpath( a )
+        elif o in ("-m", "--comparator"):
+            options.comparator = a
 
     # <cmdline-tool> and <argument>
     if len(args) < 2:

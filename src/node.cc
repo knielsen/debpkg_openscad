@@ -78,7 +78,9 @@ std::string AbstractIntersectionNode::toString() const
 
 std::string AbstractIntersectionNode::name() const
 {
-	return "intersection_for";
+  // We write intersection here since the module will have to be evaluated
+	// before we get here and it will not longer retain the intersection_for parameters
+	return "intersection";
 }
 
 void AbstractNode::progress_prepare()
@@ -94,6 +96,8 @@ void AbstractNode::progress_report() const
 
 std::ostream &operator<<(std::ostream &stream, const AbstractNode &node)
 {
+	// FIXME: Don't use deep access to modinst members
+	if (node.modinst->isBackground()) stream << "%";
 	stream << node.toString();
 	return stream;
 }

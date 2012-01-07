@@ -16,8 +16,15 @@
 #include "CGALCache.h"
 #include "cgal.h"
 #include "cgalutils.h"
-#include <CGAL/assertions_behaviour.h>
-#include <CGAL/exceptions.h>
+
+#ifdef NDEBUG
+#define PREV_NDEBUG NDEBUG
+#undef NDEBUG
+#endif
+#include <CGAL/convex_hull_3.h>
+#ifdef PREV_NDEBUG
+#define NDEBUG PREV_NDEBUG
+#endif
 
 #include <string>
 #include <map>
@@ -28,6 +35,8 @@
 #include <QRegExp>
 
 #include <boost/foreach.hpp>
+#include <boost/unordered_map.hpp>
+#include <boost/bind.hpp>
 
 CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const AbstractNode &node)
 {
@@ -56,20 +65,29 @@ void CGALEvaluator::process(CGAL_Nef_polyhedron &target, const CGAL_Nef_polyhedr
 	if (src.empty()) return; // Empty polyhedron. This can happen for e.g. square([0,0])
 	if (target.dim != src.dim) return; // If someone tries to e.g. union 2d and 3d objects
 
-	switch (op) {
-	case CGE_UNION:
-		target += src;
-		break;
-	case CGE_INTERSECTION:
-		target *= src;
-		break;
-	case CGE_DIFFERENCE:
-		target -= src;
-		break;
-	case CGE_MINKOWSKI:
-		target.minkowski(src);
-		break;
+	CGAL::Failure_behaviour old_behaviour = CGAL::set_error_behaviour(CGAL::THROW_EXCEPTION);
+	try {
+		switch (op) {
+		case CGE_UNION:
+			target += src;
+			break;
+		case CGE_INTERSECTION:
+			target *= src;
+			break;
+		case CGE_DIFFERENCE:
+			target -= src;
+			break;
+		case CGE_MINKOWSKI:
+			target.minkowski(src);
+			break;
+		}
 	}
+	catch (CGAL::Assertion_exception e) {
+		// union && difference assert triggered by testdata/scad/bugs/rotate-diff-nonmanifold-crash.scad
+		std::string opstr = op == CGE_UNION ? "union" : op == CGE_INTERSECTION ? "intersection" : op == CGE_DIFFERENCE ? "difference" : op == CGE_MINKOWSKI ? "minkowski" : "UNKNOWN";
+		PRINTF("CGAL error in CGAL_Nef_polyhedron's %s operator: %s", opstr.c_str(), e.what());
+	}
+	CGAL::set_error_behaviour(old_behaviour);
 }
 
 /*!
@@ -81,7 +99,7 @@ CGAL_Nef_polyhedron CGALEvaluator::applyToChildren(const AbstractNode &node, CGA
 		const AbstractNode *chnode = item.first;
 		const CGAL_Nef_polyhedron &chN = item.second;
 		// FIXME: Don't use deep access to modinst members
-		if (chnode->modinst->tag_background) continue;
+		if (chnode->modinst->isBackground()) continue;
 
     // NB! We insert into the cache here to ensure that all children of
     // a node is a valid object. If we inserted as we created them, the 
@@ -98,30 +116,53 @@ CGAL_Nef_polyhedron CGALEvaluator::applyToChildren(const AbstractNode &node, CGA
 	return N;
 }
 
-extern CGAL_Nef_polyhedron2 *convexhull2(std::list<CGAL_Nef_polyhedron2*> a);
-
 CGAL_Nef_polyhedron CGALEvaluator::applyHull(const CgaladvNode &node)
 {
 	CGAL_Nef_polyhedron N;
 	std::list<CGAL_Nef_polyhedron2*> polys;
-	bool all2d = true;
+	std::list<CGAL_Nef_polyhedron2::Point> points2d;
+	std::list<CGAL_Polyhedron::Vertex::Point_3> points3d;
+	int dim = 0;
 	BOOST_FOREACH(const ChildItem &item, this->visitedchildren[node.index()]) {
 		const AbstractNode *chnode = item.first;
 		const CGAL_Nef_polyhedron &chN = item.second;
 		// FIXME: Don't use deep access to modinst members
-		if (chnode->modinst->tag_background) continue;
-		if (chN.dim == 2) {
-			polys.push_back(chN.p2.get());
+		if (chnode->modinst->isBackground()) continue;
+		if (dim == 0) {
+			dim = chN.dim;
 		}
-		else if (chN.dim == 3) {
-			PRINT("WARNING: hull() is not implemented yet for 3D objects!");
-			all2d = false;
+		else if (dim != chN.dim) {
+			PRINT("WARNING: hull() does not support mixing 2D and 3D objects.");
+			continue;
+		}
+		if (dim == 2) {
+			CGAL_Nef_polyhedron2::Explorer explorer = chN.p2->explorer();
+			BOOST_FOREACH(const CGAL_Nef_polyhedron2::Explorer::Vertex &vh, 
+										std::make_pair(explorer.vertices_begin(), explorer.vertices_end())) {
+				if (explorer.is_standard(&vh)) {
+					points2d.push_back(explorer.point(&vh));
+				}
+			}
+		}
+		else if (dim == 3) {
+			CGAL_Polyhedron P;
+			chN.p3->convert_to_Polyhedron(P);
+			std::transform(P.vertices_begin(), P.vertices_end(), std::back_inserter(points3d), 
+										 boost::bind(static_cast<const CGAL_Polyhedron::Vertex::Point_3&(CGAL_Polyhedron::Vertex::*)() const>(&CGAL_Polyhedron::Vertex::point), _1));
 		}
 		chnode->progress_report();
 	}
 	
-	if (all2d) {
-		N = CGAL_Nef_polyhedron(convexhull2(polys));
+	if (dim == 2) {
+		std::list<CGAL_Nef_polyhedron2::Point> result;
+		CGAL::convex_hull_2(points2d.begin(), points2d.end(),std:: back_inserter(result));
+		N = CGAL_Nef_polyhedron(new CGAL_Nef_polyhedron2(result.begin(), result.end(), 
+																										 CGAL_Nef_polyhedron2::INCLUDED));
+	}
+	else if (dim == 3) {
+		CGAL_Polyhedron P;
+		CGAL::convex_hull_3(points3d.begin(), points3d.end(), P);
+		N = CGAL_Nef_polyhedron(new CGAL_Nef_polyhedron3(P));
 	}
 	return N;
 }
@@ -383,9 +424,10 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 		struct PolyReducer
 		{
 			Grid2d<int> grid;
-			QHash< QPair<int,int>, QPair<int,int> > egde_to_poly;
-			QHash< int, CGAL_Nef_polyhedron2::Point > points;
-			QHash< int, QList<int> > polygons;
+			boost::unordered_map<std::pair<int,int>, std::pair<int,int> > edge_to_poly;
+			boost::unordered_map<int, CGAL_Nef_polyhedron2::Point> points;
+			typedef boost::unordered_map<int, std::vector<int> > PolygonMap;
+			PolygonMap polygons;
 			int poly_n;
 
 			void add_edges(int pn)
@@ -394,10 +436,10 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 					int a = this->polygons[pn][j-1];
 					int b = this->polygons[pn][j % this->polygons[pn].size()];
 					if (a > b) { a = a^b; b = a^b; a = a^b; }
-					if (this->egde_to_poly[QPair<int,int>(a, b)].first == 0)
-						this->egde_to_poly[QPair<int,int>(a, b)].first = pn;
-					else if (this->egde_to_poly[QPair<int,int>(a, b)].second == 0)
-						this->egde_to_poly[QPair<int,int>(a, b)].second = pn;
+					if (this->edge_to_poly[std::pair<int,int>(a, b)].first == 0)
+						this->edge_to_poly[std::pair<int,int>(a, b)].first = pn;
+					else if (this->edge_to_poly[std::pair<int,int>(a, b)].second == 0)
+						this->edge_to_poly[std::pair<int,int>(a, b)].second = pn;
 					else
 						abort();
 				}
@@ -409,12 +451,12 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 					int a = this->polygons[pn][j-1];
 					int b = this->polygons[pn][j % this->polygons[pn].size()];
 					if (a > b) { a = a^b; b = a^b; a = a^b; }
-					if (this->egde_to_poly[QPair<int,int>(a, b)].first == pn)
-						this->egde_to_poly[QPair<int,int>(a, b)].first = 0;
-					if (this->egde_to_poly[QPair<int,int>(a, b)].second == pn)
-						this->egde_to_poly[QPair<int,int>(a, b)].second = 0;
+					if (this->edge_to_poly[std::pair<int,int>(a, b)].first == pn)
+						this->edge_to_poly[std::pair<int,int>(a, b)].first = 0;
+					if (this->edge_to_poly[std::pair<int,int>(a, b)].second == pn)
+						this->edge_to_poly[std::pair<int,int>(a, b)].second = 0;
 				}
-				this->polygons.remove(pn);
+				this->polygons.erase(pn);
 			}
 
 			PolyReducer(const PolySet &ps) : grid(GRID_COARSE), poly_n(1)
@@ -429,12 +471,13 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 							// Filter away two vertices with the same index (due to grid)
 							// This could be done in a more general way, but we'd rather redo the entire
 							// grid concept instead.
-							if (this->polygons[this->poly_n].indexOf(idx) == -1) {
-								this->polygons[this->poly_n].append(this->grid.data(x, y));
+							std::vector<int> &poly = this->polygons[this->poly_n];
+							if (std::find(poly.begin(), poly.end(), idx) == poly.end()) {
+								poly.push_back(this->grid.data(x, y));
 							}
 						} else {
 							this->grid.align(x, y) = point_n;
-							this->polygons[this->poly_n].append(point_n);
+							this->polygons[this->poly_n].push_back(point_n);
 							this->points[point_n] = CGAL_Nef_polyhedron2::Point(x, y);
 							point_n++;
 						}
@@ -444,7 +487,7 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 						this->poly_n++;
 					}
 					else {
-						this->polygons.remove(this->poly_n);
+						this->polygons.erase(this->poly_n);
 					}
 				}
 			}
@@ -453,11 +496,11 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 			{
 				for (int i = 1; i < this->polygons[p1].size(); i++) {
 					int j = (p1e + i) % this->polygons[p1].size();
-					this->polygons[this->poly_n].append(this->polygons[p1][j]);
+					this->polygons[this->poly_n].push_back(this->polygons[p1][j]);
 				}
 				for (int i = 1; i < this->polygons[p2].size(); i++) {
 					int j = (p2e + i) % this->polygons[p2].size();
-					this->polygons[this->poly_n].append(this->polygons[p2][j]);
+					this->polygons[this->poly_n].push_back(this->polygons[p2][j]);
 				}
 				del_poly(p1);
 				del_poly(p2);
@@ -467,25 +510,22 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 
 			void reduce()
 			{
-				QList<int> work_queue;
-				QHashIterator< int, QList<int> > it(polygons);
-				while (it.hasNext()) {
-					it.next();
-					work_queue.append(it.key());
+				std::deque<int> work_queue;
+				BOOST_FOREACH(const PolygonMap::value_type &i, polygons) {
+					work_queue.push_back(i.first);
 				}
-				while (!work_queue.isEmpty()) {
-					int poly1_n = work_queue.first();
-					work_queue.removeFirst();
-					if (!this->polygons.contains(poly1_n))
-						continue;
+				while (!work_queue.empty()) {
+					int poly1_n = work_queue.front();
+					work_queue.pop_front();
+					if (this->polygons.find(poly1_n) == this->polygons.end()) continue;
 					for (int j = 1; j <= this->polygons[poly1_n].size(); j++) {
 						int a = this->polygons[poly1_n][j-1];
 						int b = this->polygons[poly1_n][j % this->polygons[poly1_n].size()];
 						if (a > b) { a = a^b; b = a^b; a = a^b; }
-						if (this->egde_to_poly[QPair<int,int>(a, b)].first != 0 &&
-								this->egde_to_poly[QPair<int,int>(a, b)].second != 0) {
-							int poly2_n = this->egde_to_poly[QPair<int,int>(a, b)].first +
-									this->egde_to_poly[QPair<int,int>(a, b)].second - poly1_n;
+						if (this->edge_to_poly[std::pair<int,int>(a, b)].first != 0 &&
+								this->edge_to_poly[std::pair<int,int>(a, b)].second != 0) {
+							int poly2_n = this->edge_to_poly[std::pair<int,int>(a, b)].first +
+									this->edge_to_poly[std::pair<int,int>(a, b)].second - poly1_n;
 							int poly2_edge = -1;
 							for (int k = 1; k <= this->polygons[poly2_n].size(); k++) {
 								int c = this->polygons[poly2_n][k-1];
@@ -495,14 +535,14 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 									poly2_edge = k-1;
 									continue;
 								}
-								int poly3_n = this->egde_to_poly[QPair<int,int>(c, d)].first +
-										this->egde_to_poly[QPair<int,int>(c, d)].second - poly2_n;
+								int poly3_n = this->edge_to_poly[std::pair<int,int>(c, d)].first +
+										this->edge_to_poly[std::pair<int,int>(c, d)].second - poly2_n;
 								if (poly3_n < 0)
 									continue;
 								if (poly3_n == poly1_n)
 									goto next_poly1_edge;
 							}
-							work_queue.append(merge(poly1_n, j-1, poly2_n, poly2_edge));
+							work_queue.push_back(merge(poly1_n, j-1, poly2_n, poly2_edge));
 							goto next_poly1;
 						}
 					next_poly1_edge:;
@@ -515,12 +555,10 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 			{
 				CGAL_Nef_polyhedron2 *N = new CGAL_Nef_polyhedron2;
 
-				QHashIterator< int, QList<int> > it(polygons);
-				while (it.hasNext()) {
-					it.next();
+				BOOST_FOREACH(const PolygonMap::value_type &i, polygons) {
 					std::list<CGAL_Nef_polyhedron2::Point> plist;
-					for (int j = 0; j < it.value().size(); j++) {
-						int p = it.value()[j];
+					for (int j = 0; j < i.second.size(); j++) {
+						int p = i.second[j];
 						plist.push_back(points[p]);
 					}
 					*N += CGAL_Nef_polyhedron2(plist.begin(), plist.end(), CGAL_Nef_polyhedron2::INCLUDED);
@@ -574,19 +612,20 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 	}
 	else // not (this->is2d)
 	{
+		CGAL_Nef_polyhedron3 *N = NULL;
 		CGAL::Failure_behaviour old_behaviour = CGAL::set_error_behaviour(CGAL::THROW_EXCEPTION);
 		try {
+			// FIXME: Are we leaking memory for the CGAL_Polyhedron object?
 			CGAL_Polyhedron *P = createPolyhedronFromPolySet(ps);
 			if (P) {
-				CGAL_Nef_polyhedron3 *N = new CGAL_Nef_polyhedron3(*P);
-				return CGAL_Nef_polyhedron(N);
+				N = new CGAL_Nef_polyhedron3(*P);
 			}
 		}
 		catch (CGAL::Assertion_exception e) {
-			PRINTF("CGAL error in CGA_Nef_polyhedron3(): %s", e.what());
-			CGAL::set_error_behaviour(old_behaviour);
-			return CGAL_Nef_polyhedron();
+			PRINTF("CGAL error in CGAL_Nef_polyhedron3(): %s", e.what());
 		}
+		CGAL::set_error_behaviour(old_behaviour);
+		return CGAL_Nef_polyhedron(N);
 	}
 	return CGAL_Nef_polyhedron();
 }

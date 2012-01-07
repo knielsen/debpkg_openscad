@@ -114,12 +114,6 @@ AbstractNode *LinearExtrudeModule::evaluate(const Context *ctx, const ModuleInst
 	return node;
 }
 
-void register_builtin_dxf_linear_extrude()
-{
-	builtin_modules["dxf_linear_extrude"] = new LinearExtrudeModule();
-	builtin_modules["linear_extrude"] = new LinearExtrudeModule();
-}
-
 class PolySet *LinearExtrudeNode::evaluate_polyset(PolySetEvaluator *evaluator) const
 {
 	if (!evaluator) {
@@ -143,10 +137,9 @@ std::string LinearExtrudeNode::toString() const
 	stream << this->name() << "(";
 	if (!this->filename.empty()) { // Ignore deprecated parameters if empty 
 		stream <<
-			"file = \"" << this->filename << "\", "
-			"cache = \"" << 	QFileInfo(QString::fromStdString(this->filename)) << "\", "
-			"layer = \"" << this->layername << "\", "
-			"origin = [ " << this->origin_x << " " << this->origin_y << " ], "
+			"file = " << this->filename << ", "
+			"layer = " << QuotedString(this->layername) << ", "
+			"origin = [" << this->origin_x << ", " << this->origin_y << "], "
 			"scale = " << this->scale << ", ";
 	}
 	stream <<
@@ -160,4 +153,10 @@ std::string LinearExtrudeNode::toString() const
 	stream << ", $fn = " << this->fn << ", $fa = " << this->fa << ", $fs = " << this->fs << ")";
 	
 	return stream.str();
+}
+
+void register_builtin_dxf_linear_extrude()
+{
+	Builtins::init("dxf_linear_extrude", new LinearExtrudeModule());
+	Builtins::init("linear_extrude", new LinearExtrudeModule());
 }

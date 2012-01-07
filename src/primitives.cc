@@ -236,17 +236,6 @@ AbstractNode *PrimitiveModule::evaluate(const Context *ctx, const ModuleInstanti
 	return node;
 }
 
-void register_builtin_primitives()
-{
-	builtin_modules["cube"] = new PrimitiveModule(CUBE);
-	builtin_modules["sphere"] = new PrimitiveModule(SPHERE);
-	builtin_modules["cylinder"] = new PrimitiveModule(CYLINDER);
-	builtin_modules["polyhedron"] = new PrimitiveModule(POLYHEDRON);
-	builtin_modules["square"] = new PrimitiveModule(SQUARE);
-	builtin_modules["circle"] = new PrimitiveModule(CIRCLE);
-	builtin_modules["polygon"] = new PrimitiveModule(POLYGON);
-}
-
 /*!
 	Returns the number of subdivision of a whole circle, given radius and
 	the three special variables $fn, $fs and $fa
@@ -256,7 +245,7 @@ int get_fragments_from_r(double r, double fn, double fs, double fa)
 	if (r < GRID_FINE) return 0;
 	if (fn > 0.0)
 		return (int)fn;
-	return (int)ceil(fmax(fmin(360.0 / fa, r*M_PI / fs), 5));
+	return (int)ceil(fmax(fmin(360.0 / fa, r*2*M_PI / fs), 5));
 }
 
 struct point2d {
@@ -338,7 +327,7 @@ PolySet *PrimitiveNode::evaluate_polyset(class PolySetEvaluator *) const
 		};
 
 		int fragments = get_fragments_from_r(r1, fn, fs, fa);
-		int rings = fragments/2;
+		int rings = (fragments+1)/2;
 // Uncomment the following three lines to enable experimental sphere tesselation
 //		if (rings % 2 == 0) rings++; // To ensure that the middle ring is at phi == 0 degrees
 
@@ -516,7 +505,7 @@ sphere_next_r2:
 		for (size_t i=0; i<this->points.vec.size(); i++) {
 			double x,y;
 			if (!this->points.vec[i]->getv2(x, y)) {
-				PRINTF("ERROR: Unable to convert point at index %d to a vec2 of numbers", i);
+				PRINTF("ERROR: Unable to convert point at index %d to a vec2 of numbers", int(i));
 				delete p;
 				return NULL;
 			}
@@ -605,4 +594,15 @@ std::string PrimitiveNode::toString() const
 	}
 
 	return stream.str();
+}
+
+void register_builtin_primitives()
+{
+	Builtins::init("cube", new PrimitiveModule(CUBE));
+	Builtins::init("sphere", new PrimitiveModule(SPHERE));
+	Builtins::init("cylinder", new PrimitiveModule(CYLINDER));
+	Builtins::init("polyhedron", new PrimitiveModule(POLYHEDRON));
+	Builtins::init("square", new PrimitiveModule(SQUARE));
+	Builtins::init("circle", new PrimitiveModule(CIRCLE));
+	Builtins::init("polygon", new PrimitiveModule(POLYGON));
 }

@@ -25,15 +25,20 @@
  */
 
 #include "polyset.h"
-// FIXME: Reenable/rewrite - don't be dependant on GUI
-// #include "Preferences.h"
-#ifdef ENABLE_CGAL
-#include <CGAL/assertions_behaviour.h>
-#include <CGAL/exceptions.h>
-#endif
 #include "linalg.h"
 #include <Eigen/LU>
 #include <QColor>
+
+/*! /class PolySet
+
+	The PolySet class fulfils multiple tasks, partially for historical reasons.
+	FIXME: It's a bit messy and is a prime target for refactoring.
+
+	1) Store 2D and 3D polygon meshes from all origins
+	2) Store 2D outlines, used for rendering edges
+	3) Rendering of polygons and edges
+
+ */
 
 PolySet::PolySet() : grid(GRID_FINE), is2d(false), convexity(1)
 {
@@ -112,52 +117,9 @@ static void gl_draw_triangle(GLint *shaderinfo, const Vector3d &p0, const Vector
 	}
 }
 
-void PolySet::render_surface(colormode_e colormode, csgmode_e csgmode, const Transform3d &m, GLint *shaderinfo) const
+void PolySet::render_surface(csgmode_e csgmode, const Transform3d &m, GLint *shaderinfo) const
 {
 	bool mirrored = m.matrix().determinant() < 0;
-
-	if (colormode == COLORMODE_MATERIAL) {
-// FIXME: Reenable/rewrite - don't be dependant on GUI
-//		const QColor &col = Preferences::inst()->color(Preferences::OPENCSG_FACE_FRONT_COLOR);
-		const QColor &col = QColor(0xf9, 0xd7, 0x2c);
-		glColor3f(col.redF(), col.greenF(), col.blueF());
-#ifdef ENABLE_OPENCSG
-		if (shaderinfo) {
-			glUniform4f(shaderinfo[1], col.redF(), col.greenF(), col.blueF(), 1.0f);
-			glUniform4f(shaderinfo[2], 255 / 255.0f, 236 / 255.0f, 94 / 255.0f, 1.0f);
-		}
-#endif /* ENABLE_OPENCSG */
-	}
-	if (colormode == COLORMODE_CUTOUT) {
-// FIXME: Reenable/rewrite - don't be dependant on GUI
-//		const QColor &col = Preferences::inst()->color(Preferences::OPENCSG_FACE_BACK_COLOR);
-		const QColor &col = QColor(0x9d, 0xcb, 0x51);
-		glColor3f(col.redF(), col.greenF(), col.blueF());
-#ifdef ENABLE_OPENCSG
-		if (shaderinfo) {
-			glUniform4f(shaderinfo[1], 157 / 255.0f, 203 / 255.0f, 81 / 255.0f, 1.0f);
-			glUniform4f(shaderinfo[2], 171 / 255.0f, 216 / 255.0f, 86 / 255.0f, 1.0f);
-		}
-#endif /* ENABLE_OPENCSG */
-	}
-	if (colormode == COLORMODE_HIGHLIGHT) {
-		glColor4ub(255, 157, 81, 128);
-#ifdef ENABLE_OPENCSG
-		if (shaderinfo) {
-			glUniform4f(shaderinfo[1], 255 / 255.0f, 157 / 255.0f, 81 / 255.0f, 0.5f);
-			glUniform4f(shaderinfo[2], 255 / 255.0f, 171 / 255.0f, 86 / 255.0f, 0.5f);
-		}
-#endif /* ENABLE_OPENCSG */
-	}
-	if (colormode == COLORMODE_BACKGROUND) {
-		glColor4ub(180, 180, 180, 128);
-#ifdef ENABLE_OPENCSG
-		if (shaderinfo) {
-			glUniform4f(shaderinfo[1], 180 / 255.0f, 180 / 255.0f, 180 / 255.0f, 0.5f);
-			glUniform4f(shaderinfo[2], 150 / 255.0f, 150 / 255.0f, 150 / 255.0f, 0.5f);
-		}
-#endif /* ENABLE_OPENCSG */
-	}
 #ifdef ENABLE_OPENCSG
 	if (shaderinfo) {
 		glUniform1f(shaderinfo[7], shaderinfo[9]);
@@ -252,16 +214,9 @@ void PolySet::render_surface(colormode_e colormode, csgmode_e csgmode, const Tra
 	}
 }
 
-void PolySet::render_edges(colormode_e colormode, csgmode_e csgmode) const
+void PolySet::render_edges(csgmode_e csgmode) const
 {
-	if (colormode == COLORMODE_MATERIAL)
-		glColor3ub(255, 236, 94);
-	if (colormode == COLORMODE_CUTOUT)
-		glColor3ub(171, 216, 86);
-	if (colormode == COLORMODE_HIGHLIGHT)
-		glColor4ub(255, 171, 86, 128);
-	if (colormode == COLORMODE_BACKGROUND)
-		glColor4ub(150, 150, 150, 128);
+	glDisable(GL_LIGHTING);
 	if (this->is2d) {
 		double zbase = csgmode;
 		for (double z = -zbase/2; z < zbase; z += zbase)
@@ -297,6 +252,7 @@ void PolySet::render_edges(colormode_e colormode, csgmode_e csgmode) const
 			glEnd();
 		}
 	}
+	glEnable(GL_LIGHTING);
 }
 
 BoundingBox PolySet::getBoundingBox() const

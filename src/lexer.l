@@ -88,7 +88,8 @@ QString filepath;
 %x comment string
 %x include
 
-DIGIT [0-9]
+D [0-9]
+E [Ee][+-]?{D}+
 
 %%
 
@@ -155,8 +156,10 @@ use[ \t\r\n>]*"<"[^\t\r\n>]+">" {
 "false"		return TOK_FALSE;
 "undef"		return TOK_UNDEF;
 
-{DIGIT}+|{DIGIT}*\.{DIGIT}+|{DIGIT}+\.{DIGIT}* { parserlval.number = QString(yytext).toDouble(); return TOK_NUMBER; }
-"$"?[a-zA-Z0-9_]+ { parserlval.text = strdup(yytext); return TOK_ID; }
+{D}+{E}? | 
+{D}*\.{D}+{E}? |
+{D}+\.{D}*{E}?          { parserlval.number = QString(yytext).toDouble(); return TOK_NUMBER; }
+"$"?[a-zA-Z0-9_]+       { parserlval.text = strdup(yytext); return TOK_ID; }
 
 \"			{ BEGIN(string); stringcontents = new QString(); }
 <string>{
@@ -197,35 +200,39 @@ QDir sourcepath()
 	return QDir(parser_source_path);
 }
 
+/*
+  Rules for include <path/file>
+  1) include <sourcepath/path/file>
+  2) include <librarydir/path/file>
+ */
 void includefile()
 {
-	if(filename.isEmpty())
-		return;
+  if (filename.isEmpty()) return;
 
-	if(filepath.isEmpty()) {
-		path_stack.push(sourcepath());
-	} else {
-		QFileInfo dirinfo(sourcepath(),filepath);
-		path_stack.push(dirinfo.dir());
-		filepath.clear();
-	}
+  QDir dirinfo(sourcepath());
+  if (!filepath.isEmpty()) {
+    dirinfo.cd(filepath);
+  }
 
-	QFileInfo finfo(sourcepath(), filename);
-	if (!finfo.exists()) {
-		finfo = QFileInfo(QDir(librarydir), filename);
-	}
+  QFileInfo finfo(dirinfo, filename);
+  if (!finfo.exists()) {
+    finfo = QFileInfo(QFileInfo(QDir(librarydir), filepath).dir(), filename);
+  }
 
-	handle_dep(finfo.absoluteFilePath().toStdString());
-	yyin = fopen(finfo.absoluteFilePath().toLocal8Bit(), "r");
-	if (!yyin) {
-		PRINTA("WARNING: Can't open input file `%1'.", filename);
-		path_stack.pop();
-		return;
-	}
-	openfiles.append(yyin);
-	filename.clear();
+  filepath.clear();
+  path_stack.push(dirinfo);
 
-	yypush_buffer_state(yy_create_buffer( yyin, YY_BUF_SIZE ));
+  handle_dep(finfo.absoluteFilePath().toStdString());
+  yyin = fopen(finfo.absoluteFilePath().toLocal8Bit(), "r");
+  if (!yyin) {
+    PRINTA("WARNING: Can't open input file `%1'.", filename);
+    path_stack.pop();
+    return;
+  }
+  openfiles.append(yyin);
+  filename.clear();
+  
+  yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
 }
 
 /*!

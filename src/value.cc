@@ -28,6 +28,8 @@
 #include "mathc99.h"
 #include <assert.h>
 #include <sstream>
+#include <QDir>
+#include <boost/foreach.hpp>
 
 Value::Value()
 {
@@ -341,7 +343,7 @@ std::string Value::toString() const
 
 	switch (this->type) {
 	case STRING:
-		stream << '"' << this->text << '"';
+		stream << this->text;
 		break;
 	case VECTOR:
 		stream << '[';
@@ -361,7 +363,20 @@ std::string Value::toString() const
 			<< ']';
 		break;
 	case NUMBER:
+#ifdef OPENSCAD_TESTING
+		// Quick and dirty hack to work around floating point rounding differences
+		// across platforms for testing purposes.
+	{
+		std::stringstream tmp;
+		tmp.precision(16);
+		tmp << this->num;
+		std::string tmpstr = tmp.str();
+		if (tmpstr.size() > 16) tmpstr.erase(16);
+		stream << tmpstr;
+	}
+#else
 		stream << this->num;
+#endif
 		break;
 	case BOOL:
 		stream << (this->b ? "true" : "false");
@@ -409,7 +424,37 @@ void Value::append(Value *val)
 
 std::ostream &operator<<(std::ostream &stream, const Value &value)
 {
-	stream << value.toString();
+	if (value.type == Value::STRING) stream << QuotedString(value.toString());
+	else stream << value.toString();
 	return stream;
 }
 
+std::ostream &operator<<(std::ostream &stream, const Filename &filename)
+{
+	stream << QuotedString(QDir::current().relativeFilePath(QString::fromStdString(filename)).toStdString());
+	return stream;
+}
+
+std::ostream &operator<<(std::ostream &stream, const QuotedString &s)
+{
+	stream << '"';
+	BOOST_FOREACH(char c, s) {
+		switch (c) {
+		case '\t':
+			stream << "\\t";
+			break;
+		case '\n':
+			stream << "\\n";
+			break;
+		case '"':
+		case '\\':
+			stream << '\\';
+			stream << c;
+			break;
+		default:
+			stream << c;
+		}
+	}
+	stream << '"';
+	return stream;
+}

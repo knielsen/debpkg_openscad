@@ -24,7 +24,6 @@
  *
  */
 
-#include "myqhash.h"
 #include "openscad.h"
 #include "MainWindow.h"
 #include "node.h"
@@ -43,7 +42,6 @@
 
 #ifdef ENABLE_CGAL
 #include "CGAL_Nef_polyhedron.h"
-#include <CGAL/assertions_behaviour.h>
 #include "CGALEvaluator.h"
 #include "PolySetCGALEvaluator.h"
 #endif
@@ -70,7 +68,7 @@ namespace po = boost::program_options;
 
 static void help(const char *progname)
 {
-	fprintf(stderr, "Usage: %s [ { -o output_file } [ -d deps_file ] ]\\\n"
+	fprintf(stderr, "Usage: %s [ -o output_file [ -d deps_file ] ]\\\n"
 					"%*s[ -m make_command ] [ -D var=val [..] ] filename\n",
 					progname, int(strlen(progname))+8, "");
 	exit(1);
@@ -101,8 +99,7 @@ int main(int argc, char **argv)
 	// (which we don't catch). This gives us stack traces without rerunning in gdb.
 	CGAL::set_error_behaviour(CGAL::ABORT);
 #endif
-	initialize_builtin_functions();
-	initialize_builtin_modules();
+	Builtins::instance()->initialize();
 
 #ifdef Q_WS_X11
 	// see <http://qt.nokia.com/doc/4.5/qapplication.html#QApplication-2>:
@@ -124,6 +121,7 @@ int main(int argc, char **argv)
 	QCoreApplication::setOrganizationName("OpenSCAD");
 	QCoreApplication::setOrganizationDomain("openscad.org");
 	QCoreApplication::setApplicationName("OpenSCAD");
+	QCoreApplication::setApplicationVersion(TOSTRING(OPENSCAD_VERSION));
 
 	const char *filename = NULL;
 	const char *output_file = NULL;
@@ -134,6 +132,8 @@ int main(int argc, char **argv)
 		("help,h", "help message")
 		("version,v", "print the version")
 		("o,o", po::value<string>(), "out-file")
+		("s,s", po::value<string>(), "stl-file")
+		("x,x", po::value<string>(), "dxf-file")
 		("d,d", po::value<string>(), "deps-file")
 		("m,m", po::value<string>(), "makefile")
 		("D,D", po::value<vector<string> >(), "var=val");
@@ -159,6 +159,16 @@ int main(int argc, char **argv)
 		// FIXME: Allow for multiple output files?
 		if (output_file) help(argv[0]);
 		output_file = vm["o"].as<string>().c_str();
+	}
+	if (vm.count("s")) {
+		fprintf(stderr, "DEPRECATED: The -s option is deprecated. Use -o instead.\n");
+		if (output_file) help(argv[0]);
+		output_file = vm["s"].as<string>().c_str();
+	}
+	if (vm.count("x")) { 
+		fprintf(stderr, "DEPRECATED: The -x option is deprecated. Use -o instead.\n");
+		if (output_file) help(argv[0]);
+		output_file = vm["x"].as<string>().c_str();
 	}
 	if (vm.count("d")) {
 		if (deps_output_file)
@@ -260,21 +270,7 @@ int main(int argc, char **argv)
 
 #ifdef ENABLE_CGAL
 		Context root_ctx;
-		root_ctx.functions_p = &builtin_functions;
-		root_ctx.modules_p = &builtin_modules;
-		root_ctx.set_variable("$fn", Value(0.0));
-		root_ctx.set_variable("$fs", Value(1.0));
-		root_ctx.set_variable("$fa", Value(12.0));
-		root_ctx.set_variable("$t", Value(0.0));
-
-		Value zero3;
-		zero3.type = Value::VECTOR;
-		zero3.append(new Value(0.0));
-		zero3.append(new Value(0.0));
-		zero3.append(new Value(0.0));
-		root_ctx.set_variable("$vpt", zero3);
-		root_ctx.set_variable("$vpr", zero3);
-
+		register_builtin(root_ctx);
 
 		AbstractModule *root_module;
 		ModuleInstantiation root_inst;
@@ -368,6 +364,10 @@ int main(int argc, char **argv)
 			}
 			
 			if (dxf_output_file) {
+				if (root_N.dim != 2) {
+					fprintf(stderr, "Current top level object is not a 2D object.\n");
+					exit(1);
+				}
 				std::ofstream fstream(dxf_output_file);
 				if (!fstream.is_open()) {
 					PRINTF("Can't open file \"%s\" for export", dxf_output_file);
@@ -422,8 +422,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	destroy_builtin_functions();
-	destroy_builtin_modules();
+	Builtins::instance(true);
 
 	return rc;
 }

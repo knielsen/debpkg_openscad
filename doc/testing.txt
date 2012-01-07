@@ -1,14 +1,14 @@
 Running regression tests:
 -------------------------
 
-Prerequisites: cmake, python
+Prerequisites: cmake, python, ImageMagick 6.5.9.3 or newer
 
-cd tests
-mkdir build
-cd build
-cmake ..
-make
-make test
+A) Building test environment
+
+Linux, Mac:
+$ cd tests
+$ cmake .
+$ make
 
 Windows:
 
@@ -16,16 +16,24 @@ First, get a normal build working by following instructions at
 http://en.wikibooks.org/wiki/OpenSCAD_User_Manual/Building_on_Windows
 Then, from the QT command prompt:
 
-cd tests
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-sed -i s/\/MD/\/MT/ CMakeCache.txt
-cmake ..
-nmake -f Makefile
-nmake -f Makefile test
+> cd tests
+> cmake . -DCMAKE_BUILD_TYPE=Release
+> sed -i s/\/MD/\/MT/ CMakeCache.txt
+> cmake .
+> nmake -f Makefile
 
-Adding  a new regression test:
+B) Running tests
+
+$ ctest               Runs tests enabled by default
+$ ctest -R <regex>    Runs only matching tests, e.g. ctest -R dxf
+$ ctest -C <configs>  Adds extended tests belonging to configs.
+                      Valid configs:
+                      Default  - Run default tests
+                      Heavy    - Run more time consuming tests (> ~10 seconds)
+                      Examples - test all examples
+                      All      - test everything
+
+Adding a new regression test:
 ------------------------------
 
 1) create a test file at an appropriate location under testdata/
@@ -39,23 +47,60 @@ Adding  a new regression test:
 7) run the test normally and verify that it passes:
   $ ctest -R mytest
 
-Note that test files which don't have an *-expected.<suffix> file will
-be ignored for the test apps in question.
-
-Troubleshooting a failed test:
+Troubleshooting:
 ------------------------------
 
-You can run a single test by passing the test name to ctest:
- $ ctest -R throwntogethertest_sphere
+0. Headless unix servers
 
-You can run a series of tests by passing part of a name to ctest:
- $ ctest -R cgalpng  # runs all cgalpng tests
- $ ctest -R sphere   # runs all sphere tests
-    
+If you are attempting to run the tests on a unix-like system but only
+have shell-console access, you may be able to run the tests by using a 
+virtual framebuffer program like Xvnc or Xvfb. For example:
+
+$ Xvfb :5 -screen 0 800x600x24 &
+$ DISPLAY=:5 ctest
+
+Some versions of Xvfb may fail, however. 
+
+1. Trouble finding libraries on unix
+
+ To help CMAKE find eigen2, OpenCSG, CGAL, Boost, and GLEW, you can use 
+ environment variables, just like for the main qmake & openscad.pro. Examples:
+
+ OPENSCAD_LIBRARIES=~ cmake .
+ CGALDIR=~/CGAL-3.9 BOOSTDIR=~/boost-1.47.0 cmake .
+
+ Valid variables are as follows:
+
+ BOOSTDIR, CGALDIR, EIGEN2DIR, GLEWDIR, OPENCSGDIR, OPENSCAD_LIBRARIES
+
+2. Location of logs
+ 
 Logs of test runs are found in tests/build/Testing/Temporary
+A pretty-printed index.html is in a subdir of tests/build/Testing/Temporary
 Expected results are found in tests/regression/*
 Actual results are found in tests/build/testname-output/*
 
-You can also compile a single test program:
+3. Cross-compiling 
 
- $ make cgalpngtest
+Cross-compiling of tests has not been automated nor tested
+
+4. Image-based tests takes a long time, they fail, and the log says 'return -11'
+
+Imagemagick may have crashed while comparing the expected images to the 
+test-run generated (actual) images. You can try using the alternate 
+ImageMagick comparison method by by erasing CMakeCache, and re-running 
+cmake with -DCOMPARATOR=ncc. This will enable the Normalized Cross 
+Comparison method.
+
+5. Testing images fails with 'morphology not found" for ImageMagick in the log
+
+Your version of imagemagick is old. Upgrade, or pass -DCOMPARATOR=old to 
+cmake. The comparison will be of lowered reliability.
+
+6. Other issues
+
+The OpenSCAD User Manual has a section on buildling. Please check there 
+for updates:
+
+http://en.wikibooks.org/wiki/OpenSCAD_User_Manual
+
