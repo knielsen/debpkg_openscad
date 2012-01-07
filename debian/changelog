@@ -8,8 +8,9 @@ openscad (2011.12-1) unstable; urgency=low
     - standard shortcuts for save and reload
     - Bugfixes
   * Ship testing data in main package
+  * Dropped man page (in upstream now)
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 07 Jan 2012 22:49:32 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 07 Jan 2012 23:00:22 +0100
 
 openscad (2011.11~.03-git3bc03713-1) experimental; urgency=low
 
