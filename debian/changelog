@@ -1,8 +1,15 @@
-openscad (2011.11~.03-git3bc03713-2) UNRELEASED; urgency=low
+openscad (2011.12-1) unstable; urgency=low
 
+  * New upstream release
+    - New functions: version, version_num, len
+    - Enhanced functionaltiy: hull(), color()
+    - Unified import statement, including OFF file format
+    - Enhanced string handling: indexing, comparison
+    - standard shortcuts for save and reload
+    - Bugfixes
   * Ship testing data in main package
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 04 Nov 2011 16:25:10 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 07 Jan 2012 22:49:32 +0100
 
 openscad (2011.11~.03-git3bc03713-1) experimental; urgency=low
 
