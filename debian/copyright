@@ -25,7 +25,8 @@ License: GPL-2+
 
 Files: contrib/OpenSCAD.xml
 Copyright: 2011 tjhowse <tjhowse@gmail.com>
-License: FIXME check this
+License: FIXME
+ check this
 
 Files: tests/lodepng.*
 Copyright: 2005-2011 Lode Vandevenne
@@ -51,7 +52,7 @@ License:
 
 File: tests/OffscreenContextGLX.cc
 Copyright: 1999-2001 Brian Paul
-License: MIT/X11
+License: X11
 
 File: tests/test_pretty_print.py
 Copyright: 2011 Don Bright <hugh.m.bright@gmail.com>
@@ -90,7 +91,7 @@ License: Apache
  A copy of the Apache 2.0 License can be found in
  /usr/share/common-licenses/Apache-2.0.
 
-License: MIT/X11
+License: X11
  Permission is hereby granted, free of charge, to any person obtaining a
  copy of this software and associated documentation files (the "Software"),
  to deal in the Software without restriction, including without limitation
