@@ -17,13 +17,31 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 	dh_auto_install --destdir=debian/openscad
+
 	ln -s /usr/share/openscad/examples debian/openscad/usr/share/doc/openscad/examples
+
 	# don't ship mcad, neither the empty directory (when this is built from
 	# a normal git source checkout) nor the full library (when this is
 	# built from a git checkout with submodules or from a tarball). mcad
 	# gets its own package.
 	rm -rf debian/openscad/usr/share/openscad/libraries/MCAD/
-	rmdir debian/openscad/usr/share/openscad/libraries || true
+	-rmdir debian/openscad/usr/share/openscad/libraries
+
+	# solve the http://wiki.debian.org/RpathIssue the brutal way; it's only
+	# the testing scripts and not the regular build process for openscad,
+	# so i'll accept not getting the extra score for finding out what's
+	# wrong exactly
+	for x in \
+		cgalpngtest \
+		cgalstlsanitytest \
+		cgaltest \
+		csgtermtest \
+		csgtexttest \
+		dumptest \
+		echotest \
+		opencsgtest \
+		throwntogethertest\
+		; do chrpath -d tests/$$x; done
 
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
