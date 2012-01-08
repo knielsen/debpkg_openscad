@@ -9,8 +9,9 @@ openscad (2011.12-1) unstable; urgency=low
     - Bugfixes
   * Ship testing data in main package
   * Dropped man page (in upstream now)
+  * Split test suite out to -testing and -testing-data
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 07 Jan 2012 23:00:22 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 08 Jan 2012 16:48:40 +0100
 
 openscad (2011.11~.03-git3bc03713-1) experimental; urgency=low
 

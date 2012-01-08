@@ -1,7 +1,7 @@
 Source: openscad
 Priority: optional
 Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
-Build-Depends: debhelper (>= 7.0.50~), qt4-qmake (>=4.4), libcgal-dev (>=3.5), libopencsg-dev (>=1.3.0), libeigen2-dev (>= 2.0.13), bison (>= 2.4), flex (>=2.5.35), libqt4-opengl-dev, libglew1.6-dev | libglew-dev, libgmp3-dev | libgmp10-dev, libmpfr-dev, imagemagick, python, cmake
+Build-Depends: debhelper (>= 7.0.50~), qt4-qmake (>=4.4), libcgal-dev (>=3.5), libopencsg-dev (>=1.3.0), libeigen2-dev (>= 2.0.13), bison (>= 2.4), flex (>=2.5.35), libqt4-opengl-dev, libglew1.6-dev | libglew-dev, libgmp-dev | libgmp10-dev | libgmp3-dev, libmpfr-dev, imagemagick, python, cmake, libboost-dev (>= 1.46.0)
 Standards-Version: 3.9.2
 Section: contrib/graphics
 Homepage: http://openscad.org/
@@ -11,7 +11,7 @@ Vcs-git: git://gitorious.org/openscad-debian/openscad.git/
 Package: openscad
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Recommends: openscad-mcad
+Recommends: openscad-mcad (>= 2011.12)
 Suggests: meshlab, geomview, qcad
 Description: script file based graphical CAD environment
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
@@ -22,3 +22,23 @@ Description: script file based graphical CAD environment
  the 3D model from this script. This gives the designer full control over the
  modelling process and enables him to easily change any step in the modelling
  process or make designes that are defined by configurable parameters.
+
+Package: openscad-testing
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, openscad-testing-data
+Recommends: openscad
+Description: script file based graphical CAD environment
+ OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
+ aspects rather than artistic ones.
+ .
+ This package contains all programs required to run the test suites.
+
+Package: openscad-testing-data
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: openscad-testing
+Description: script file based graphical CAD environment
+ OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
+ aspects rather than artistic ones.
+ .
+ This package contains all programs required to run the test suites.

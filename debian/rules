@@ -8,8 +8,15 @@ override_dh_auto_build:
 	dh_auto_build
 	convert icons/icon-alpha.png -resize 688x688 -background transparent -gravity center -extent 688x688 openscad.png
 
+	# build test suite; FIXME: there should be a better way to set the path
+	cd tests && cmake -DGLEW_DIR=/usr/include/GL -DGLEW_LIBRARY=/usr/lib/x86_64-linux-gnu/libGLEW.so .
+	cd tests && make
+
+	# fix absolute paths in ctest scripts
+	cd tests && perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s/$$here/./g' *.cmake
+
 override_dh_auto_install:
-	dh_auto_install
+	dh_auto_install --destdir=debian/openscad
 	ln -s /usr/share/openscad/examples debian/openscad/usr/share/doc/openscad/examples
 	# don't ship mcad, neither the empty directory (when this is built from
 	# a normal git source checkout) nor the full library (when this is
@@ -20,12 +27,9 @@ override_dh_auto_install:
 
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
-	mkdir -p tests/build
-	cd tests/build && cmake -DGLEW_DIR=/usr/include/GL -DGLEW_LIBRARY=/usr/lib/x86_64-linux-gnu/libGLEW.so ..
-	cd tests/build && make
 	# FIXME: ignoring the tests is not a nice thing to do, but it seems
 	# they are too much under construction atm
-	cd tests/build && make test || echo "Not failing just because some tests went wrong..."
+	cd tests && ctest || echo "Not failing just because some tests went wrong..."
 else
 	@echo "Skipping test suite as requested in DEB_BUILD_OPTIONS"
 endif

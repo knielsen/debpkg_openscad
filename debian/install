@@ -1,7 +1,0 @@
-debian/openscad.desktop /usr/share/applications/
-openscad.png /usr/share/pixmaps/
-
-# this will need some serious splitting
-testdata /usr/share/openscad/tests/
-tests/regression /usr/share/openscad/tests/
-tests/build /usr/share/openscad/tests/
