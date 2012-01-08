@@ -42,7 +42,7 @@ Description: script file based graphical CAD environment (test suite data)
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
  aspects rather than artistic ones.
  .
- This package contains all programs required to run the test suites.
+ This package contains the data required to run the test suites.
 
 Package: openscad-dbg
 Architecture: any
