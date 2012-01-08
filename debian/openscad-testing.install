@@ -19,4 +19,4 @@ tests/CTestCustom.cmake /usr/lib/openscad/testprograms/
 tests/EnforceConfig.cmake /usr/lib/openscad/testprograms/
 
 
-debian/openscad-testrun.py /usr/bin/
+debian/openscad-testrun /usr/bin/
