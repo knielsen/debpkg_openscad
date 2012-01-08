@@ -26,7 +26,7 @@ Description: script file based graphical CAD environment
 Package: openscad-testing
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, openscad-testing-data, python, python-argparse
-Description: script file based graphical CAD environment
+Description: script file based graphical CAD environment (test suite)
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
  aspects rather than artistic ones.
  .
@@ -38,8 +38,20 @@ Depends: ${shlibs:Depends}, ${misc:Depends}
 # the examples, which are shipped in openscad, are part of the test suite
 Recommends: openscad
 Suggests: openscad-testing
-Description: script file based graphical CAD environment
+Description: script file based graphical CAD environment (test suite data)
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
  aspects rather than artistic ones.
  .
  This package contains all programs required to run the test suites.
+
+Package: openscad-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: openscad (=${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: script file based graphical CAD environment (debugging symbols)
+ OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
+ aspects rather than artistic ones.
+ .
+ This package contains debugging information stripped from the binaries, and is
+ needed when

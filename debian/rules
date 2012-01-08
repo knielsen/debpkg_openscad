@@ -51,3 +51,6 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 else
 	@echo "Skipping test suite as requested in DEB_BUILD_OPTIONS"
 endif
+
+override_dh_strip:
+	dh_strip --dbg-package openscad-dbg
