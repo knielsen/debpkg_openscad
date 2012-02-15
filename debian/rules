@@ -8,7 +8,7 @@ override_dh_auto_build:
 	dh_auto_build
 	convert icons/icon-alpha.png -resize 688x688 -background transparent -gravity center -extent 688x688 openscad.png
 
-	# build test suite; FIXME: still not satisfied, i guess this can be solved more elegantly
+	# build test suite; FIXME: why is this not discovered automatically?
 	cd tests && cmake -DGLEW_LIBRARY=`pkg-config --variable libdir glew`/libGLEW.so .
 	cd tests && make
 
