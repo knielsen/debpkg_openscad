@@ -8,8 +8,20 @@ License: GPL-2+ with CGAL exception
 
 Files: src/OGL_helper.h
 Copyright: © 1997-2002 Max-Planck-Institute Saarbruecken (Germany)
-License: QPL
-FIXME: original author has been contacted for gpl dual-licensing (this contains patches for openscad)
+License: GPL-3+
+Comment: This used to be derived from the original QPL'd OGL_helper.h from the
+ CGAL library. The library got re-licensed to GPL-3+ (or LGPL-3+, for other
+ parts) in its 4.0 version, with no significant changes to the OGL_helper.h
+ file. So while the file in here claims to be QPL derived, it can be
+ equivalently thought of being derived from the new OGL_helper.h in CGAL4,
+ which can be obtained from
+ https://gforge.inria.fr/frs/download.php/30225/CGAL-4.0-beta1.tar.gz
+ and states the following in its current license section:
+ .
+ This file is part of CGAL (www.cgal.org).
+ You can redistribute it and/or modify it under the terms of the GNU
+ General Public License as published by the Free Software Foundation,
+ either version 3 of the License, or (at your option) any later version.
 
 Files: src/cache.h
 Copyright: © 2009-2011 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>, 2010 Nokia Corporation and/or its subsidiary(-ies)
@@ -81,9 +93,6 @@ License: GPL-2+ with CGAL exception
  A copy of the GNU General Public License can be found in
  /usr/share/common-licenses/GPL-2.
 
-License: QPL
- FIXME: we can't ship this in this tarball anyway w/o making it nonfree
-
 License: Apache
  Licensed under the terms of the Apache Software License 2.0:
  http://www.apache.org/licenses/LICENSE-2.0
@@ -128,7 +137,7 @@ License: LGPL-2.1 with some exception
  In addition, as a special exception, Nokia gives you certain additional
  rights.  These rights are described in the Nokia Qt LGPL Exception
  version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
-FIXME: The LGPL_EXCEPTION.txt is not shipped upstream. As it only affects
+Comment: The LGPL_EXCEPTION.txt is not shipped upstream. As it only affects
  "certain rights" (which we don't need), no further action was taken to
  determine what it is about exactly.
 

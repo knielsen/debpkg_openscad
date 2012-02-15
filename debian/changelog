@@ -7,13 +7,13 @@ openscad (2011.12-1) unstable; urgency=low
     - Enhanced string handling: indexing, comparison
     - standard shortcuts for save and reload
     - Bugfixes
-  * Ship testing data in main package
   * Dropped man page (in upstream now)
-  * Split test suite out to -testing and -testing-data (introduces new
+  * Ship test suite as -testing and -testing-data (introduces new
     dependencies)
   * Adapted GLEW dependency to avoid something similar as bug #658551
+  * License issue around OGL_helper.h resolved by CGAL moving to GPL-3+
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 12 Feb 2012 10:09:11 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 15 Feb 2012 13:34:04 +0100
 
 openscad (2011.11~.03-git3bc03713-1) experimental; urgency=low
 
