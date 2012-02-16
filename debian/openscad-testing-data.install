@@ -1,11 +1,2 @@
 testdata /usr/share/openscad/
 tests/regression /usr/share/openscad/
-
-tests/cgalpngtest-output /usr/share/openscad/buildtestresults/
-tests/cgalstlsanitytest-output /usr/share/openscad/buildtestresults/
-tests/csgtermtest-output /usr/share/openscad/buildtestresults/
-tests/csgtexttest-output /usr/share/openscad/buildtestresults/
-tests/dumptest-output /usr/share/openscad/buildtestresults/
-tests/echotest-output /usr/share/openscad/buildtestresults/
-tests/opencsgtest-output /usr/share/openscad/buildtestresults/
-tests/throwntogethertest-output /usr/share/openscad/buildtestresults/
