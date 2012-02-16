@@ -37,8 +37,15 @@ License: GPL-2+
 
 Files: contrib/OpenSCAD.xml
 Copyright: 2011 tjhowse <tjhowse@gmail.com>
-License: FIXME
- check this
+License: GPL-2+
+Comment:
+ There is no note in the upstream tar ball that clarifies the license, but the
+ author of the file (as indicated by the git history) has in the meantime
+ requested an appropriate notice to be added, see
+ https://github.com/tjhowse/openscad/commit/068632fe2bbe9a2f8fe1fcebe2d05a0eba94b0f0
+ for the change requested and
+ http://rocklinux.net/pipermail/openscad/2012-February/002625.html for an email
+ with some more information.
 
 Files: tests/lodepng.*
 Copyright: 2005-2011 Lode Vandevenne
