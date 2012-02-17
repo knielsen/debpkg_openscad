@@ -1,1 +1,6 @@
 openscad.png
+
+# not sure if those are all the files not automatically cleaned; that list
+# comes from observing dirty git repositories
+tests/CTestCustom.cmake
+tests/sysinfo.txt
