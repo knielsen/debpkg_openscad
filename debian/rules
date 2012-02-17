@@ -4,26 +4,34 @@
 %:
 	dh $@
 
+override_dh_auto_clean:
+	dh_auto_clean
+	
+	cd tests && make clean
+
 override_dh_auto_build:
 	dh_auto_build
+
 	convert icons/icon-alpha.png -resize 688x688 -background transparent -gravity center -extent 688x688 openscad.png
 
-	# build test suite; FIXME: why is this not discovered automatically?
+	# build test suite; FIXME: why is the GLEW path not discovered automatically?
 	cd tests && cmake -DGLEW_LIBRARY=`pkg-config --variable libdir glew`/libGLEW.so .
 	cd tests && make
 
 	# fix absolute paths in ctest scripts
 	cd tests && perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s/$$here/./g' *.cmake
 
-override_dh_auto_clean:
-	dh_auto_clean
-	
-	cd tests && make clean
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	# FIXME: ignoring the tests is not a nice thing to do, but it seems
+	# they are too much under construction atm
+	cd tests && ctest || echo "Not failing just because some tests went wrong..."
+else
+	@echo "Skipping test suite as requested in DEB_BUILD_OPTIONS"
+endif
 
 override_dh_auto_install:
 	dh_auto_install --destdir=debian/openscad
-
-	ln -s /usr/share/openscad/examples debian/openscad/usr/share/doc/openscad/examples
 
 	# don't ship mcad, neither the empty directory (when this is built from
 	# a normal git source checkout) nor the full library (when this is
@@ -48,24 +56,11 @@ override_dh_auto_install:
 		throwntogethertest\
 		; do chrpath -d tests/$$x; done
 
-override_dh_auto_test:
-ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
-	# FIXME: ignoring the tests is not a nice thing to do, but it seems
-	# they are too much under construction atm
-	cd tests && ctest || echo "Not failing just because some tests went wrong..."
-else
-	@echo "Skipping test suite as requested in DEB_BUILD_OPTIONS"
-endif
-
-override_dh_install:
-	dh_install
-
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	# can't do that in debian/openscad-testing-data.install as it would fail when building with nocheck
 	mkdir -p debian/openscad-testing-data/usr/share/openscad/buildtestresults/
 	for x in tests/*.output; do dh_install --package openscad-testing-data $x /usr/share/openscad/buildtestresults/; done
 endif
-	
 
 override_dh_strip:
 	dh_strip --dbg-package openscad-dbg
