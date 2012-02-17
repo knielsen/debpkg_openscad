@@ -4,11 +4,6 @@
 %:
 	dh $@
 
-override_dh_auto_clean:
-	dh_auto_clean
-	
-	cd tests && make clean
-
 override_dh_auto_build:
 	dh_auto_build
 
