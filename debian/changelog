@@ -1,3 +1,9 @@
+openscad (2011.12-2) unstable; urgency=low
+
+  * Add a patch for tests/CMakeLists.txt so it works with -Wl,--as-needed too
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 21 Feb 2012 21:53:56 +0100
+
 openscad (2011.12-1) unstable; urgency=low
 
   * New upstream release
