@@ -2,8 +2,9 @@ openscad (2011.12-2) unstable; urgency=low
 
   * Add a patch for tests/CMakeLists.txt so it works with -Wl,--as-needed too
   * Add a patch to include GL/glu where needed (required since Ubuntu precise)
+  * Depend on cmake (ctest) for openscad-testing
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 22 Feb 2012 10:44:08 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 22 Feb 2012 17:35:12 +0100
 
 openscad (2011.12-1) unstable; urgency=low
 
