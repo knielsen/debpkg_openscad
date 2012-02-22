@@ -5,6 +5,7 @@
 #include <sstream>
 #include <string>
 #include "system-gl.h"
+#include <GL/glu.h>
 #include <boost/algorithm/string.hpp>
 
 using namespace std;

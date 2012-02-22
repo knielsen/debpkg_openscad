@@ -22,6 +22,8 @@
 #include "csgtermnormalizer.h"
 #include "OffscreenView.h"
 
+#include <GL/glu.h>
+
 #include <QApplication>
 #include <QFile>
 #include <QDir>
