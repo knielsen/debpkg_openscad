@@ -7,10 +7,11 @@ openscad (2011.12-2) unstable; urgency=low
   * Move from contrib to main as CGAL 4.0 moved from nonfree to main
   * Change Standards-Version to 3.9.3
     - Use correct Format: specifier in now official DEP5
+  * Initial upload to Debian (Closes: #583476)
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 13 Apr 2012 19:12:16 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 13 Apr 2012 19:25:17 +0200
 
-openscad (2011.12-1) unstable; urgency=low
+openscad (2011.12-1) UNRELEASED; urgency=low
 
   * New upstream release
     - New functions: version, version_num, len
@@ -27,7 +28,7 @@ openscad (2011.12-1) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 15 Feb 2012 13:34:04 +0100
 
-openscad (2011.11~.03-git3bc03713-1) experimental; urgency=low
+openscad (2011.11~.03-git3bc03713-1) UNRELEASED; urgency=low
 
   * More precise eigen dependency
   * Changed version format to better reflect how upstream calls unreleased
@@ -47,7 +48,7 @@ openscad (2011.11~.03-git3bc03713-1) experimental; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 04 Nov 2011 16:25:00 +0100
 
-openscad (2011.09~git20110929-1) experimental; urgency=low
+openscad (2011.09~git20110929-1) UNRELEASED; urgency=low
 
   * Imported changes from upstream git
     - OFF file format support
@@ -63,7 +64,7 @@ openscad (2011.09~git20110929-1) experimental; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 30 Sep 2011 03:08:01 +0200
 
-openscad (2011.06-2) unstable; urgency=low
+openscad (2011.06-2) UNRELEASED; urgency=low
 
   * Adapt libglew dependency to 1.6 | anything
   * Updated watchfile to github hosting
@@ -71,7 +72,7 @@ openscad (2011.06-2) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 24 Sep 2011 03:29:41 +0200
 
-openscad (2011.06-1) unstable; urgency=low
+openscad (2011.06-1) UNRELEASED; urgency=low
 
   * New upstream release
     - Added image export
@@ -80,7 +81,7 @@ openscad (2011.06-1) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 14 Jun 2011 19:48:07 +0200
 
-openscad (2011.04-1) unstable; urgency=low
+openscad (2011.04-1) UNRELEASED; urgency=low
 
   * New upstream release 
     - Added hull() for convex hulls (2D object only)
@@ -91,7 +92,7 @@ openscad (2011.04-1) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 27 Apr 2011 19:56:29 +0200
 
-openscad (2011.01~git20110204-2) unstable; urgency=low
+openscad (2011.01~git20110204-2) UNRELEASED; urgency=low
 
   * Removing versioned dependency on libgmp dependency according to upstream
   * Removing versioned dependency on libmpfr (building works w/o as well,
@@ -99,7 +100,7 @@ openscad (2011.01~git20110204-2) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 03 Apr 2011 14:35:52 +0200
 
-openscad (2011.01~git20110204-1) unstable; urgency=low
+openscad (2011.01~git20110204-1) UNRELEASED; urgency=low
 
   * Import changes from upstream git
     - Added rands() function
@@ -113,7 +114,7 @@ openscad (2011.01~git20110204-1) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 21 Feb 2011 22:40:53 +0100
 
-openscad (2010.06~svn568-1) unstable; urgency=low
+openscad (2010.06~svn568-1) UNRELEASED; urgency=low
 
   * Import bugfixes from upstream SVN
     - Enhance DXF export for Inkscape import
@@ -125,7 +126,7 @@ openscad (2010.06~svn568-1) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 13 Sep 2010 21:19:16 +0200
 
-openscad (2010.06~svn560-1) unstable; urgency=low
+openscad (2010.06~svn560-1) UNRELEASED; urgency=low
 
   * Import bugfixes from upstream SVN
     - Accept 3D parameters for 2D functions
@@ -134,7 +135,7 @@ openscad (2010.06~svn560-1) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 26 Jun 2010 18:28:12 +0200
 
-openscad (2010.05-2) unstable; urgency=low
+openscad (2010.05-2) UNRELEASED; urgency=low
 
   * New openscad.desktop
   * Create openscad.png with aspect ratio appropriate for icons
@@ -143,7 +144,7 @@ openscad (2010.05-2) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 29 May 2010 00:54:19 +0200
 
-openscad (2010.05-1) unstable; urgency=low
+openscad (2010.05-1) UNRELEASED; urgency=low
 
   * New upstream release:
     - more math functions
@@ -156,14 +157,14 @@ openscad (2010.05-1) unstable; urgency=low
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 18 May 2010 22:34:25 +0200
 
-openscad (2010.02-2) unstable; urgency=low
+openscad (2010.02-2) UNRELEASED; urgency=low
 
   * Better build dependencies
   * Added Vcs fields 
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 02 Mar 2010 09:35:09 +0100
 
-openscad (2010.02-1) unstable; urgency=low
+openscad (2010.02-1) UNRELEASED; urgency=low
 
   * Initial packaging
 
