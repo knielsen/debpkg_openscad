@@ -2,7 +2,7 @@ Source: openscad
 Priority: optional
 Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
 Build-Depends: debhelper (>= 7.0.50~), qt4-qmake (>=4.4), libcgal-dev (>=3.6), libopencsg-dev (>=1.3.0), libeigen2-dev (>= 2.0.13), bison (>= 2.4), flex (>=2.5.35), libqt4-opengl-dev, libglew-dev (>= 1.5.4) | libglew1.6-dev | libglew1.5-dev (>= 1.5.4), libgmp-dev | libgmp10-dev | libgmp3-dev, libmpfr-dev, imagemagick, python, cmake, libboost-dev (>= 1.46.0), chrpath, pkg-config
-Standards-Version: 3.9.2
+Standards-Version: 3.9.3
 Section: graphics
 Homepage: http://openscad.org/
 Vcs-Browser: http://gitorious.org/openscad-debian/openscad/commits/debian

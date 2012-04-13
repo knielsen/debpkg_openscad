@@ -5,8 +5,10 @@ openscad (2011.12-2) unstable; urgency=low
   * Depend on cmake (ctest) for openscad-testing
   * Raise CGAL dependency to 3.6
   * Move from contrib to main as CGAL 4.0 moved from nonfree to main
+  * Change Standards-Version to 3.9.3
+    - Use correct Format: specifier in now official DEP5
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 13 Apr 2012 19:07:47 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 13 Apr 2012 19:12:16 +0200
 
 openscad (2011.12-1) unstable; urgency=low
 
