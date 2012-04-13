@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: opencsg
-Source: http://opencsg.org/
+Upstream-Name: openscad
+Source: http://www.openscad.org/
 
 Files: *
 Copyright: © 2009-2011 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>

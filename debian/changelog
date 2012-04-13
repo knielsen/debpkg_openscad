@@ -7,6 +7,7 @@ openscad (2011.12-2) unstable; urgency=low
   * Move from contrib to main as CGAL 4.0 moved from nonfree to main
   * Change Standards-Version to 3.9.3
     - Use correct Format: specifier in now official DEP5
+  * Fix leftover mistake from copy/pasting in debian/copyright
   * Initial upload to Debian (Closes: #583476)
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 13 Apr 2012 19:25:17 +0200
