@@ -53,5 +53,4 @@ Description: script file based graphical CAD environment (debugging symbols)
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
  aspects rather than artistic ones.
  .
- This package contains debugging information stripped from the binaries, and is
- needed when
+ This package contains debugging information stripped from the binaries.
