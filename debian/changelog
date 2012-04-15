@@ -1,8 +1,9 @@
 openscad (2011.12-3) unstable; urgency=low
 
   * Enable parallel building
+  * Suggest librecad instead of qcad
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 14 Apr 2012 09:43:16 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 15 Apr 2012 20:08:11 +0200
 
 openscad (2011.12-2) unstable; urgency=low
 
