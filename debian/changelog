@@ -3,6 +3,7 @@ openscad (2011.12+next) experimental; urgency=low
   * Build-depend on boost modules required by new version
   * Specify GLEW include dir for tests
   * Un-apply 1b98da3f (GL/glu.h includes), fixed upstream
+  * Un-apply 1cd856be (CMakeList fix), fixed upstream
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 12 May 2012 16:52:26 +0200
 
