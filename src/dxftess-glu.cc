@@ -5,7 +5,6 @@
 #include <stdio.h>
 
 #include "system-gl.h"
-#include <GL/glu.h>
 #include "mathc99.h"
 
 #include <QVector>

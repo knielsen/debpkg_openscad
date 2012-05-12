@@ -56,7 +56,6 @@
 #elif !defined(__APPLE__)
 #include <GL/glxew.h>
 #endif
-#include <GL/glu.h>
 
 #define FAR_FAR_AWAY 100000.0
 
