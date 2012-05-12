@@ -17,6 +17,9 @@ Build-Depends:
     python,
     cmake,
     libboost-dev (>= 1.46.0),
+    libboost-regex-dev,
+    libboost-system-dev,
+    libboost-filesystem-dev,
     chrpath,
     pkg-config
 Standards-Version: 3.9.3
