@@ -31,6 +31,11 @@ eigen2 {
     linux*: EIGEN2_INCLUDEPATH = /usr/include/eigen2
   }
 
+  isEmpty(EIGEN2_INCLUDEPATH) {
+    CONFIG += link_pkgconfig
+    PKGCONFIG += eigen2
+  }
+
   # eigen2 being under 'include/eigen2' needs special prepending
   QMAKE_INCDIR_QT = $$EIGEN2_INCLUDEPATH $$QMAKE_INCDIR_QT
 
