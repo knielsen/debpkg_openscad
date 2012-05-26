@@ -214,7 +214,7 @@ inclusion( GLEW_DIR GLEW_INCLUDE_PATH )
 # Flex/Bison
 find_package(BISON REQUIRED)
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+if(${CMAKE_SYSTEM_NAME} MATCHES "^FreeBSD")
   # FreeBSD has an old flex in /usr/bin and a new flex in /usr/local/bin
   set(FLEX_EXECUTABLE /usr/local/bin/flex)
 endif()
