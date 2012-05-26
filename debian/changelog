@@ -1,6 +1,7 @@
 openscad (2011.12-3) unstable; urgency=low
 
   * Patch eigen2.pri to build on kfreebsd and hurd (Closes: #673694)
+  * Explicitly call pkg-config to feed eigen2 paths to testing system
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 25 May 2012 20:44:44 +0200
 
