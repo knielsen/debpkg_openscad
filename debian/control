@@ -21,6 +21,7 @@ Build-Depends:
     pkg-config
 Standards-Version: 3.9.3
 Section: graphics
+DM-Upload-Allowed: yes
 Homepage: http://openscad.org/
 Vcs-Browser: http://gitorious.org/openscad-debian/openscad/commits/debian
 Vcs-git: git://gitorious.org/openscad-debian/openscad.git/
