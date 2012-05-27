@@ -1,6 +1,8 @@
 openscad (2011.12-4) UNRELEASED; urgency=low
 
   * Acknowledge DM-Upload-Allowed: yes
+  * Enable hardening flags
+  * Switch to debhelper 9 to ease configuration
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 28 May 2012 00:13:01 +0200
 
