@@ -4,6 +4,7 @@
 #include "tests-common.h"
 #include "system-gl.h"
 #include "openscad.h"
+#include "parsersettings.h"
 #include "builtin.h"
 #include "context.h"
 #include "node.h"
@@ -22,17 +23,18 @@
 #include "csgtermnormalizer.h"
 #include "OffscreenView.h"
 
-#include <QApplication>
-#include <QFile>
-#include <QDir>
-#include <QSet>
+#include <QCoreApplication>
 #include <QTimer>
 
 #include <sstream>
 #include <vector>
 
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
+
 namespace po = boost::program_options;
+namespace fs = boost::filesystem;
+#include "boosty.h"
 
 using std::string;
 using std::vector;
@@ -40,7 +42,6 @@ using std::cerr;
 using std::cout;
 
 std::string commandline_commands;
-QString librarydir;
 
 //#define DEBUG
 
@@ -116,7 +117,7 @@ po::variables_map parse_options(int argc, char *argv[])
 //        po::options_description hidden("Hidden options");
 //        hidden.add_options()
                 ("input-file", po::value< vector<string> >(), "input file")
-                ("output-file", po::value< vector<string> >(), "ouput file");
+                ("output-file", po::value< vector<string> >(), "output file");
 
         po::positional_options_description p;
         p.add("input-file", 1).add("output-file", 1);
@@ -250,30 +251,14 @@ int csgtestcore(int argc, char *argv[], test_type_e test_type)
 
 	Builtins::instance()->initialize();
 
-	QApplication app(argc, argv, false);
+	QCoreApplication app(argc, argv);
 
-	QDir original_path = QDir::current();
+	fs::path original_path = fs::current_path();
 
-	QString currentdir = QDir::currentPath();
+	std::string currentdir = boosty::stringy( fs::current_path() );
 
-	QDir libdir(QApplication::instance()->applicationDirPath());
-#ifdef Q_WS_MAC
-	libdir.cd("../Resources"); // Libraries can be bundled
-	if (!libdir.exists("libraries")) libdir.cd("../../..");
-#elif defined(Q_OS_UNIX)
-	if (libdir.cd("../share/openscad/libraries")) {
-		librarydir = libdir.path();
-	} else
-	if (libdir.cd("../../share/openscad/libraries")) {
-		librarydir = libdir.path();
-	} else
-	if (libdir.cd("../../libraries")) {
-		librarydir = libdir.path();
-	} else
-#endif
-	if (libdir.cd("libraries")) {
-		librarydir = libdir.path();
-	}
+	parser_init(QCoreApplication::instance()->applicationDirPath().toStdString());
+	set_librarydir(boosty::stringy(fs::path(QCoreApplication::instance()->applicationDirPath().toStdString()) / "../libraries"));
 
 	Context root_ctx;
 	register_builtin(root_ctx);
@@ -291,8 +276,9 @@ int csgtestcore(int argc, char *argv[], test_type_e test_type)
 	}
 
 	if (!sysinfo_dump) {
-		QFileInfo fileInfo(filename);
-		QDir::setCurrent(fileInfo.absolutePath());
+		if (fs::path(filename).has_parent_path()) {
+			fs::current_path(fs::path(filename).parent_path());
+		}
 	}
 
 	AbstractNode::resetIndexCounter();
@@ -317,20 +303,23 @@ int csgtestcore(int argc, char *argv[], test_type_e test_type)
 
 	// CSG normalization
 	CSGTermNormalizer normalizer;
-	csgInfo.root_norm_term = normalizer.normalize(root_raw_term);
-		
-	assert(csgInfo.root_norm_term);
+	csgInfo.root_norm_term = normalizer.normalize(root_raw_term, 5000);
+	if (csgInfo.root_norm_term) {
+		csgInfo.root_chain = new CSGChain();
+		csgInfo.root_chain->import(csgInfo.root_norm_term);
+		fprintf(stderr, "Normalized CSG tree has %d elements\n", int(csgInfo.root_chain->polysets.size()));
+	}
+	else {
+		csgInfo.root_chain = NULL;
+		fprintf(stderr, "WARNING: CSG normalization resulted in an empty tree\n");
+	}
 
-	csgInfo.root_chain = new CSGChain();
-	csgInfo.root_chain->import(csgInfo.root_norm_term);
-	fprintf(stderr, "Normalized CSG tree has %d elements\n", int(csgInfo.root_chain->polysets.size()));
-	
 	if (csgInfo.highlight_terms.size() > 0) {
 		cerr << "Compiling highlights (" << csgInfo.highlight_terms.size() << " CSG Trees)...\n";
 		
 		csgInfo.highlights_chain = new CSGChain();
 		for (unsigned int i = 0; i < csgInfo.highlight_terms.size(); i++) {
-			csgInfo.highlight_terms[i] = normalizer.normalize(csgInfo.highlight_terms[i]);
+			csgInfo.highlight_terms[i] = normalizer.normalize(csgInfo.highlight_terms[i], 5000);
 			csgInfo.highlights_chain->import(csgInfo.highlight_terms[i]);
 		}
 	}
@@ -340,12 +329,12 @@ int csgtestcore(int argc, char *argv[], test_type_e test_type)
 		
 		csgInfo.background_chain = new CSGChain();
 		for (unsigned int i = 0; i < csgInfo.background_terms.size(); i++) {
-			csgInfo.background_terms[i] = normalizer.normalize(csgInfo.background_terms[i]);
+			csgInfo.background_terms[i] = normalizer.normalize(csgInfo.background_terms[i], 5000);
 			csgInfo.background_chain->import(csgInfo.background_terms[i]);
 		}
 	}
 	
-	QDir::setCurrent(original_path.absolutePath());
+	fs::current_path(original_path);
 
 	try {
 		csgInfo.glview = new OffscreenView(512,512);
@@ -356,12 +345,14 @@ int csgtestcore(int argc, char *argv[], test_type_e test_type)
 	enable_opencsg_shaders(csgInfo.glview);
 
 	if (sysinfo_dump) cout << info_dump(csgInfo.glview);
-	BoundingBox bbox = csgInfo.root_chain->getBoundingBox();
+	Vector3d center(0,0,0);
+	double radius = 1.0;
 
-	Vector3d center = (bbox.min() + bbox.max()) / 2;
-	double radius = (bbox.max() - bbox.min()).norm() / 2;
-
-
+	if (csgInfo.root_chain) {
+		BoundingBox bbox = csgInfo.root_chain->getBoundingBox();
+		center = (bbox.min() + bbox.max()) / 2;
+		radius = (bbox.max() - bbox.min()).norm() / 2;
+	}
 	Vector3d cameradir(1, 1, -0.5);
 	Vector3d camerapos = center - radius*1.8*cameradir;
 	csgInfo.glview->setCamera(camerapos, center);

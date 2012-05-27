@@ -7,9 +7,9 @@
 #include <QFileInfo>
 #include <sstream>
 
-AbstractModule *parsefile(const char *filename)
+Module *parsefile(const char *filename)
 {
-	AbstractModule *root_module = NULL;
+	Module *root_module = NULL;
 
 	QFileInfo fileInfo(filename);
 	handle_dep(filename);
@@ -25,8 +25,11 @@ AbstractModule *parsefile(const char *filename)
 			text << buffer;
 		}
 		fclose(fp);
-		text << commandline_commands;
+		text << "\n" << commandline_commands;
 		root_module = parse(text.str().c_str(), fileInfo.absolutePath().toLocal8Bit(), false);
+		if (root_module) {
+			root_module->handleDependencies();
+		}
 	}
 	return root_module;
 }

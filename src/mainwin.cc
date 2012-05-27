@@ -25,8 +25,10 @@
  */
 
 #include "PolySetCache.h"
+#include "ModuleCache.h"
 #include "MainWindow.h"
 #include "openscad.h" // examplesdir
+#include "parsersettings.h"
 #include "Preferences.h"
 #include "printutils.h"
 #include "node.h"
@@ -40,10 +42,9 @@
 #ifdef ENABLE_OPENCSG
 #include "CSGTermEvaluator.h"
 #include "OpenCSGRenderer.h"
+#include <opencsg.h>
 #endif
-#ifdef USE_PROGRESSWIDGET
 #include "ProgressWidget.h"
-#endif
 #include "ThrownTogetherRenderer.h"
 #include "csgtermnormalizer.h"
 
@@ -53,8 +54,6 @@
 #include <QSplitter>
 #include <QFileDialog>
 #include <QApplication>
-#include <QProgressDialog>
-#include <QProgressBar>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
@@ -68,6 +67,8 @@
 #include <QMessageBox>
 #include <QDesktopServices>
 #include <QSettings>
+#include <QProgressDialog>
+#include <QMutexLocker>
 #ifdef _QCODE_EDIT_
 #include "qdocument.h"
 #include "qformatscheme.h"
@@ -77,10 +78,10 @@
 #include <fstream>
 
 #include <algorithm>
+#include <boost/version.hpp>
 #include <boost/foreach.hpp>
-#include <boost/lambda/lambda.hpp>
-#include <boost/lambda/bind.hpp>
-using namespace boost::lambda;
+#include <boost/version.hpp>
+#include <sys/stat.h>
 
 #ifdef ENABLE_CGAL
 
@@ -90,8 +91,13 @@ using namespace boost::lambda;
 #include "CGALRenderer.h"
 #include "CGAL_Nef_polyhedron.h"
 #include "cgal.h"
+#include "cgalworker.h"
 
 #endif // ENABLE_CGAL
+
+#ifndef OPENCSG_VERSION_STRING
+#define OPENCSG_VERSION_STRING "unknown, <1.3.2"
+#endif
 
 // Global application state
 unsigned int GuiLocker::gui_locked = 0;
@@ -100,7 +106,11 @@ unsigned int GuiLocker::gui_locked = 0;
 #define QUOTED(x__) QUOTE(x__)
 
 static char helptitle[] =
-	"OpenSCAD " QUOTED(OPENSCAD_VERSION) " (www.openscad.org)\n\n";
+	"OpenSCAD " QUOTED(OPENSCAD_VERSION)
+#ifdef OPENSCAD_COMMIT
+	" (git " QUOTED(OPENSCAD_COMMIT) ")"
+#endif
+	"\nhttp://www.openscad.org\n\n";
 static char copyrighttext[] =
 	"Copyright (C) 2009-2011 Marius Kintel <marius@kintel.net> and Clifford Wolf <clifford@clifford.at>\n"
 	"\n"
@@ -141,15 +151,20 @@ settings_valueList(const QString &key, const QList<int> &defaultList = QList<int
 }
 
 MainWindow::MainWindow(const QString &filename)
+	: progresswidget(NULL)
 {
 	setupUi(this);
+
+	this->cgalworker = new CGALWorker();
+	connect(this->cgalworker, SIGNAL(done(CGAL_Nef_polyhedron *)), 
+					this, SLOT(actionRenderCGALDone(CGAL_Nef_polyhedron *)));
 
 	register_builtin(root_ctx);
 
 	this->openglbox = NULL;
 	root_module = NULL;
 	absolute_root_node = NULL;
-	root_chain = NULL;
+	this->root_chain = NULL;
 #ifdef ENABLE_CGAL
 	this->root_N = NULL;
 	this->cgalRenderer = NULL;
@@ -178,7 +193,6 @@ MainWindow::MainWindow(const QString &filename)
 	editor->setTabStopWidth(30);
 #endif
 	editor->setLineWrapping(true); // Not designable
-	setFont("", 12); // Init default font
 
 	this->glview->statusLabel = new QLabel(this);
 	statusBar()->addWidget(this->glview->statusLabel);
@@ -190,8 +204,8 @@ MainWindow::MainWindow(const QString &filename)
 	autoReloadTimer->setSingleShot(false);
 	connect(autoReloadTimer, SIGNAL(timeout()), this, SLOT(checkAutoReload()));
 
-	connect(e_tval, SIGNAL(textChanged(QString)), this, SLOT(actionCompile()));
-	connect(e_fps, SIGNAL(textChanged(QString)), this, SLOT(updatedFps()));
+	connect(this->e_tval, SIGNAL(textChanged(QString)), this, SLOT(actionCompile()));
+	connect(this->e_fps, SIGNAL(textChanged(QString)), this, SLOT(updatedFps()));
 
 	animate_panel->hide();
 
@@ -314,10 +328,9 @@ MainWindow::MainWindow(const QString &filename)
 	connect(this->helpActionAbout, SIGNAL(triggered()), this, SLOT(helpAbout()));
 	connect(this->helpActionHomepage, SIGNAL(triggered()), this, SLOT(helpHomepage()));
 	connect(this->helpActionManual, SIGNAL(triggered()), this, SLOT(helpManual()));
-	connect(this->helpActionOpenGLInfo, SIGNAL(triggered()), this, SLOT(helpOpenGL()));
+	connect(this->helpActionLibraryInfo, SIGNAL(triggered()), this, SLOT(helpLibrary()));
 
 
-	console->setReadOnly(true);
 	setCurrentOutput();
 
 	PRINT(helptitle);
@@ -344,6 +357,8 @@ MainWindow::MainWindow(const QString &filename)
 	connect(Preferences::inst(), SIGNAL(requestRedraw()), this->glview, SLOT(updateGL()));
 	connect(Preferences::inst(), SIGNAL(fontChanged(const QString&,uint)), 
 					this, SLOT(setFont(const QString&,uint)));
+	connect(Preferences::inst(), SIGNAL(openCSGSettingsChanged()),
+					this, SLOT(openCSGSettingsChanged()));
 	Preferences::inst()->apply();
 
 	// make sure it looks nice..
@@ -405,8 +420,13 @@ void
 MainWindow::loadDesignSettings()
 {
 	QSettings settings;
-	if (settings.value("design/autoReload").toBool())
+	if (settings.value("design/autoReload").toBool()) {
 		designActionAutoReload->setChecked(true);
+	}
+	uint polySetCacheSize = Preferences::inst()->getValue("advanced/polysetCacheSize").toUInt();
+	PolySetCache::instance()->setMaxSize(polySetCacheSize);
+	uint cgalCacheSize = Preferences::inst()->getValue("advanced/cgalCacheSize").toUInt();
+	CGALCache::instance()->setMaxSize(cgalCacheSize);
 }
 
 MainWindow::~MainWindow()
@@ -422,32 +442,24 @@ MainWindow::~MainWindow()
 #endif
 }
 
-#ifdef USE_PROGRESSWIDGET
 void MainWindow::showProgress()
 {
 	this->statusBar()->addPermanentWidget(qobject_cast<ProgressWidget*>(sender()));
 }
-#endif
 
-static void report_func(const class AbstractNode*, void *vp, int mark)
+void MainWindow::report_func(const class AbstractNode*, void *vp, int mark)
 {
-#ifdef USE_PROGRESSWIDGET
-	ProgressWidget *pw = static_cast<ProgressWidget*>(vp);
+	MainWindow *thisp = static_cast<MainWindow*>(vp);
 	int v = (int)((mark*100.0) / progress_report_count);
 	int percent = v < 100 ? v : 99; 
-	if (percent > pw->value()) pw->setValue(percent);
-	QApplication::processEvents();
-	if (pw->wasCanceled()) throw ProgressCancelException();
-#else
-	QProgressDialog *pd = static_cast<QProgressDialog*>(vp);
-	int v = (int)((mark*100.0) / progress_report_count);
-	pd->setValue(v < 100 ? v : 99);
-	QString label;
-	label.sprintf("Rendering Polygon Mesh (%d/%d)", mark, progress_report_count);
-	pd->setLabelText(label);
-	QApplication::processEvents();
-	if (pd->wasCanceled()) throw ProgressCancelException();
-#endif
+	
+	if (percent > thisp->progresswidget->value()) {
+		QMetaObject::invokeMethod(thisp->progresswidget, "setValue", Qt::QueuedConnection,
+															Q_ARG(int, percent));
+		QApplication::processEvents();
+	}
+
+	if (thisp->progresswidget->wasCanceled()) throw ProgressCancelException();
 }
 
 /*!
@@ -481,7 +493,7 @@ MainWindow::openFile(const QString &new_filename)
 #endif
 	setFileName(new_filename);
 
-	load();
+	refreshDocument();
 	updateRecentFiles();
 }
 
@@ -490,7 +502,7 @@ MainWindow::setFileName(const QString &filename)
 {
 	if (filename.isEmpty()) {
 		this->fileName.clear();
-		this->root_ctx.setDocumentPath(currentdir.toStdString());
+		this->root_ctx.setDocumentPath(currentdir);
 		setWindowTitle("OpenSCAD - New Document[*]");
 	}
 	else {
@@ -537,11 +549,11 @@ void MainWindow::updateRecentFiles()
 void MainWindow::updatedFps()
 {
 	bool fps_ok;
-	double fps = e_fps->text().toDouble(&fps_ok);
+	double fps = this->e_fps->text().toDouble(&fps_ok);
 	animate_timer->stop();
 	if (fps_ok && fps > 0) {
 		animate_timer->setSingleShot(false);
-		animate_timer->setInterval(int(1000 / e_fps->text().toDouble()));
+		animate_timer->setInterval(int(1000 / this->e_fps->text().toDouble()));
 		animate_timer->start();
 	}
 }
@@ -549,31 +561,32 @@ void MainWindow::updatedFps()
 void MainWindow::updateTVal()
 {
 	bool fps_ok;
-	double fps = e_fps->text().toDouble(&fps_ok);
+	double fps = this->e_fps->text().toDouble(&fps_ok);
 	if (fps_ok) {
 		if (fps <= 0) {
 			actionCompile();
 		} else {
-			double s = e_fsteps->text().toDouble();
-			double t = e_tval->text().toDouble() + 1/s;
+			double s = this->e_fsteps->text().toDouble();
+			double t = this->e_tval->text().toDouble() + 1/s;
 			QString txt;
 			txt.sprintf("%.5f", t >= 1.0 ? 0.0 : t);
-			e_tval->setText(txt);
+			this->e_tval->setText(txt);
 		}
 	}
 }
 
-void MainWindow::load()
+void MainWindow::refreshDocument()
 {
 	setCurrentOutput();
 	if (!this->fileName.isEmpty()) {
 		QFile file(this->fileName);
 		if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-			PRINTA("Failed to open file: %1 (%2)", this->fileName, file.errorString());
+			PRINTB("Failed to open file %s: %s", 
+						 this->fileName.toStdString() % file.errorString().toStdString());
 		}
 		else {
 			QString text = QTextStream(&file).readAll();
-			PRINTA("Loaded design `%1'.", this->fileName);
+			PRINTB("Loaded design '%s'.", this->fileName.toStdString());
 			editor->setPlainText(text);
 		}
 	}
@@ -591,42 +604,30 @@ AbstractNode *MainWindow::find_root_tag(AbstractNode *n)
 
 /*!
 	Parse and evaluate the design => this->root_node
+
+	Returns true if something was compiled, false if nothing was changed
+  and the root_node was left untouched.
 */
-void MainWindow::compile(bool procevents)
+bool MainWindow::compile(bool reload, bool procevents)
 {
-	PRINT("Parsing design (AST generation)...");
-	if (procevents)
-		QApplication::processEvents();
+	if (!compileTopLevelDocument(reload)) return false;
 
   // Invalidate renderers before we kill the CSG tree
 	this->glview->setRenderer(NULL);
-	if (this->opencsgRenderer) {
-		delete this->opencsgRenderer;
-		this->opencsgRenderer = NULL;
-	}
-	if (this->thrownTogetherRenderer) {
-		delete this->thrownTogetherRenderer;
-		this->thrownTogetherRenderer = NULL;
-	}
+	delete this->opencsgRenderer;
+	this->opencsgRenderer = NULL;
+	delete this->thrownTogetherRenderer;
+	this->thrownTogetherRenderer = NULL;
 
 	// Remove previous CSG tree
-	if (this->root_module) {
-		delete this->root_module;
-		this->root_module = NULL;
-	}
-
-	if (this->absolute_root_node) {
-		delete this->absolute_root_node;
-		this->absolute_root_node = NULL;
-	}
+	delete this->absolute_root_node;
+	this->absolute_root_node = NULL;
 
 	this->root_raw_term.reset();
 	this->root_norm_term.reset();
 
-	if (this->root_chain) {
-		delete this->root_chain;
-		this->root_chain = NULL;
-	}
+	delete this->root_chain;
+	this->root_chain = NULL;
 
 	this->highlight_terms.clear();
 	delete this->highlights_chain;
@@ -639,96 +640,43 @@ void MainWindow::compile(bool procevents)
 	this->root_node = NULL;
 	this->tree.setRoot(NULL);
 
-	// Initialize special variables
-	this->root_ctx.set_variable("$t", Value(e_tval->text().toDouble()));
-
-	Value vpt;
-	vpt.type = Value::VECTOR;
-	vpt.append(new Value(-this->glview->object_trans_x));
-	vpt.append(new Value(-this->glview->object_trans_y));
-	vpt.append(new Value(-this->glview->object_trans_z));
-	this->root_ctx.set_variable("$vpt", vpt);
-
-	Value vpr;
-	vpr.type = Value::VECTOR;
-	vpr.append(new Value(fmodf(360 - this->glview->object_rot_x + 90, 360)));
-	vpr.append(new Value(fmodf(360 - this->glview->object_rot_y, 360)));
-	vpr.append(new Value(fmodf(360 - this->glview->object_rot_z, 360)));
-	root_ctx.set_variable("$vpr", vpr);
-
-	// Parse
-	this->last_compiled_doc = editor->toPlainText();
-	this->root_module = parse((this->last_compiled_doc + "\n" + 
-														 QString::fromStdString(commandline_commands)).toAscii().data(), 
-														this->fileName.isEmpty() ? 
-														"" : 
-														QFileInfo(this->fileName).absolutePath().toLocal8Bit(), 
-														false);
-
-	// Error highlighting
-	if (this->highlighter) {
-		delete this->highlighter;
-		this->highlighter = NULL;
-	}
-	if (parser_error_pos >= 0) {
-		this->highlighter = new Highlighter(editor->document());
-	}
-
-	if (!this->root_module) {
-		if (!animate_panel->isVisible()) {
-#ifdef _QCODE_EDIT_
-			QDocumentCursor cursor = editor->cursor();
-			cursor.setPosition(parser_error_pos);
-#else
-			QTextCursor cursor = editor->textCursor();
-			cursor.setPosition(parser_error_pos);
-			editor->setTextCursor(cursor);
-#endif
+	if (this->root_module) {
+		// Evaluate CSG tree
+		PRINT("Compiling design (CSG Tree generation)...");
+		if (procevents) QApplication::processEvents();
+		
+		AbstractNode::resetIndexCounter();
+		this->root_inst = ModuleInstantiation();
+		this->absolute_root_node = this->root_module->evaluate(&this->root_ctx, &this->root_inst);
+		
+		if (this->absolute_root_node) {
+			// Do we have an explicit root node (! modifier)?
+			if (!(this->root_node = find_root_tag(this->absolute_root_node))) {
+				this->root_node = this->absolute_root_node;
+			}
+			// FIXME: Consider giving away ownership of root_node to the Tree, or use reference counted pointers
+			this->tree.setRoot(this->root_node);
+			// Dump the tree (to initialize caches).
+			// FIXME: We shouldn't really need to do this explicitly..
+			this->tree.getString(*this->root_node);
 		}
-		goto fail;
 	}
 
-	// Evaluate CSG tree
-	PRINT("Compiling design (CSG Tree generation)...");
-	if (procevents)
-		QApplication::processEvents();
-
-	AbstractNode::resetIndexCounter();
-	this->root_inst = ModuleInstantiation();
-	this->absolute_root_node = this->root_module->evaluate(&this->root_ctx, &this->root_inst);
-
-	if (!this->absolute_root_node)
-		goto fail;
-
-	// Do we have an explicit root node (! modifier)?
-	if (!(this->root_node = find_root_tag(this->absolute_root_node))) {
-		this->root_node = this->absolute_root_node;
-	}
-	// FIXME: Consider giving away ownership of root_node to the Tree, or use reference counted pointers
-	this->tree.setRoot(this->root_node);
-  // Dump the tree (to initialize caches).
-  // FIXME: We shouldn't really need to do this explicitly..
-	this->tree.getString(*this->root_node);
-
- 	if (1) {
-		PRINT("Compilation finished.");
-		if (procevents)
-			QApplication::processEvents();
-	} else {
-fail:
+	if (!this->root_node) {
 		if (parser_error_pos < 0) {
 			PRINT("ERROR: Compilation failed! (no top level object found)");
 		} else {
 			PRINT("ERROR: Compilation failed!");
 		}
-		if (procevents)
-			QApplication::processEvents();
+		if (procevents) QApplication::processEvents();
 	}
+
+	return true;
 }
 
 /*!
 	Generates CSG tree for OpenCSG evaluation.
-	Assumes that the design has been parsed and evaluated
+	Assumes that the design has been parsed and evaluated (this->root_node is set)
 */
 void MainWindow::compileCSG(bool procevents)
 {
@@ -741,21 +689,10 @@ void MainWindow::compileCSG(bool procevents)
 	QTime t;
 	t.start();
 
-#ifdef USE_PROGRESSWIDGET
-	ProgressWidget *pd = new ProgressWidget(this);
-	pd->setRange(0, 100);
-	pd->setValue(0);
-	connect(pd, SIGNAL(requestShow()), this, SLOT(showProgress()));
-#else
-	QProgressDialog *pd = new QProgressDialog("Rendering CSG products...", "Cancel", 0, 100);
-	pd->setRange(0, 100);
-	pd->setValue(0);
-	pd->setAutoClose(false);
-	pd->show();
-#endif
-	QApplication::processEvents();
+	this->progresswidget = new ProgressWidget(this);
+	connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
 
-	progress_report_prep(root_node, report_func, pd);
+	progress_report_prep(this->root_node, report_func, this);
 	try {
 		CGALEvaluator cgalevaluator(this->tree);
 		PolySetCGALEvaluator psevaluator(cgalevaluator);
@@ -773,10 +710,9 @@ void MainWindow::compileCSG(bool procevents)
 		PRINT("CSG generation cancelled.");
 	}
 	progress_report_fin();
-#ifdef USE_PROGRESSWIDGET
-	this->statusBar()->removeWidget(pd);
-#endif
-	delete pd;
+	this->statusBar()->removeWidget(this->progresswidget);
+	delete this->progresswidget;
+	this->progresswidget = NULL;
 
 	if (root_raw_term) {
 		PRINT("Compiling design (CSG Products normalization)...");
@@ -784,44 +720,54 @@ void MainWindow::compileCSG(bool procevents)
 			QApplication::processEvents();
 		
 		CSGTermNormalizer normalizer;
-		this->root_norm_term = normalizer.normalize(this->root_raw_term);
-		assert(this->root_norm_term);
-
-		root_chain = new CSGChain();
-		root_chain->import(this->root_norm_term);
+		size_t normalizelimit = 2 * Preferences::inst()->getValue("advanced/openCSGLimit").toUInt();
+		this->root_norm_term = normalizer.normalize(this->root_raw_term, normalizelimit);
+		if (this->root_norm_term) {
+			this->root_chain = new CSGChain();
+			this->root_chain->import(this->root_norm_term);
+		}
+		else {
+			this->root_chain = NULL;
+			PRINT("WARNING: CSG normalization resulted in an empty tree");
+			if (procevents)
+				QApplication::processEvents();
+		}
 		
 		if (highlight_terms.size() > 0)
 		{
-			PRINTF("Compiling highlights (%zu CSG Trees)...", highlight_terms.size());
+			PRINTB("Compiling highlights (%d CSG Trees)...", highlight_terms.size());
 			if (procevents)
 				QApplication::processEvents();
 			
 			highlights_chain = new CSGChain();
 			for (unsigned int i = 0; i < highlight_terms.size(); i++) {
-				highlight_terms[i] = normalizer.normalize(highlight_terms[i]);
+				highlight_terms[i] = normalizer.normalize(highlight_terms[i], normalizelimit);
 				highlights_chain->import(highlight_terms[i]);
 			}
 		}
 		
 		if (background_terms.size() > 0)
 		{
-			PRINTF("Compiling background (%zu CSG Trees)...", background_terms.size());
+			PRINTB("Compiling background (%d CSG Trees)...", background_terms.size());
 			if (procevents)
 				QApplication::processEvents();
 			
 			background_chain = new CSGChain();
 			for (unsigned int i = 0; i < background_terms.size(); i++) {
-				background_terms[i] = normalizer.normalize(background_terms[i]);
+				background_terms[i] = normalizer.normalize(background_terms[i], normalizelimit);
 				background_chain->import(background_terms[i]);
 			}
 		}
 
-		if (root_chain->polysets.size() > 1000) {
-			PRINTF("WARNING: Normalized tree has %d elements!", int(root_chain->polysets.size()));
-			PRINTF("WARNING: OpenCSG rendering has been disabled.");
+		if (this->root_chain && 
+				(this->root_chain->polysets.size() > 
+				 Preferences::inst()->getValue("advanced/openCSGLimit").toUInt())) {
+			PRINTB("WARNING: Normalized tree has %d elements!", this->root_chain->polysets.size());
+			PRINT("WARNING: OpenCSG rendering has been disabled.");
 		}
 		else {
-			PRINTF("Normalized CSG tree has %d elements", int(root_chain->polysets.size()));
+			PRINTB("Normalized CSG tree has %d elements", 
+						 (this->root_chain ? this->root_chain->polysets.size() : 0));
 			this->opencsgRenderer = new OpenCSGRenderer(this->root_chain, 
 																									this->highlights_chain, 
 																									this->background_chain, 
@@ -832,7 +778,7 @@ void MainWindow::compileCSG(bool procevents)
 																															this->background_chain);
 		PRINT("CSG generation finished.");
 		int s = t.elapsed() / 1000;
-		PRINTF("Total rendering time: %d hours, %d minutes, %d seconds", s / (60*60), (s / 60) % 60, s % 60);
+		PRINTB("Total rendering time: %d hours, %d minutes, %d seconds", (s / (60*60)) % ((s / 60) % 60) % (s % 60));
 		if (procevents)
 			QApplication::processEvents();
 	}
@@ -947,11 +893,11 @@ void MainWindow::actionSave()
 		setCurrentOutput();
 		QFile file(this->fileName);
 		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
-			PRINTA("Failed to open file for writing: %1 (%2)", this->fileName, file.errorString());
+			PRINTB("Failed to open file for writing: %s (%s)", this->fileName.toStdString() % file.errorString().toStdString());
 		}
 		else {
 			QTextStream(&file) << this->editor->toPlainText();
-			PRINTA("Saved design `%1'.", this->fileName);
+			PRINTB("Saved design '%s'.", this->fileName.toStdString());
 			this->editor->setContentModified(false);
 		}
 		clearCurrentOutput();
@@ -986,7 +932,7 @@ void MainWindow::actionSaveAs()
 
 void MainWindow::actionReload()
 {
-	if (checkModified()) load();
+	if (checkEditorModified()) refreshDocument();
 }
 
 void MainWindow::hideEditor()
@@ -1026,16 +972,127 @@ void MainWindow::pasteViewportRotation()
 	cursor.insertText(txt);
 }
 
-void MainWindow::checkAutoReload()
+void MainWindow::updateTemporalVariables()
+{
+	this->root_ctx.set_variable("$t", Value(this->e_tval->text().toDouble()));
+	
+	Value vpt;
+	vpt.type = Value::VECTOR;
+	vpt.append(new Value(-this->glview->object_trans_x));
+	vpt.append(new Value(-this->glview->object_trans_y));
+	vpt.append(new Value(-this->glview->object_trans_z));
+	this->root_ctx.set_variable("$vpt", vpt);
+	
+	Value vpr;
+	vpr.type = Value::VECTOR;
+	vpr.append(new Value(fmodf(360 - this->glview->object_rot_x + 90, 360)));
+	vpr.append(new Value(fmodf(360 - this->glview->object_rot_y, 360)));
+	vpr.append(new Value(fmodf(360 - this->glview->object_rot_z, 360)));
+	root_ctx.set_variable("$vpr", vpr);
+}
+
+bool MainWindow::fileChangedOnDisk()
 {
 	if (!this->fileName.isEmpty()) {
-		QString new_stinfo;
-		QFileInfo finfo(this->fileName);
-		new_stinfo = QString::number(finfo.size()) + QString::number(finfo.lastModified().toTime_t());
-		if (new_stinfo != autoReloadInfo)
-			actionReloadCompile();
-		autoReloadInfo = new_stinfo;
+		struct stat st;
+		memset(&st, 0, sizeof(struct stat));
+		stat(this->fileName.toLocal8Bit(), &st);
+		std::string newid = str(boost::format("%x.%x") % st.st_mtime % st.st_size);
+
+		if (newid != this->autoReloadId) {
+			this->autoReloadId = newid;
+			return true;
+		}
 	}
+	return false;
+}
+
+// FIXME: The following two methods are duplicated in ModuleCache.cc - refactor
+static bool is_modified(const std::string &filename, const time_t &mtime)
+{
+	struct stat st;
+	memset(&st, 0, sizeof(struct stat));
+	stat(filename.c_str(), &st);
+	return (st.st_mtime > mtime);
+}
+
+bool MainWindow::includesChanged()
+{
+	if (this->root_module) {
+		BOOST_FOREACH(const Module::IncludeContainer::value_type &item, this->root_module->includes) {
+			if (is_modified(item.first, item.second)) return true;
+		}
+	}
+	return false;
+}
+
+/*!
+	If reload is true, does a timestamp check on the document and tries to reload it.
+	Otherwise, just reparses the current document and any dependencies, updates the 
+	GUI accordingly and populates this->root_module.
+
+	Returns true if anything was compiled.
+*/
+bool MainWindow::compileTopLevelDocument(bool reload)
+{
+	bool shouldcompiletoplevel = !reload;
+
+	if ((reload && fileChangedOnDisk() && checkEditorModified()) ||
+			includesChanged()) {
+		shouldcompiletoplevel = true;
+		refreshDocument();
+	}
+	
+	if (shouldcompiletoplevel) {
+		console->clear();
+
+		updateTemporalVariables();
+		
+		this->last_compiled_doc = editor->toPlainText();
+		std::string fulltext = 
+			this->last_compiled_doc.toStdString() + "\n" + commandline_commands;
+		
+		delete this->root_module;
+		this->root_module = NULL;
+		
+		this->root_module = parse(fulltext.c_str(),
+															this->fileName.isEmpty() ? 
+															"" : 
+															QFileInfo(this->fileName).absolutePath().toLocal8Bit(), 
+															false);
+
+		// Error highlighting
+		delete this->highlighter;
+		this->highlighter = NULL;
+		
+		if (!this->root_module) {
+			this->highlighter = new Highlighter(editor->document());
+
+			if (!animate_panel->isVisible()) {
+#ifdef _QCODE_EDIT_
+				QDocumentCursor cursor = editor->cursor();
+				cursor.setPosition(parser_error_pos);
+#else
+				QTextCursor cursor = editor->textCursor();
+				cursor.setPosition(parser_error_pos);
+				editor->setTextCursor(cursor);
+#endif
+			}
+		}
+	}
+
+	bool changed = shouldcompiletoplevel;
+	if (this->root_module) {
+		changed |= this->root_module->handleDependencies();
+		if (changed) PRINTB("Module cache size: %d modules", ModuleCache::instance()->size());
+	}
+
+	return changed;
+}
+
+void MainWindow::checkAutoReload()
+{
+	if (!this->fileName.isEmpty()) actionReloadCompile();
 }
 
 void MainWindow::autoReloadSet(bool on)
@@ -1043,14 +1100,14 @@ void MainWindow::autoReloadSet(bool on)
 	QSettings settings;
 	settings.setValue("design/autoReload",designActionAutoReload->isChecked());
 	if (on) {
-		autoReloadInfo = QString();
+		autoReloadId = "";
 		autoReloadTimer->start(200);
 	} else {
 		autoReloadTimer->stop();
 	}
 }
 
-bool MainWindow::checkModified()
+bool MainWindow::checkEditorModified()
 {
 	if (editor->isContentModified()) {
 		QMessageBox::StandardButton ret;
@@ -1070,15 +1127,11 @@ void MainWindow::actionReloadCompile()
 {
 	if (GuiLocker::isLocked()) return;
 	GuiLocker lock;
-
-	if (!checkModified()) return;
-
-	console->clear();
-
-	load();
-
 	setCurrentOutput();
-	compile(true);
+
+	// PRINT("Parsing design (AST generation)...");
+	// QApplication::processEvents();
+	if (!compile(true, true)) return;
 	if (this->root_node) compileCSG(true);
 
 	// Go to non-CGAL view mode
@@ -1100,11 +1153,12 @@ void MainWindow::actionCompile()
 {
 	if (GuiLocker::isLocked()) return;
 	GuiLocker lock;
-
 	setCurrentOutput();
 	console->clear();
 
-	compile(!viewActionAnimate->isChecked());
+	PRINT("Parsing design (AST generation)...");
+	QApplication::processEvents();
+	compile(false, !viewActionAnimate->isChecked());
 	if (this->root_node) compileCSG(!viewActionAnimate->isChecked());
 
 	// Go to non-CGAL view mode
@@ -1122,8 +1176,8 @@ void MainWindow::actionCompile()
 	if (viewActionAnimate->isChecked() && e_dump->isChecked()) {
 		QImage img = this->glview->grabFrameBuffer();
 		QString filename;
-		double s = e_fsteps->text().toDouble();
-		double t = e_tval->text().toDouble();
+		double s = this->e_fsteps->text().toDouble();
+		double t = this->e_tval->text().toDouble();
 		filename.sprintf("frame%05d.png", int(round(s*t)));
 		img.save(filename, "PNG");
 	}
@@ -1141,7 +1195,9 @@ void MainWindow::actionRenderCGAL()
 	setCurrentOutput();
 	console->clear();
 
-	compile(true);
+	PRINT("Parsing design (AST generation)...");
+	QApplication::processEvents();
+	compile(false, true);
 
 	if (!this->root_module || !this->root_node) {
 		return;
@@ -1156,90 +1212,52 @@ void MainWindow::actionRenderCGAL()
 	}
 
 	PRINT("Rendering Polygon Mesh using CGAL...");
-	QApplication::processEvents();
 
-	QTime t;
-	t.start();
+	this->progresswidget = new ProgressWidget(this);
+	connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
 
+	progress_report_prep(this->root_node, report_func, this);
 
-#ifdef USE_PROGRESSWIDGET
-	ProgressWidget *pd = new ProgressWidget(this);
-	pd->setRange(0, 100);
-	pd->setValue(0);
-	connect(pd, SIGNAL(requestShow()), this, SLOT(showProgress()));
-#else
-	QProgressDialog *pd = new QProgressDialog("Rendering Polygon Mesh using CGAL...", "Cancel", 0, 100);
-	pd->setRange(0, 100);
-	pd->setValue(0);
-	pd->setAutoClose(false);
-	pd->show();
-#endif
+	GuiLocker::lock(); // Will be unlocked in actionRenderCGALDone()
+	this->cgalworker->start(this->tree);
+}
 
-	QApplication::processEvents();
-
-	progress_report_prep(this->root_node, report_func, pd);
-	try {
-		CGALEvaluator evaluator(this->tree);
-		this->root_N = new CGAL_Nef_polyhedron(evaluator.evaluateCGALMesh(*this->root_node));
-		PolySetCache::instance()->print();
-		CGALCache::instance()->print();
-	}
-	catch (ProgressCancelException e) {
-		PRINT("Rendering cancelled.");
-	}
+void MainWindow::actionRenderCGALDone(CGAL_Nef_polyhedron *root_N)
+{
 	progress_report_fin();
 
-	if (this->root_N)
-	{
-		// FIXME: Reenable cache cost info
-// 		PRINTF("Number of vertices currently in CGAL cache: %d", AbstractNode::cgal_nef_cache.totalCost());
-// 		PRINTF("Number of objects currently in CGAL cache: %d", AbstractNode::cgal_nef_cache.size());
-		QApplication::processEvents();
+	if (root_N) {
+		PolySetCache::instance()->print();
+		CGALCache::instance()->print();
 
-		if (this->root_N->dim == 2) {
-			PRINTF("   Top level object is a 2D object:");
-			QApplication::processEvents();
-			PRINTF("   Empty:      %6s", this->root_N->p2->is_empty() ? "yes" : "no");
-			QApplication::processEvents();
-			PRINTF("   Plane:      %6s", this->root_N->p2->is_plane() ? "yes" : "no");
-			QApplication::processEvents();
-			PRINTF("   Vertices:   %6d", (int)this->root_N->p2->explorer().number_of_vertices());
-			QApplication::processEvents();
-			PRINTF("   Halfedges:  %6d", (int)this->root_N->p2->explorer().number_of_halfedges());
-			QApplication::processEvents();
-			PRINTF("   Edges:      %6d", (int)this->root_N->p2->explorer().number_of_edges());
-			QApplication::processEvents();
-			PRINTF("   Faces:      %6d", (int)this->root_N->p2->explorer().number_of_faces());
-			QApplication::processEvents();
-			PRINTF("   FaceCycles: %6d", (int)this->root_N->p2->explorer().number_of_face_cycles());
-			QApplication::processEvents();
-			PRINTF("   ConnComp:   %6d", (int)this->root_N->p2->explorer().number_of_connected_components());
-			QApplication::processEvents();
+		if (root_N->dim == 2) {
+			PRINT("   Top level object is a 2D object:");
+			PRINTB("   Empty:      %6s", (root_N->p2->is_empty() ? "yes" : "no"));
+			PRINTB("   Plane:      %6s", (root_N->p2->is_plane() ? "yes" : "no"));
+			PRINTB("   Vertices:   %6d", root_N->p2->explorer().number_of_vertices());
+			PRINTB("   Halfedges:  %6d", root_N->p2->explorer().number_of_halfedges());
+			PRINTB("   Edges:      %6d", root_N->p2->explorer().number_of_edges());
+			PRINTB("   Faces:      %6d", root_N->p2->explorer().number_of_faces());
+			PRINTB("   FaceCycles: %6d", root_N->p2->explorer().number_of_face_cycles());
+			PRINTB("   ConnComp:   %6d", root_N->p2->explorer().number_of_connected_components());
 		}
 
-		if (this->root_N->dim == 3) {
-			PRINTF("   Top level object is a 3D object:");
-			PRINTF("   Simple:     %6s", this->root_N->p3->is_simple() ? "yes" : "no");
-			QApplication::processEvents();
-			PRINTF("   Valid:      %6s", this->root_N->p3->is_valid() ? "yes" : "no");
-			QApplication::processEvents();
-			PRINTF("   Vertices:   %6d", (int)this->root_N->p3->number_of_vertices());
-			QApplication::processEvents();
-			PRINTF("   Halfedges:  %6d", (int)this->root_N->p3->number_of_halfedges());
-			QApplication::processEvents();
-			PRINTF("   Edges:      %6d", (int)this->root_N->p3->number_of_edges());
-			QApplication::processEvents();
-			PRINTF("   Halffacets: %6d", (int)this->root_N->p3->number_of_halffacets());
-			QApplication::processEvents();
-			PRINTF("   Facets:     %6d", (int)this->root_N->p3->number_of_facets());
-			QApplication::processEvents();
-			PRINTF("   Volumes:    %6d", (int)this->root_N->p3->number_of_volumes());
-			QApplication::processEvents();
+		if (root_N->dim == 3) {
+			PRINT("   Top level object is a 3D object:");
+			PRINTB("   Simple:     %6s", (root_N->p3->is_simple() ? "yes" : "no"));
+			PRINTB("   Valid:      %6s", (root_N->p3->is_valid() ? "yes" : "no"));
+			PRINTB("   Vertices:   %6d", root_N->p3->number_of_vertices());
+			PRINTB("   Halfedges:  %6d", root_N->p3->number_of_halfedges());
+			PRINTB("   Edges:      %6d", root_N->p3->number_of_edges());
+			PRINTB("   Halffacets: %6d", root_N->p3->number_of_halffacets());
+			PRINTB("   Facets:     %6d", root_N->p3->number_of_facets());
+			PRINTB("   Volumes:    %6d", root_N->p3->number_of_volumes());
 		}
 
-		int s = t.elapsed() / 1000;
-		PRINTF("Total rendering time: %d hours, %d minutes, %d seconds", s / (60*60), (s / 60) % 60, s % 60);
+		int s = this->progresswidget->elapsedTime() / 1000;
+		PRINTB("Total rendering time: %d hours, %d minutes, %d seconds", (s / (60*60)) % ((s / 60) % 60) % (s % 60));
 
+		this->root_N = root_N;
 		if (!this->root_N->empty()) {
 			this->cgalRenderer = new CGALRenderer(*this->root_N);
 			// Go to CGAL view mode
@@ -1257,11 +1275,12 @@ void MainWindow::actionRenderCGAL()
 		}
 	}
 
-#ifdef USE_PROGRESSWIDGET
-	this->statusBar()->removeWidget(pd);
-#endif
-	delete pd;
+	this->statusBar()->removeWidget(this->progresswidget);
+	delete this->progresswidget;
+	this->progresswidget = NULL;
 	clearCurrentOutput();
+
+	GuiLocker::unlock();
 }
 
 #endif /* ENABLE_CGAL */
@@ -1310,7 +1329,7 @@ void MainWindow::actionDisplayCSGProducts()
 	e->setTabStopWidth(30);
 	e->setWindowTitle("CSG Products Dump");
 	e->setReadOnly(true);
-	e->setPlainText(QString("\nCSG before normalization:\n%1\n\n\nCSG after normalization:\n%2\n\n\nCSG rendering chain:\n%3\n\n\nHighlights CSG rendering chain:\n%4\n\n\nBackground CSG rendering chain:\n%5\n").arg(root_raw_term ? QString::fromStdString(root_raw_term->dump()) : "N/A", root_norm_term ? QString::fromStdString(root_norm_term->dump()) : "N/A", root_chain ? QString::fromStdString(root_chain->dump()) : "N/A", highlights_chain ? QString::fromStdString(highlights_chain->dump()) : "N/A", background_chain ? QString::fromStdString(background_chain->dump()) : "N/A"));
+	e->setPlainText(QString("\nCSG before normalization:\n%1\n\n\nCSG after normalization:\n%2\n\n\nCSG rendering chain:\n%3\n\n\nHighlights CSG rendering chain:\n%4\n\n\nBackground CSG rendering chain:\n%5\n").arg(root_raw_term ? QString::fromStdString(root_raw_term->dump()) : "N/A", root_norm_term ? QString::fromStdString(root_norm_term->dump()) : "N/A", this->root_chain ? QString::fromStdString(this->root_chain->dump()) : "N/A", highlights_chain ? QString::fromStdString(highlights_chain->dump()) : "N/A", background_chain ? QString::fromStdString(background_chain->dump()) : "N/A"));
 	e->show();
 	e->resize(600, 400);
 	clearCurrentOutput();
@@ -1351,31 +1370,22 @@ void MainWindow::actionExportSTLorOFF(bool)
 			this->fileName.isEmpty() ? "Untitled"+suffix : QFileInfo(this->fileName).baseName()+suffix,
 			stl_mode ? "STL Files (*.stl)" : "OFF Files (*.off)");
 	if (stl_filename.isEmpty()) {
-		PRINTF("No filename specified. %s export aborted.", stl_mode ? "STL" : "OFF");
+		PRINTB("No filename specified. %s export aborted.", (stl_mode ? "STL" : "OFF"));
 		clearCurrentOutput();
 		return;
 	}
 
-	QProgressDialog *pd = new QProgressDialog(
-			stl_mode ? "Exporting object to STL file..." : "Exporting object to OFF file...",
-			QString(), 0, this->root_N->p3->number_of_facets() + 1);
-	pd->setValue(0);
-	pd->setAutoClose(false);
-	pd->show();
-	QApplication::processEvents();
-
 	std::ofstream fstream(stl_filename.toUtf8());
 	if (!fstream.is_open()) {
-		PRINTA("Can't open file \"%1\" for export", stl_filename);
+		PRINTB("Can't open file \"%s\" for export", stl_filename.toStdString());
 	}
 	else {
-		if (stl_mode) export_stl(this->root_N, fstream, pd);
-		else export_off(this->root_N, fstream, pd);
+		if (stl_mode) export_stl(this->root_N, fstream);
+		else export_off(this->root_N, fstream);
 		fstream.close();
 
-		PRINTF("%s export finished.", stl_mode ? "STL" : "OFF");
+		PRINTB("%s export finished.", (stl_mode ? "STL" : "OFF"));
 	}
-	delete pd;
 
 	clearCurrentOutput();
 #endif /* ENABLE_CGAL */
@@ -1413,19 +1423,19 @@ void MainWindow::actionExportDXF()
 			this->fileName.isEmpty() ? "Untitled.dxf" : QFileInfo(this->fileName).baseName()+".dxf",
 			"DXF Files (*.dxf)");
 	if (dxf_filename.isEmpty()) {
-		PRINTF("No filename specified. DXF export aborted.");
+		PRINT("No filename specified. DXF export aborted.");
 		clearCurrentOutput();
 		return;
 	}
 
 	std::ofstream fstream(dxf_filename.toUtf8());
 	if (!fstream.is_open()) {
-		PRINTA("Can't open file \"%s\" for export", dxf_filename);
+		PRINTB("Can't open file \"%s\" for export", dxf_filename.toStdString());
 	}
 	else {
-		export_dxf(this->root_N, fstream, NULL);
+		export_dxf(this->root_N, fstream);
 		fstream.close();
-		PRINTF("DXF export finished.");
+		PRINT("DXF export finished.");
 	}
 
 	clearCurrentOutput();
@@ -1446,19 +1456,19 @@ void MainWindow::actionExportCSG()
 																											this->fileName.isEmpty() ? "Untitled.csg" : QFileInfo(this->fileName).baseName()+".csg",
 																											"CSG Files (*.csg)");
 	if (csg_filename.isEmpty()) {
-		PRINTF("No filename specified. CSG export aborted.");
+		PRINT("No filename specified. CSG export aborted.");
 		clearCurrentOutput();
 		return;
 	}
 
 	std::ofstream fstream(csg_filename.toUtf8());
 	if (!fstream.is_open()) {
-		PRINTA("Can't open file \"%s\" for export", csg_filename);
+		PRINTB("Can't open file \"%s\" for export", csg_filename.toStdString());
 	}
 	else {
 		fstream << this->tree.getString(*this->root_node) << "\n";
 		fstream.close();
-		PRINTF("CSG export finished.");
+		PRINT("CSG export finished.");
 	}
 
 	clearCurrentOutput();
@@ -1472,7 +1482,7 @@ void MainWindow::actionExportImage()
 	QString img_filename = QFileDialog::getSaveFileName(this,
 			"Export Image", "", "PNG Files (*.png)");
 	if (img_filename.isEmpty()) {
-		PRINTF("No filename specified. Image export aborted.");
+		PRINT("No filename specified. Image export aborted.");
 		clearCurrentOutput();
 		return;
 	}
@@ -1490,7 +1500,7 @@ void MainWindow::actionFlushCaches()
 #endif
 	dxf_dim_cache.clear();
 	dxf_cross_cache.clear();
-	Module::clear_library_cache();
+	ModuleCache::instance()->clear();
 }
 
 void MainWindow::viewModeActionsUncheck()
@@ -1597,7 +1607,7 @@ void MainWindow::animateUpdate()
 {
 	if (animate_panel->isVisible()) {
 		bool fps_ok;
-		double fps = e_fps->text().toDouble(&fps_ok);
+		double fps = this->e_fps->text().toDouble(&fps_ok);
 		if (fps_ok && fps <= 0 && !animate_timer->isActive()) {
 			animate_timer->stop();
 			animate_timer->setSingleShot(true);
@@ -1740,15 +1750,28 @@ MainWindow::helpManual()
 	QDesktopServices::openUrl(QUrl("http://en.wikibooks.org/wiki/OpenSCAD_User_Manual"));
 }
 
-void MainWindow::helpOpenGL()
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+void MainWindow::helpLibrary()
 {
+	QString libinfo;
+	libinfo.sprintf("Boost version: %s\n"
+									"Eigen version: %d.%d.%d\n"
+									"CGAL version: %s\n"
+									"OpenCSG version: %s\n\n",
+									BOOST_LIB_VERSION,
+									EIGEN_WORLD_VERSION, EIGEN_MAJOR_VERSION, EIGEN_MINOR_VERSION,
+									TOSTRING(CGAL_VERSION),
+									OPENCSG_VERSION_STRING);
+
 	if (!this->openglbox) {
 		this->openglbox = new QMessageBox(QMessageBox::Information, 
-																			"OpenGL Info", "Detailed OpenGL Info",
+																			"OpenGL Info", "Detailed Library Info",
 																			QMessageBox::Ok, this);
 		
 	}
-	this->openglbox->setDetailedText(this->glview->getRendererInfo());
+
+	this->openglbox->setDetailedText(libinfo + this->glview->getRendererInfo());
 	this->openglbox->show();
 }
 
@@ -1814,6 +1837,15 @@ void MainWindow::quit()
 	if (ev.isAccepted()) QApplication::instance()->quit();
 }
 
+void MainWindow::consoleOutput(const std::string &msg, void *userdata)
+{
+	// Invoke the append function in the main thread in case the output
+  // originates in a worker thread.
+	MainWindow *thisp = static_cast<MainWindow*>(userdata);
+	QMetaObject::invokeMethod(thisp->console, "append", Qt::QueuedConnection,
+														 Q_ARG(QString, QString::fromStdString(msg)));
+}
+
 void MainWindow::setCurrentOutput()
 {
 	set_output_handler(&MainWindow::consoleOutput, this);
@@ -1824,3 +1856,9 @@ void MainWindow::clearCurrentOutput()
 	set_output_handler(NULL, NULL);
 }
 
+void MainWindow::openCSGSettingsChanged()
+{
+#ifdef ENABLE_OPENCSG
+	OpenCSG::setOption(OpenCSG::AlgorithmSetting, Preferences::inst()->getValue("advanced/forceGoldfeather").toBool() ? OpenCSG::Goldfeather : OpenCSG::Automatic);
+#endif
+}

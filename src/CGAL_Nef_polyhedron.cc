@@ -61,9 +61,17 @@ CGAL_Nef_polyhedron &CGAL_Nef_polyhedron::minkowski(const CGAL_Nef_polyhedron &o
 
 int CGAL_Nef_polyhedron::weight() const
 {
-	if (this->dim == 2) return this->p2->explorer().number_of_vertices();
-	if (this->dim == 3) return this->p3->number_of_vertices();
-	return 0;
+	if (this->empty()) return 0;
+
+	size_t memsize = sizeof(CGAL_Nef_polyhedron);
+	if (this->dim == 2) {
+		memsize += sizeof(CGAL_Nef_polyhedron2) +
+			this->p2->explorer().number_of_vertices() * sizeof(CGAL_Nef_polyhedron2::Explorer::Vertex) +
+			this->p2->explorer().number_of_halfedges() * sizeof(CGAL_Nef_polyhedron2::Explorer::Halfedge) +
+			this->p2->explorer().number_of_edges() * sizeof(CGAL_Nef_polyhedron2::Explorer::Face);
+	}
+	if (this->dim == 3) memsize += this->p3->bytes();
+	return memsize;
 }
 
 /*!
@@ -94,7 +102,7 @@ PolySet *CGAL_Nef_polyhedron::convertToPolyset()
 			ps = createPolySetFromPolyhedron(P);
 		}
 		catch (CGAL::Precondition_exception e) {
-			PRINTF("CGAL error in CGAL_Nef_polyhedron::convertToPolyset(): %s", e.what());
+			PRINTB("CGAL error in CGAL_Nef_polyhedron::convertToPolyset(): %s", e.what());
 		}
 		CGAL::set_error_behaviour(old_behaviour);
 	}

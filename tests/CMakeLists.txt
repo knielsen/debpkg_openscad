@@ -13,6 +13,9 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}")
 # Build debug build as default
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-strict-aliasing")
 endif()
 
@@ -24,11 +27,11 @@ endif()
 # Windows
 #
 
-if(WIN32)
+if(WIN32 AND MSVC)
   set(WIN32_STATIC_BUILD "True")
 endif()
 
-if(WIN32_STATIC_BUILD)
+if(WIN32_STATIC_BUILD AND MSVC)
   if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set(EMSG "\nTo build Win32 STATIC OpenSCAD please see doc/testing.txt")
     message(FATAL_ERROR ${EMSG})
@@ -36,7 +39,7 @@ if(WIN32_STATIC_BUILD)
 endif()
 
 # Disable warnings
-if(WIN32)
+if(WIN32 AND MSVC)
   # too long decorated names
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4503")
   # int cast to bool in CGAL
@@ -52,7 +55,7 @@ if(WIN32)
 endif()
 
 # Debugging - if you uncomment, use nmake -f Makefile > log.txt (the log is big)
-if(WIN32)
+if(WIN32 AND MSVC)
   # Linker debugging
   #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -VERBOSE")
 
@@ -60,15 +63,19 @@ if(WIN32)
   # you have to pass -DCMAKE_VERBOSE_MAKEFILE=ON to cmake when you run it. 
 endif()
 
+if(WIN32 AND CMAKE_COMPILER_IS_GNUCXX)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive -frounding-math")
+endif()
+
 #
 # Build test apps
 #
 
 function(inclusion user_set_path found_paths)
-  # This function exists as a wrapper for INCLUDE_DIRECTORIES
-  # to deal with systems in which some libraries are found 
-  # in the system paths, (/usr) but others are found in customized 
-  # paths set in environment variables (CGAL_DIR). 
+  # If user_set_path indicates an env. variable was specifically
+  # set by the user, then found_paths become an include priority (prepend);
+  # otherwise found_paths are stuck on the end of the include flags (append).
+
   # message(STATUS "inclusion ${user_set_path} ${found_paths}")
   # message(STATUS "inclusion ${${user_set_path}} ${${found_paths}}")
   set( inclusion_match 0 )
@@ -88,6 +95,10 @@ function(inclusion user_set_path found_paths)
 endfunction()
 
 # Boost
+# 
+# FindBoost.cmake has been included from Cmake's GIT circa the end of 2011
+# because most existing installs of cmake had a buggy older version. 
+#
 # Update this if FindBoost.cmake gets out of sync with the current boost release
 # set(Boost_ADDITIONAL_VERSIONS "1.47.0" "1.46.0")
 
@@ -114,7 +125,7 @@ if (NOT $ENV{BOOSTDIR} STREQUAL "")
   message(STATUS "BOOST_ROOT: " ${BOOST_ROOT})
 endif()
 
-find_package( Boost 1.35.0 COMPONENTS thread program_options REQUIRED)
+find_package( Boost 1.35.0 COMPONENTS thread program_options filesystem system regex REQUIRED)
 message(STATUS "Boost includes found: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost libraries found:")
 foreach(boostlib ${Boost_LIBRARIES})
@@ -122,6 +133,7 @@ foreach(boostlib ${Boost_LIBRARIES})
 endforeach()
 
 inclusion(BOOST_ROOT Boost_INCLUDE_DIRS)
+add_definitions(-DBOOST_FILESYSTEM_VERSION=3) # Use V3 for boost 1.44-1.45
 
 # Mac OS X
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -132,8 +144,17 @@ endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 set(CMAKE_INCLUDE_DIRECTORIES_BEFORE ON)
 find_package(OpenGL REQUIRED)
-find_package(Qt4 COMPONENTS QtCore QtGui QtOpenGL REQUIRED)
-include(${QT_USE_FILE})
+
+if (MINGW_CROSS_ENV_DIR) 
+  mingw_cross_env_find_qt()
+  mingw_cross_env_info()
+  include_directories( ${QT_INCLUDE_DIRS} )
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${QT_CFLAGS_OTHER}")
+else()
+  find_package(Qt4 COMPONENTS QtCore REQUIRED)
+  include(${QT_USE_FILE})
+endif()
+
 set(CMAKE_INCLUDE_DIRECTORIES_BEFORE OFF)
 
 # Eigen2
@@ -157,6 +178,8 @@ if (NOT EIGEN2_INCLUDE_DIR)
   endif()
   if (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
     set(EIGEN2_FIND_PATHS /usr/local/include/eigen2)
+  elseif (${CMAKE_SYSTEM_NAME} MATCHES "NetBSD")
+    set(EIGEN2_FIND_PATHS /usr/pkg/include/eigen2)
   else()
     set(EIGEN2_FIND_PATHS /opt/local/include/eigen2 /usr/include/eigen2)
   endif()
@@ -206,10 +229,27 @@ if (NOT $ENV{GLEWDIR} STREQUAL "")
 elseif (NOT $ENV{OPENSCAD_LIBRARIES} STREQUAL "")
   set(GLEW_DIR "$ENV{OPENSCAD_LIBRARIES}")
 endif()
+if (NOT GLEW_INCLUDE_DIR)
+  message(STATUS "OPENCSG_DIR: " ${OPENCSG_DIR})
+  find_path(GLEW_INCLUDE_DIR
+            GL/glew.h
+            HINTS ${GLEW_DIR}/include
+	    NO_DEFAULT_PATH)
+  find_library(GLEW_LIBRARY
+               NAMES GLEW glew
+               HINTS ${GLEW_DIR}/lib
+	       NO_DEFAULT_PATH)
+  if (NOT GLEW_LIBRARY)
+    find_package(GLEW REQUIRED)
+    if (NOT GLEW_LIBRARY)
+      message(FATAL_ERROR "GLEW not found")
+    endif()
+  endif()
+  message(STATUS "GLEW include: " ${GLEW_INCLUDE_DIR})
+  message(STATUS "GLEW library: " ${GLEW_LIBRARY})
+endif()
 
-find_package(GLEW REQUIRED)
-
-inclusion( GLEW_DIR GLEW_INCLUDE_PATH )
+inclusion(GLEW_DIR GLEW_INCLUDE_DIR)
 
 # Flex/Bison
 find_package(BISON REQUIRED)
@@ -217,6 +257,11 @@ find_package(BISON REQUIRED)
 if(${CMAKE_SYSTEM_NAME} MATCHES "^FreeBSD")
   # FreeBSD has an old flex in /usr/bin and a new flex in /usr/local/bin
   set(FLEX_EXECUTABLE /usr/local/bin/flex)
+endif()
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "NetBSD")
+  include_directories( /usr/pkg/include /usr/X11R7/include )
+  set(FLEX_EXECUTABLE /usr/pkg/bin/flex)
 endif()
 
 find_package(FLEX REQUIRED)
@@ -256,11 +301,13 @@ inclusion(CGAL_DIR CGAL_INCLUDE_DIRS)
 
 # Imagemagick
 
-find_package(ImageMagick COMPONENTS convert)
-if (ImageMagick_convert_FOUND)
-  message(STATUS "ImageMagick convert executable found: " ${ImageMagick_convert_EXECUTABLE})
-else()
-  message(FATAL_ERROR "Couldn't find imagemagick 'convert' program")
+if (NOT SKIP_IMAGEMAGICK)
+  find_package(ImageMagick COMPONENTS convert)
+  if (ImageMagick_convert_FOUND)
+    message(STATUS "ImageMagick convert executable found: " ${ImageMagick_convert_EXECUTABLE})
+  else()
+    message(FATAL_ERROR "Couldn't find imagemagick 'convert' program")
+  endif()
 endif()
 
 # Internal includes
@@ -271,6 +318,7 @@ add_definitions(-DOPENSCAD_TESTING)
 
 set(CORE_SOURCES
   tests-common.cc 
+  ../src/parsersettings.cc
   ../src/mathc99.cc
   ../src/linalg.cc
   ../src/handle_dep.cc 
@@ -278,6 +326,7 @@ set(CORE_SOURCES
   ../src/expr.cc 
   ../src/func.cc 
   ../src/module.cc 
+  ../src/ModuleCache.cc 
   ../src/node.cc 
   ../src/context.cc 
   ../src/csgterm.cc 
@@ -348,6 +397,7 @@ set(OFFSCREEN_SOURCES
   system-gl.cc)
 
 add_library(tests-core STATIC ${CORE_SOURCES})
+target_link_libraries(tests-core ${OPENGL_LIBRARY})
 add_library(tests-common STATIC ${COMMON_SOURCES})
 target_link_libraries(tests-common tests-core)
 add_library(tests-cgal STATIC ${CGAL_SOURCES})
@@ -368,19 +418,25 @@ target_link_libraries(echotest tests-nocgal tests-core ${QT_LIBRARIES} ${OPENGL_
 # dumptest
 #
 add_executable(dumptest dumptest.cc)
-target_link_libraries(dumptest tests-common tests-nocgal ${QT_LIBRARIES} ${OPENGL_LIBRARY} ${Boost_LIBRARIES})
+target_link_libraries(dumptest tests-nocgal ${QT_LIBRARIES} ${OPENGL_LIBRARY} ${Boost_LIBRARIES})
+
+#
+# modulecachetest
+#
+add_executable(modulecachetest modulecachetest.cc)
+target_link_libraries(modulecachetest tests-nocgal ${QT_LIBRARIES} ${OPENGL_LIBRARY} ${Boost_LIBRARIES})
 
 #
 # csgtexttest
 #
 add_executable(csgtexttest csgtexttest.cc CSGTextRenderer.cc CSGTextCache.cc)
-target_link_libraries(csgtexttest tests-common tests-nocgal ${QT_LIBRARIES} ${OPENGL_LIBRARY} ${Boost_LIBRARIES})
+target_link_libraries(csgtexttest tests-nocgal ${QT_LIBRARIES} ${OPENGL_LIBRARY} ${Boost_LIBRARIES})
 
 #
 # csgtermtest
 #
 add_executable(csgtermtest csgtermtest.cc ../src/CSGTermEvaluator.cc)
-target_link_libraries(csgtermtest tests-common tests-nocgal ${QT_LIBRARIES} ${OPENGL_LIBRARY} ${Boost_LIBRARIES})
+target_link_libraries(csgtermtest tests-nocgal ${QT_LIBRARIES} ${OPENGL_LIBRARY} ${Boost_LIBRARIES})
 
 #
 # cgaltest
@@ -402,6 +458,13 @@ target_link_libraries(cgalstlsanitytest tests-cgal ${CGAL_LIBRARY} ${CGAL_3RD_PA
 add_executable(cgalpngtest cgalpngtest.cc bboxhelp.cc ../src/CGALRenderer.cc ../src/renderer.cc ../src/rendersettings.cc)
 set_target_properties(cgalpngtest PROPERTIES COMPILE_FLAGS "-DENABLE_CGAL ${CGAL_CXX_FLAGS_INIT}")
 target_link_libraries(cgalpngtest tests-offscreen tests-cgal ${CGAL_LIBRARY} ${CGAL_3RD_PARTY_LIBRARIES} ${QT_LIBRARIES}  ${GLEW_LIBRARY} ${COCOA_LIBRARY} ${OPENGL_LIBRARY} ${Boost_LIBRARIES})
+
+#
+# cgalcachetest
+#
+add_executable(cgalcachetest cgalcachetest.cc bboxhelp.cc)
+set_target_properties(cgalcachetest PROPERTIES COMPILE_FLAGS "-DENABLE_CGAL ${CGAL_CXX_FLAGS_INIT}")
+target_link_libraries(cgalcachetest tests-cgal ${CGAL_LIBRARY} ${CGAL_3RD_PARTY_LIBRARIES} ${QT_LIBRARIES}  ${GLEW_LIBRARY} ${COCOA_LIBRARY} ${OPENGL_LIBRARY} ${Boost_LIBRARIES})
 
 #
 # opencsgtest
@@ -515,7 +578,10 @@ macro(add_cmdline_test TESTCMD TESTSUFFIX)
       set(CONFARG CONFIGURATIONS)
       set(CONFVAL ${FOUNDCONFIGS})
 
-      add_test(NAME ${TEST_FULLNAME} ${CONFARG} ${CONFVAL} COMMAND ${PYTHON_EXECUTABLE} ${tests_SOURCE_DIR}/test_cmdline_tool.py --comparator=${COMPARATOR} -c ${ImageMagick_convert_EXECUTABLE} -s ${TESTSUFFIX} ${CMAKE_BINARY_DIR}/${TESTCMD} "${SCADFILE}")
+      if (MINGW_CROSS_ENV_DIR)
+        set( MINGW_CROSS_ARG "--mingw-cross-env" )
+      endif()
+      add_test(NAME ${TEST_FULLNAME} ${CONFARG} ${CONFVAL} COMMAND ${PYTHON_EXECUTABLE} ${tests_SOURCE_DIR}/test_cmdline_tool.py ${MINGW_CROSS_ARG} --comparator=${COMPARATOR} -c ${ImageMagick_convert_EXECUTABLE} -s ${TESTSUFFIX} ${CMAKE_BINARY_DIR}/${TESTCMD} "${SCADFILE}")
     endif()
   endforeach()
 endmacro()
@@ -525,6 +591,9 @@ enable_testing()
 # set up custom pretty printing of results
 
 set(INFOCMD "execute_process(COMMAND ${CMAKE_CURRENT_BINARY_DIR}/opencsgtest --info OUTPUT_FILE sysinfo.txt)")
+if (MINGW_CROSS_ENV_DIR)
+  set(INFOCMD "execute_process(COMMAND wine ${CMAKE_CURRENT_BINARY_DIR}/opencsgtest --info OUTPUT_FILE sysinfo.txt)")
+endif()
 set(PRETTYCMD "\"${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_pretty_print.py --builddir=${CMAKE_CURRENT_BINARY_DIR}\"")
 set(CTEST_CUSTOM_FILE ${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake)
 set(CTEST_CUSTOM_TXT "\n
@@ -541,13 +610,15 @@ endforeach()
 
 set_directory_properties(PROPERTIES TEST_INCLUDE_FILE "${CMAKE_SOURCE_DIR}/EnforceConfig.cmake")
 
+# Subst files
+configure_file(${CMAKE_SOURCE_DIR}/../testdata/scad/misc/include-tests-template.scad
+               ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/include-tests.scad)
+configure_file(${CMAKE_SOURCE_DIR}/../testdata/scad/misc/use-tests-template.scad
+               ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/use-tests.scad)
+
 # Find all scad files
 file(GLOB MINIMAL_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/minimal/*.scad)
 file(GLOB FEATURES_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/features/*.scad)
-# Remove included files not to be used as tests
-list(REMOVE_ITEM FEATURES_FILES
-     ${CMAKE_SOURCE_DIR}/../testdata/scad/features/include\ test6.scad
-     ${CMAKE_SOURCE_DIR}/../testdata/scad/features/include-test5.scad)
 file(GLOB BUGS_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/*.scad)
 file(GLOB SCAD_DXF_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/dxf/*.scad)
 file(GLOB FUNCTION_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/functions/*.scad)
@@ -561,14 +632,21 @@ list(APPEND ECHO_FILES ${FUNCTION_FILES}
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/builtin-tests.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/dim-all.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/string-test.scad
-            ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/string-indexing.scad)
+            ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/string-indexing.scad
+            ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/vector-values.scad
+            ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/search-tests.scad)
 
 list(APPEND DUMPTEST_FILES ${MINIMAL_FILES} ${FEATURES_FILES} ${EXAMPLE_FILES})
-list(APPEND DUMPTEST_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/escape-test.scad)
+list(APPEND DUMPTEST_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/escape-test.scad
+                           ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/include-tests.scad
+                           ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/use-tests.scad)
 
 list(APPEND CGALPNGTEST_FILES ${FEATURES_FILES} ${SCAD_DXF_FILES} ${EXAMPLE_FILES})
+list(APPEND CGALPNGTEST_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/include-tests.scad
+                           ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/use-tests.scad)
 list(APPEND OPENCSGTEST_FILES ${CGALPNGTEST_FILES})
 list(APPEND OPENCSGTEST_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/bbox-transform-bug.scad)
+list(APPEND OPENCSGTEST_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/intersection-prune-test.scad)
 list(APPEND THROWNTOGETHERTEST_FILES ${OPENCSGTEST_FILES})
 
 list(APPEND CGALSTLSANITYTEST_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/normal-nan.scad)
@@ -579,6 +657,7 @@ disable_tests(dumptest_transform-tests
               dumptest_render-tests
               dumptest_difference-tests
               dumptest_intersection-tests
+              dumptest_text-search-test
               dumptest_example001
               dumptest_example005
               dumptest_example006
@@ -590,7 +669,8 @@ disable_tests(dumptest_transform-tests
               dumptest_example017
               dumptest_example020
               dumptest_example021
-              dumptest_example022)
+              dumptest_example022
+              dumptest_example023)
 
 # FIXME: This test illustrates a weakness in child() combined with modifiers.
 # Reenable it when this is improved

@@ -29,6 +29,8 @@
 #include <QFontDatabase>
 #include <QKeyEvent>
 #include <QSettings>
+#include "PolySetCache.h"
+#include "CGALCache.h"
 
 Preferences *Preferences::instance = NULL;
 
@@ -37,20 +39,43 @@ Preferences::Preferences(QWidget *parent) : QMainWindow(parent)
 	setupUi(this);
 
 	// Editor pane
+	// Setup default font (Try to use a nice monospace font)
+	QString fontfamily;
+#ifdef Q_WS_X11
+	fontfamily = "Mono";
+#elif defined (Q_WS_WIN)
+	fontfamily = "Console";
+#elif defined (Q_WS_MAC)
+	fontfamily = "Monaco";
+#endif
+	QFont font;
+	font.setStyleHint(QFont::TypeWriter);
+	font.setFamily(fontfamily); // this runs Qt's font matching algorithm
+	QString found_family(QFontInfo(font).family());
+	this->defaultmap["editor/fontfamily"] = found_family;
+ 	this->defaultmap["editor/fontsize"] = 12;
+
+	uint savedsize = getValue("editor/fontsize").toUInt();
 	QFontDatabase db;
-	foreach(int size, db.standardSizes()) {
+	foreach(uint size, db.standardSizes()) {
 		this->fontSize->addItem(QString::number(size));
-		if (size == 12) {
+		if (size == savedsize) {
 			this->fontSize->setCurrentIndex(this->fontSize->count()-1);
 		}
 	}
 
+	connect(this->fontSize, SIGNAL(currentIndexChanged(const QString&)),
+					this, SLOT(on_fontSize_editTextChanged(const QString &)));
+
 	// Setup default settings
 	this->defaultmap["3dview/colorscheme"] = this->colorSchemeChooser->currentItem()->text();
-	this->defaultmap["editor/fontfamily"] = this->fontChooser->currentText();
-	this->defaultmap["editor/fontsize"] = this->fontSize->currentText().toUInt();
 	this->defaultmap["advanced/opencsg_show_warning"] = true;
 	this->defaultmap["advanced/enable_opencsg_opengl1x"] = true;
+	this->defaultmap["advanced/polysetCacheSize"] = uint(PolySetCache::instance()->maxSize());
+	this->defaultmap["advanced/cgalCacheSize"] = uint(CGALCache::instance()->maxSize());
+	this->defaultmap["advanced/openCSGLimit"] = 2000;
+	this->defaultmap["advanced/forceGoldfeather"] = false;
+
 
 	// Toolbar
 	QActionGroup *group = new QActionGroup(this);
@@ -63,47 +88,45 @@ Preferences::Preferences(QWidget *parent) : QMainWindow(parent)
 	this->actionTriggered(this->prefsAction3DView);
 
 	// 3D View pane
-	this->colorschemes["Cornfield"][RenderSettings::BACKGROUND_COLOR] = QColor(0xff, 0xff, 0xe5);
-	this->colorschemes["Cornfield"][RenderSettings::OPENCSG_FACE_FRONT_COLOR] = QColor(0xf9, 0xd7, 0x2c);
-	this->colorschemes["Cornfield"][RenderSettings::OPENCSG_FACE_BACK_COLOR] = QColor(0x9d, 0xcb, 0x51);
-	this->colorschemes["Cornfield"][RenderSettings::CGAL_FACE_FRONT_COLOR] = QColor(0xf9, 0xd7, 0x2c);
-	this->colorschemes["Cornfield"][RenderSettings::CGAL_FACE_BACK_COLOR] = QColor(0x9d, 0xcb, 0x51);
-	this->colorschemes["Cornfield"][RenderSettings::CGAL_FACE_2D_COLOR] = QColor(0x00, 0xbf, 0x99);
-	this->colorschemes["Cornfield"][RenderSettings::CGAL_EDGE_FRONT_COLOR] = QColor(0xff, 0x00, 0x00);
-	this->colorschemes["Cornfield"][RenderSettings::CGAL_EDGE_BACK_COLOR] = QColor(0xff, 0x00, 0x00);
-	this->colorschemes["Cornfield"][RenderSettings::CGAL_EDGE_2D_COLOR] = QColor(0xff, 0x00, 0x00);
-	this->colorschemes["Cornfield"][RenderSettings::CROSSHAIR_COLOR] = QColor(0x80, 0x00, 0x00);
+	this->colorschemes["Cornfield"][RenderSettings::BACKGROUND_COLOR] = Color4f(0xff, 0xff, 0xe5);
+	this->colorschemes["Cornfield"][RenderSettings::OPENCSG_FACE_FRONT_COLOR] = Color4f(0xf9, 0xd7, 0x2c);
+	this->colorschemes["Cornfield"][RenderSettings::OPENCSG_FACE_BACK_COLOR] = Color4f(0x9d, 0xcb, 0x51);
+	this->colorschemes["Cornfield"][RenderSettings::CGAL_FACE_FRONT_COLOR] = Color4f(0xf9, 0xd7, 0x2c);
+	this->colorschemes["Cornfield"][RenderSettings::CGAL_FACE_BACK_COLOR] = Color4f(0x9d, 0xcb, 0x51);
+	this->colorschemes["Cornfield"][RenderSettings::CGAL_FACE_2D_COLOR] = Color4f(0x00, 0xbf, 0x99);
+	this->colorschemes["Cornfield"][RenderSettings::CGAL_EDGE_FRONT_COLOR] = Color4f(0xff, 0x00, 0x00);
+	this->colorschemes["Cornfield"][RenderSettings::CGAL_EDGE_BACK_COLOR] = Color4f(0xff, 0x00, 0x00);
+	this->colorschemes["Cornfield"][RenderSettings::CGAL_EDGE_2D_COLOR] = Color4f(0xff, 0x00, 0x00);
+	this->colorschemes["Cornfield"][RenderSettings::CROSSHAIR_COLOR] = Color4f(0x80, 0x00, 0x00);
 
-	this->colorschemes["Metallic"][RenderSettings::BACKGROUND_COLOR] = QColor(0xaa, 0xaa, 0xff);
-	this->colorschemes["Metallic"][RenderSettings::OPENCSG_FACE_FRONT_COLOR] = QColor(0xdd, 0xdd, 0xff);
-	this->colorschemes["Metallic"][RenderSettings::OPENCSG_FACE_BACK_COLOR] = QColor(0xdd, 0x22, 0xdd);
-	this->colorschemes["Metallic"][RenderSettings::CGAL_FACE_FRONT_COLOR] = QColor(0xdd, 0xdd, 0xff);
-	this->colorschemes["Metallic"][RenderSettings::CGAL_FACE_BACK_COLOR] = QColor(0xdd, 0x22, 0xdd);
-	this->colorschemes["Metallic"][RenderSettings::CGAL_FACE_2D_COLOR] = QColor(0x00, 0xbf, 0x99);
-	this->colorschemes["Metallic"][RenderSettings::CGAL_EDGE_FRONT_COLOR] = QColor(0xff, 0x00, 0x00);
-	this->colorschemes["Metallic"][RenderSettings::CGAL_EDGE_BACK_COLOR] = QColor(0xff, 0x00, 0x00);
-	this->colorschemes["Metallic"][RenderSettings::CGAL_EDGE_2D_COLOR] = QColor(0xff, 0x00, 0x00);
-	this->colorschemes["Metallic"][RenderSettings::CROSSHAIR_COLOR] = QColor(0x80, 0x00, 0x00);
+	this->colorschemes["Metallic"][RenderSettings::BACKGROUND_COLOR] = Color4f(0xaa, 0xaa, 0xff);
+	this->colorschemes["Metallic"][RenderSettings::OPENCSG_FACE_FRONT_COLOR] = Color4f(0xdd, 0xdd, 0xff);
+	this->colorschemes["Metallic"][RenderSettings::OPENCSG_FACE_BACK_COLOR] = Color4f(0xdd, 0x22, 0xdd);
+	this->colorschemes["Metallic"][RenderSettings::CGAL_FACE_FRONT_COLOR] = Color4f(0xdd, 0xdd, 0xff);
+	this->colorschemes["Metallic"][RenderSettings::CGAL_FACE_BACK_COLOR] = Color4f(0xdd, 0x22, 0xdd);
+	this->colorschemes["Metallic"][RenderSettings::CGAL_FACE_2D_COLOR] = Color4f(0x00, 0xbf, 0x99);
+	this->colorschemes["Metallic"][RenderSettings::CGAL_EDGE_FRONT_COLOR] = Color4f(0xff, 0x00, 0x00);
+	this->colorschemes["Metallic"][RenderSettings::CGAL_EDGE_BACK_COLOR] = Color4f(0xff, 0x00, 0x00);
+	this->colorschemes["Metallic"][RenderSettings::CGAL_EDGE_2D_COLOR] = Color4f(0xff, 0x00, 0x00);
+	this->colorschemes["Metallic"][RenderSettings::CROSSHAIR_COLOR] = Color4f(0x80, 0x00, 0x00);
 
-	this->colorschemes["Sunset"][RenderSettings::BACKGROUND_COLOR] = QColor(0xaa, 0x44, 0x44);
-	this->colorschemes["Sunset"][RenderSettings::OPENCSG_FACE_FRONT_COLOR] = QColor(0xff, 0xaa, 0xaa);
-	this->colorschemes["Sunset"][RenderSettings::OPENCSG_FACE_BACK_COLOR] = QColor(0x88, 0x22, 0x33);
-	this->colorschemes["Sunset"][RenderSettings::CGAL_FACE_FRONT_COLOR] = QColor(0xff, 0xaa, 0xaa);
-	this->colorschemes["Sunset"][RenderSettings::CGAL_FACE_BACK_COLOR] = QColor(0x88, 0x22, 0x33);
-	this->colorschemes["Sunset"][RenderSettings::CGAL_FACE_2D_COLOR] = QColor(0x00, 0xbf, 0x99);
-	this->colorschemes["Sunset"][RenderSettings::CGAL_EDGE_FRONT_COLOR] = QColor(0xff, 0x00, 0x00);
-	this->colorschemes["Sunset"][RenderSettings::CGAL_EDGE_BACK_COLOR] = QColor(0xff, 0x00, 0x00);
-	this->colorschemes["Sunset"][RenderSettings::CGAL_EDGE_2D_COLOR] = QColor(0xff, 0x00, 0x00);
-	this->colorschemes["Sunset"][RenderSettings::CROSSHAIR_COLOR] = QColor(0x80, 0x00, 0x00);
+	this->colorschemes["Sunset"][RenderSettings::BACKGROUND_COLOR] = Color4f(0xaa, 0x44, 0x44);
+	this->colorschemes["Sunset"][RenderSettings::OPENCSG_FACE_FRONT_COLOR] = Color4f(0xff, 0xaa, 0xaa);
+	this->colorschemes["Sunset"][RenderSettings::OPENCSG_FACE_BACK_COLOR] = Color4f(0x88, 0x22, 0x33);
+	this->colorschemes["Sunset"][RenderSettings::CGAL_FACE_FRONT_COLOR] = Color4f(0xff, 0xaa, 0xaa);
+	this->colorschemes["Sunset"][RenderSettings::CGAL_FACE_BACK_COLOR] = Color4f(0x88, 0x22, 0x33);
+	this->colorschemes["Sunset"][RenderSettings::CGAL_FACE_2D_COLOR] = Color4f(0x00, 0xbf, 0x99);
+	this->colorschemes["Sunset"][RenderSettings::CGAL_EDGE_FRONT_COLOR] = Color4f(0xff, 0x00, 0x00);
+	this->colorschemes["Sunset"][RenderSettings::CGAL_EDGE_BACK_COLOR] = Color4f(0xff, 0x00, 0x00);
+	this->colorschemes["Sunset"][RenderSettings::CGAL_EDGE_2D_COLOR] = Color4f(0xff, 0x00, 0x00);
+	this->colorschemes["Sunset"][RenderSettings::CROSSHAIR_COLOR] = Color4f(0x80, 0x00, 0x00);
 
-	connect(this->colorSchemeChooser, SIGNAL(itemSelectionChanged()),
-					this, SLOT(colorSchemeChanged()));
-	connect(this->fontChooser, SIGNAL(activated(const QString &)),
-					this, SLOT(fontFamilyChanged(const QString &)));
-	connect(this->fontSize, SIGNAL(editTextChanged(const QString &)),
-					this, SLOT(fontSizeChanged(const QString &)));
-	connect(this->openCSGWarningBox, SIGNAL(toggled(bool)),
-					this, SLOT(openCSGWarningChanged(bool)));
+  // Advanced pane	
+	QValidator *validator = new QIntValidator(this);
+	this->cgalCacheSizeEdit->setValidator(validator);
+	this->polysetCacheSizeEdit->setValidator(validator);
+	this->opencsgLimitEdit->setValidator(validator);
+
 	updateGUI();
 
 	RenderSettings::inst()->setColors(this->colorschemes[getValue("3dview/colorscheme").toString()]);
@@ -128,7 +151,7 @@ Preferences::actionTriggered(QAction *action)
 	}
 }
 
-void Preferences::colorSchemeChanged()
+void Preferences::on_colorSchemeChooser_itemSelectionChanged()
 {
 	QString scheme = this->colorSchemeChooser->currentItem()->text();
 	QSettings settings;
@@ -139,14 +162,14 @@ void Preferences::colorSchemeChanged()
 	emit requestRedraw();
 }
 
-void Preferences::fontFamilyChanged(const QString &family)
+void Preferences::on_fontChooser_activated(const QString &family)
 {
 	QSettings settings;
 	settings.setValue("editor/fontfamily", family);
 	emit fontChanged(family, getValue("editor/fontsize").toUInt());
 }
 
-void Preferences::fontSizeChanged(const QString &size)
+void Preferences::on_fontSize_editTextChanged(const QString &size)
 {
 	uint intsize = size.toUInt();
 	QSettings settings;
@@ -155,17 +178,45 @@ void Preferences::fontSizeChanged(const QString &size)
 }
 
 void
-Preferences::openCSGWarningChanged(bool state)
+Preferences::on_openCSGWarningBox_toggled(bool state)
 {
 	QSettings settings;
 	settings.setValue("advanced/opencsg_show_warning",state);
 }
 
 void
-Preferences::enableOpenCSGChanged(bool state)
+Preferences::on_enableOpenCSGBox_toggled(bool state)
 {
 	QSettings settings;
 	settings.setValue("advanced/enable_opencsg_opengl1x", state);
+}
+
+void Preferences::on_cgalCacheSizeEdit_textChanged(const QString &text)
+{
+	QSettings settings;
+	settings.setValue("advanced/cgalCacheSize", text);
+	CGALCache::instance()->setMaxSize(text.toULong());
+}
+
+void Preferences::on_polysetCacheSizeEdit_textChanged(const QString &text)
+{
+	QSettings settings;
+	settings.setValue("advanced/polysetCacheSize", text);
+	PolySetCache::instance()->setMaxSize(text.toULong());
+}
+
+void Preferences::on_opencsgLimitEdit_textChanged(const QString &text)
+{
+	QSettings settings;
+	settings.setValue("advanced/openCSGLimit", text);
+	// FIXME: Set this globally?
+}
+
+void Preferences::on_forceGoldfeatherBox_toggled(bool state)
+{
+	QSettings settings;
+	settings.setValue("advanced/forceGoldfeather", state);
+	emit openCSGSettingsChanged();
 }
 
 void Preferences::keyPressEvent(QKeyEvent *e)
@@ -200,6 +251,7 @@ void Preferences::removeDefaultSettings()
 QVariant Preferences::getValue(const QString &key) const
 {
 	QSettings settings;
+	assert(settings.contains(key) || this->defaultmap.contains(key));
 	return settings.value(key, this->defaultmap[key]);
 }
 
@@ -212,7 +264,7 @@ void Preferences::updateGUI()
 	if (!found.isEmpty()) this->colorSchemeChooser->setCurrentItem(found.first());
 
 	QString fontfamily = getValue("editor/fontfamily").toString();
-	int fidx = this->fontChooser->findText(fontfamily);
+	int fidx = this->fontChooser->findText(fontfamily,Qt::MatchContains);
 	if (fidx >= 0) {
 		this->fontChooser->setCurrentIndex(fidx);
 	}
@@ -228,10 +280,15 @@ void Preferences::updateGUI()
 
 	this->openCSGWarningBox->setChecked(getValue("advanced/opencsg_show_warning").toBool());
 	this->enableOpenCSGBox->setChecked(getValue("advanced/enable_opencsg_opengl1x").toBool());
+	this->cgalCacheSizeEdit->setText(getValue("advanced/cgalCacheSize").toString());
+	this->polysetCacheSizeEdit->setText(getValue("advanced/polysetCacheSize").toString());
+	this->opencsgLimitEdit->setText(getValue("advanced/openCSGLimit").toString());
+	this->forceGoldfeatherBox->setChecked(getValue("advanced/forceGoldfeather").toBool());
 }
 
 void Preferences::apply() const
 {
 	emit fontChanged(getValue("editor/fontfamily").toString(), getValue("editor/fontsize").toUInt());
 	emit requestRedraw();
+	emit openCSGSettingsChanged();
 }

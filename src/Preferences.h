@@ -5,6 +5,8 @@
 #include <QSettings>
 #include "ui_Preferences.h"
 #include "rendersettings.h"
+#include "linalg.h"
+#include <map>
 
 class Preferences : public QMainWindow, public Ui::Preferences
 {
@@ -19,15 +21,20 @@ public:
 
 public slots:
 	void actionTriggered(class QAction *);
-	void colorSchemeChanged();
-	void fontFamilyChanged(const QString &);
-	void fontSizeChanged(const QString &);
-	void openCSGWarningChanged(bool);
-	void enableOpenCSGChanged(bool);
+	void on_colorSchemeChooser_itemSelectionChanged();
+	void on_fontChooser_activated(const QString &);
+	void on_fontSize_editTextChanged(const QString &);
+	void on_openCSGWarningBox_toggled(bool);
+	void on_enableOpenCSGBox_toggled(bool);
+	void on_cgalCacheSizeEdit_textChanged(const QString &);
+	void on_polysetCacheSizeEdit_textChanged(const QString &);
+	void on_opencsgLimitEdit_textChanged(const QString &);
+	void on_forceGoldfeatherBox_toggled(bool);
 
 signals:
 	void requestRedraw() const;
 	void fontChanged(const QString &family, uint size) const;
+	void openCSGSettingsChanged() const;
 
 private:
 	Preferences(QWidget *parent = NULL);
@@ -36,7 +43,7 @@ private:
 	void removeDefaultSettings();
 
 	QSettings::SettingsMap defaultmap;
-	QHash<QString, QMap<RenderSettings::RenderColor, QColor> > colorschemes;
+	QHash<QString, std::map<RenderSettings::RenderColor, Color4f> > colorschemes;
 
 	static Preferences *instance;
 };

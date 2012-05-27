@@ -3,10 +3,12 @@
 *.tar*
 Makefile
 objects
-*.stl
-*.dxf
+/*.stl
+/*.dxf
 /lexer_lex.cpp
 /parser_yacc.cpp
 parser_yacc.h
 /tmp
 /OpenSCAD.app
+*/#*#
+/openscad

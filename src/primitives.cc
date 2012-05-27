@@ -148,11 +148,11 @@ AbstractNode *PrimitiveModule::evaluate(const Context *ctx, const ModuleInstanti
 	node->fa = c.lookup_variable("$fa").num;
 
 	if (node->fs < F_MINIMUM) {
-		PRINTF("WARNING: $fs too small - clamping to %f", F_MINIMUM);
+		PRINTB("WARNING: $fs too small - clamping to %f", F_MINIMUM);
 		node->fs = F_MINIMUM;
 	}
 	if (node->fa < F_MINIMUM) {
-		PRINTF("WARNING: $fa too small - clamping to %f", F_MINIMUM);
+		PRINTB("WARNING: $fa too small - clamping to %f", F_MINIMUM);
 		node->fa = F_MINIMUM;
 	}
 
@@ -505,7 +505,7 @@ sphere_next_r2:
 		for (size_t i=0; i<this->points.vec.size(); i++) {
 			double x,y;
 			if (!this->points.vec[i]->getv2(x, y)) {
-				PRINTF("ERROR: Unable to convert point at index %d to a vec2 of numbers", int(i));
+				PRINTB("ERROR: Unable to convert point at index %d to a vec2 of numbers", i);
 				delete p;
 				return NULL;
 			}
@@ -530,7 +530,7 @@ sphere_next_r2:
 			{
 				dd.paths.push_back(DxfData::Path());
 				for (size_t j=0; j<this->paths.vec[i]->vec.size(); j++) {
-					int idx = this->paths.vec[i]->vec[j]->num;
+					unsigned int idx = this->paths.vec[i]->vec[j]->num;
 					if (idx < dd.points.size()) {
 						dd.paths.back().indices.push_back(idx);
 					}

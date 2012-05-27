@@ -9,6 +9,7 @@
 #include "Tree.h"
 #include "memory.h"
 #include <vector>
+#include <QMutex>
 
 class MainWindow : public QMainWindow, public Ui::MainWindow
 {
@@ -26,10 +27,10 @@ public:
 	double tval, fps, fsteps;
 
 	QTimer *autoReloadTimer;
-	QString autoReloadInfo;
+	std::string autoReloadId;
 
 	Context root_ctx;
-	AbstractModule *root_module;      // Result of parsing
+	Module *root_module;      // Result of parsing
 	ModuleInstantiation root_inst;    // Top level instance
 	AbstractNode *absolute_root_node; // Result of tree evaluation
 	AbstractNode *root_node;          // Root if the root modifier (!) is used
@@ -67,22 +68,23 @@ private slots:
 	void updateTVal();
 	void setFileName(const QString &filename);
 	void setFont(const QString &family, uint size);
-#ifdef USE_PROGRESSWIDGET
 	void showProgress();
-#endif
+	void openCSGSettingsChanged();
 
 private:
 	void openFile(const QString &filename);
-	void load();
+	void refreshDocument();
 	AbstractNode *find_root_tag(AbstractNode *n);
-	void compile(bool procevents);
+	void updateTemporalVariables();
+	bool fileChangedOnDisk();
+	bool includesChanged();
+	bool compileTopLevelDocument(bool reload);
+	bool compile(bool reload, bool procevents);
 	void compileCSG(bool procevents);
 	bool maybeSave();
-	bool checkModified();
+	bool checkEditorModified();
 	QString dumpCSGTree(AbstractNode *root);
-	static void consoleOutput(const std::string &msg, void *userdata) {
-		static_cast<MainWindow*>(userdata)->console->append(QString::fromStdString(msg));
-	}
+	static void consoleOutput(const std::string &msg, void *userdata);
 	void loadViewSettings();
 	void loadDesignSettings();
 
@@ -110,6 +112,7 @@ private slots:
 	void actionCompile();
 #ifdef ENABLE_CGAL
 	void actionRenderCGAL();
+	void actionRenderCGALDone(class CGAL_Nef_polyhedron *);
 #endif
 	void actionDisplayAST();
 	void actionDisplayCSGTree();
@@ -158,11 +161,18 @@ public slots:
 	void helpAbout();
 	void helpHomepage();
 	void helpManual();
-	void helpOpenGL();
+	void helpLibrary();
 	void quit();
 	void actionReloadCompile();
 	void checkAutoReload();
 	void autoReloadSet(bool);
+
+private:
+	static void report_func(const class AbstractNode*, void *vp, int mark);
+
+	class ProgressWidget *progresswidget;
+	class CGALWorker *cgalworker;
+	QMutex consolemutex;
 };
 
 class GuiLocker
@@ -175,6 +185,8 @@ public:
 		gui_locked--;
 	}
 	static bool isLocked() { return gui_locked > 0; }
+	static void lock() { gui_locked++; }
+	static void unlock() { gui_locked--; }
 
 private:
 	static unsigned int gui_locked;

@@ -86,6 +86,15 @@ linux*:exists(/usr/lib64/libGLU*)|linux*:exists(/usr/lib/libGLU*) {
   LIBS += -lGLU
 }
 
+netbsd* {
+   LIBS += -L/usr/X11R7/lib
+   QMAKE_LFLAGS += -Wl,-R/usr/X11R7/lib
+   QMAKE_LFLAGS += -Wl,-R/usr/pkg/lib
+   !isEmpty(OPENSCAD_LIBDIR) {
+     QMAKE_LFLAGS += -Wl,-R$$OPENSCAD_LIBDIR/lib
+   }
+}
+
 # See Dec 2011 OpenSCAD mailing list, re: CGAL/GCC bugs.
 *g++* {
   QMAKE_CXXFLAGS *= -fno-strict-aliasing
@@ -134,7 +143,8 @@ FORMS   += src/MainWindow.ui \
            src/Preferences.ui \
            src/OpenCSGWarningDialog.ui
 
-HEADERS += src/renderer.h \
+HEADERS += src/parsersettings.h \
+           src/renderer.h \
            src/rendersettings.h \
            src/ThrownTogetherRenderer.h \
            src/CGAL_renderer.h \
@@ -178,6 +188,7 @@ HEADERS += src/renderer.h \
            src/traverser.h \
            src/nodecache.h \
            src/nodedumper.h \
+           src/ModuleCache.h \
            src/PolySetCache.h \
            src/PolySetEvaluator.h \
            src/CSGTermEvaluator.h \
@@ -215,10 +226,12 @@ SOURCES += src/mathc99.cc \
            src/rotateextrude.cc \
            src/printutils.cc \
            src/progress.cc \
+           src/parsersettings.cc \
            \
            src/nodedumper.cc \
            src/traverser.cc \
            src/PolySetEvaluator.cc \
+           src/ModuleCache.cc \
            src/PolySetCache.cc \
            src/Tree.cc \
            \
@@ -255,7 +268,8 @@ HEADERS += src/cgal.h \
            src/CGALCache.h \
            src/PolySetCGALEvaluator.h \
            src/CGALRenderer.h \
-           src/CGAL_Nef_polyhedron.h
+           src/CGAL_Nef_polyhedron.h \
+           src/cgalworker.h
 
 SOURCES += src/cgalutils.cc \
            src/CGALEvaluator.cc \
@@ -264,7 +278,8 @@ SOURCES += src/cgalutils.cc \
            src/CGALRenderer.cc \
            src/CGAL_Nef_polyhedron.cc \
            src/CGAL_Nef_polyhedron_DxfData.cc \
-           src/cgaladv_minkowski2.cc
+           src/cgaladv_minkowski2.cc \
+           src/cgalworker.cc
 }
 
 macx {
@@ -285,3 +300,11 @@ INSTALLS += examples
 libraries.path = $$PREFIX/share/openscad/libraries/
 libraries.files = libraries/*
 INSTALLS += libraries
+
+applications.path = $$PREFIX/share/applications
+applications.files = icons/openscad.desktop
+INSTALLS += applications
+
+icons.path = $$PREFIX/share/pixmaps
+icons.files = icons/openscad.png
+INSTALLS += icons

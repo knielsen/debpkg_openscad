@@ -2,20 +2,25 @@
 #include "csgterm.h"
 #include "printutils.h"
 
-shared_ptr<CSGTerm> CSGTermNormalizer::normalize(const shared_ptr<CSGTerm> &root)
+/*!
+	NB! for e.g. empty intersections, this can normalize a tree to nothing and return NULL.
+*/
+shared_ptr<CSGTerm> CSGTermNormalizer::normalize(const shared_ptr<CSGTerm> &root, 
+																								 size_t limit)
 {
 	shared_ptr<CSGTerm> temp = root;
 	while (1) {
 		shared_ptr<CSGTerm> n = normalizePass(temp);
+		if (!n) return n; // If normalized to nothing
 		if (temp == n) break;
 		temp = n;
 
-		int num = count(temp);
+		unsigned int num = count(temp);
 #ifdef DEBUG
-		PRINTF("Normalize count: %d\n", num);
+		PRINTB("Normalize count: %d\n", num);
 #endif
-		if (num > 5000) {
-			PRINTF("WARNING: Normalized tree is growing past 5000 elements. Aborting normalization.\n");
+		if (num > limit) {
+			PRINTB("WARNING: Normalized tree is growing past %d elements. Aborting normalization.\n", limit);
 			return root;
 		}
 	}
@@ -39,9 +44,10 @@ shared_ptr<CSGTerm> CSGTermNormalizer::normalizePass(shared_ptr<CSGTerm> term)
 	do {
 		while (term && normalize_tail(term)) { }
 		if (!term || term->type == CSGTerm::TYPE_PRIMITIVE) return term;
-		term->left = normalizePass(term->left);
+		if (term->left) term->left = normalizePass(term->left);
 	} while (term->type != CSGTerm::TYPE_UNION &&
-					 (term->right->type != CSGTerm::TYPE_PRIMITIVE || term->left->type == CSGTerm::TYPE_UNION));
+					 ((term->right && term->right->type != CSGTerm::TYPE_PRIMITIVE) ||
+						(term->left && term->left->type == CSGTerm::TYPE_UNION)));
 	term->right = normalizePass(term->right);
 
 	// FIXME: Do we need to take into account any transformation of item here?
@@ -143,7 +149,7 @@ bool CSGTermNormalizer::normalize_tail(shared_ptr<CSGTerm> &term)
 	return false;
 }
 
-int CSGTermNormalizer::count(const shared_ptr<CSGTerm> &term) const
+unsigned int CSGTermNormalizer::count(const shared_ptr<CSGTerm> &term) const
 {
 	if (!term) return 0;
 	return term->type == CSGTerm::TYPE_PRIMITIVE ? 1 : 0 + count(term->left) + count(term->right);

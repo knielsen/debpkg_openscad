@@ -35,6 +35,7 @@
 #include "nodedumper.h"
 #include "printutils.h"
 #include "handle_dep.h"
+#include "parsersettings.h"
 
 #include <string>
 #include <vector>
@@ -47,12 +48,7 @@
 #endif
 
 #include <QApplication>
-#include <QFile>
 #include <QDir>
-#include <QSet>
-#include <QSettings>
-#include <QTextStream>
-#include <boost/program_options.hpp>
 #include <sstream>
 
 #ifdef Q_WS_MAC
@@ -60,11 +56,16 @@
 #include "AppleEvents.h"
 #endif
 
+#include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
+#include "boosty.h"
+
 #ifdef _MSC_VER
 #define snprintf _snprintf
 #endif
 
 namespace po = boost::program_options;
+namespace fs = boost::filesystem;
 
 static void help(const char *progname)
 {
@@ -83,9 +84,8 @@ static void version()
 }
 
 std::string commandline_commands;
-QString currentdir;
+std::string currentdir;
 QString examplesdir;
-QString librarydir;
 
 using std::string;
 using std::vector;
@@ -115,7 +115,7 @@ int main(int argc, char **argv)
 #ifdef Q_WS_MAC
 	app.installEventFilter(new EventFilter(&app));
 #endif
-	QDir original_path = QDir::current();
+	fs::path original_path = fs::current_path();
 
 	// set up groups for QSettings
 	QCoreApplication::setOrganizationName("OpenSCAD");
@@ -149,9 +149,14 @@ int main(int argc, char **argv)
 	all_options.add(desc).add(hidden);
 
 	po::variables_map vm;
-	po::store(po::command_line_parser(argc, argv).options(all_options).positional(p).run(), vm);
-//	po::notify(vm);
-	
+	try {
+		po::store(po::command_line_parser(argc, argv).options(all_options).positional(p).run(), vm);
+	}
+	catch(std::exception &e) { // Catches e.g. unknown options
+		fprintf(stderr, "%s\n", e.what());
+		help(argv[0]);
+	}
+
 	if (vm.count("help")) help(argv[0]);
 	if (vm.count("version")) version();
 
@@ -200,7 +205,7 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	currentdir = QDir::currentPath();
+	currentdir = boosty::stringy( fs::current_path() );
 
 	QDir exdir(QApplication::instance()->applicationDirPath());
 #ifdef Q_WS_MAC
@@ -221,24 +226,7 @@ int main(int argc, char **argv)
 					examplesdir = exdir.path();
 				}
 
-	QDir libdir(QApplication::instance()->applicationDirPath());
-#ifdef Q_WS_MAC
-	libdir.cd("../Resources"); // Libraries can be bundled
-	if (!libdir.exists("libraries")) libdir.cd("../../..");
-#elif defined(Q_OS_UNIX)
-	if (libdir.cd("../share/openscad/libraries")) {
-		librarydir = libdir.path();
-	} else
-		if (libdir.cd("../../share/openscad/libraries")) {
-			librarydir = libdir.path();
-		} else
-			if (libdir.cd("../../libraries")) {
-				librarydir = libdir.path();
-			} else
-#endif
-				if (libdir.cd("libraries")) {
-					librarydir = libdir.path();
-				}
+	parser_init(QApplication::instance()->applicationDirPath().toStdString());
 
 	// Initialize global visitors
 	NodeCache nodecache;
@@ -272,41 +260,38 @@ int main(int argc, char **argv)
 		Context root_ctx;
 		register_builtin(root_ctx);
 
-		AbstractModule *root_module;
+		Module *root_module;
 		ModuleInstantiation root_inst;
 		AbstractNode *root_node;
 
-		QFileInfo fileInfo(filename);
 		handle_dep(filename);
-		FILE *fp = fopen(filename, "rt");
-		if (!fp) {
-			fprintf(stderr, "Can't open input file `%s'!\n", filename);
+		
+		std::ifstream ifs(filename);
+		if (!ifs.is_open()) {
+			fprintf(stderr, "Can't open input file '%s'!\n", filename);
 			exit(1);
-		} else {
-			std::stringstream text;
-			char buffer[513];
-			int ret;
-			while ((ret = fread(buffer, 1, 512, fp)) > 0) {
-				buffer[ret] = 0;
-				text << buffer;
-			}
-			fclose(fp);
-			text << commandline_commands;
-			root_module = parse(text.str().c_str(), fileInfo.absolutePath().toLocal8Bit(), false);
-			if (!root_module) exit(1);
 		}
-
-		QDir::setCurrent(fileInfo.absolutePath());
+		std::string text((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+		text += "\n" + commandline_commands;
+		fs::path abspath = boosty::absolute(filename);
+		std::string parentpath = boosty::stringy(abspath.parent_path());
+		root_module = parse(text.c_str(), parentpath.c_str(), false);
+		if (!root_module) exit(1);
+		root_module->handleDependencies();
+		
+		fs::path fpath = boosty::absolute(fs::path(filename));
+		fs::path fparent = fpath.parent_path();
+		fs::current_path(fparent);
 
 		AbstractNode::resetIndexCounter();
 		root_node = root_module->evaluate(&root_ctx, &root_inst);
 		tree.setRoot(root_node);
 
 		if (csg_output_file) {
-			QDir::setCurrent(original_path.absolutePath());
+			fs::current_path(original_path);
 			std::ofstream fstream(csg_output_file);
 			if (!fstream.is_open()) {
-				PRINTF("Can't open file \"%s\" for export", csg_output_file);
+				PRINTB("Can't open file \"%s\" for export", csg_output_file);
 			}
 			else {
 				fstream << tree.getString(*root_node) << "\n";
@@ -316,7 +301,7 @@ int main(int argc, char **argv)
 		else {
 			CGAL_Nef_polyhedron root_N = cgalevaluator.evaluateCGALMesh(*tree.root());
 			
-			QDir::setCurrent(original_path.absolutePath());
+			fs::current_path(original_path);
 			
 			if (deps_output_file) {
 				if (!write_deps(deps_output_file, 
@@ -336,10 +321,10 @@ int main(int argc, char **argv)
 				}
 				std::ofstream fstream(stl_output_file);
 				if (!fstream.is_open()) {
-					PRINTF("Can't open file \"%s\" for export", stl_output_file);
+					PRINTB("Can't open file \"%s\" for export", stl_output_file);
 				}
 				else {
-					export_stl(&root_N, fstream, NULL);
+					export_stl(&root_N, fstream);
 					fstream.close();
 				}
 			}
@@ -355,10 +340,10 @@ int main(int argc, char **argv)
 				}
 				std::ofstream fstream(off_output_file);
 				if (!fstream.is_open()) {
-					PRINTF("Can't open file \"%s\" for export", off_output_file);
+					PRINTB("Can't open file \"%s\" for export", off_output_file);
 				}
 				else {
-					export_off(&root_N, fstream, NULL);
+					export_off(&root_N, fstream);
 					fstream.close();
 				}
 			}
@@ -370,10 +355,10 @@ int main(int argc, char **argv)
 				}
 				std::ofstream fstream(dxf_output_file);
 				if (!fstream.is_open()) {
-					PRINTF("Can't open file \"%s\" for export", dxf_output_file);
+					PRINTB("Can't open file \"%s\" for export", dxf_output_file);
 				}
 				else {
-					export_dxf(&root_N, fstream, NULL);
+					export_dxf(&root_N, fstream);
 					fstream.close();
 				}
 			}
@@ -391,7 +376,7 @@ int main(int argc, char **argv)
 #endif		
 
 		QString qfilename;
-		if (filename) qfilename = QFileInfo(original_path, filename).absoluteFilePath();
+		if (filename) qfilename = QString::fromStdString(boosty::stringy(boosty::absolute(filename)));
 
 #if 0 /*** disabled by clifford wolf: adds rendering artefacts with OpenCSG ***/
 		// turn on anti-aliasing
@@ -405,8 +390,8 @@ int main(int argc, char **argv)
 		vector<string> inputFiles;
 		if (vm.count("input-file")) {
 			inputFiles = vm["input-file"].as<vector<string> >();
-			for (vector<string>::const_iterator i = inputFiles.begin()+1; i != inputFiles.end(); i++) {
-				new MainWindow(QFileInfo(original_path, i->c_str()).absoluteFilePath());
+			for (vector<string>::const_iterator infile = inputFiles.begin()+1; infile != inputFiles.end(); infile++) {
+				new MainWindow(QString::fromStdString(boosty::stringy((original_path / *infile))));
 			}
 		}
 		app.connect(&app, SIGNAL(lastWindowClosed()), &app, SLOT(quit()));

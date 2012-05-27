@@ -32,7 +32,6 @@
 #include <sstream>
 #include <iostream>
 #include <assert.h>
-#include <QRegExp>
 
 #include <boost/foreach.hpp>
 #include <boost/unordered_map.hpp>
@@ -43,7 +42,7 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const AbstractNode &node)
 	if (!isCached(node)) {
 		Traverser evaluate(*this, node, Traverser::PRE_AND_POSTFIX);
 		evaluate.execute();
-		assert(isCached(node));
+		return this->root;
 	}
 	return CGALCache::instance()->get(this->tree.getIdString(node));
 }
@@ -85,7 +84,12 @@ void CGALEvaluator::process(CGAL_Nef_polyhedron &target, const CGAL_Nef_polyhedr
 	catch (CGAL::Assertion_exception e) {
 		// union && difference assert triggered by testdata/scad/bugs/rotate-diff-nonmanifold-crash.scad
 		std::string opstr = op == CGE_UNION ? "union" : op == CGE_INTERSECTION ? "intersection" : op == CGE_DIFFERENCE ? "difference" : op == CGE_MINKOWSKI ? "minkowski" : "UNKNOWN";
-		PRINTF("CGAL error in CGAL_Nef_polyhedron's %s operator: %s", opstr.c_str(), e.what());
+		PRINTB("CGAL error in CGAL_Nef_polyhedron's %s operator: %s", opstr % e.what());
+
+		// Minkowski errors can result in corrupt polyhedrons
+		if (op == CGE_MINKOWSKI) {
+			target = src;
+		}
 	}
 	CGAL::set_error_behaviour(old_behaviour);
 }
@@ -245,31 +249,45 @@ Response CGALEvaluator::visit(State &state, const TransformNode &node)
 				// objects. So we convert in to our internal 2d data format, transform it,
 				// tesselate it and create a new CGAL_Nef_polyhedron2 from it.. What a hack!
 				
-				CGAL_Aff_transformation2 t(
-					node.matrix(0,0), node.matrix(0,1), node.matrix(0,3),
-					node.matrix(1,0), node.matrix(1,1), node.matrix(1,3), node.matrix(3,3));
-				
-				DxfData *dd = N.convertToDxfData();
-				for (size_t i=0; i < dd->points.size(); i++) {
-					CGAL_Kernel2::Point_2 p = CGAL_Kernel2::Point_2(dd->points[i][0], dd->points[i][1]);
-					p = t.transform(p);
-					dd->points[i][0] = to_double(p.x());
-					dd->points[i][1] = to_double(p.y());
+				Eigen::Matrix2f testmat;
+				testmat << node.matrix(0,0), node.matrix(0,1), node.matrix(1,0), node.matrix(1,1);
+				if (testmat.determinant() == 0) {
+					PRINT("Warning: Scaling a 2D object with 0 - removing object");
+					N.p2.reset();
 				}
-				
-				PolySet ps;
-				ps.is2d = true;
-				dxf_tesselate(&ps, *dd, 0, true, false, 0);
-				
-				N = evaluateCGALMesh(ps);
-				delete dd;
+				else {
+					CGAL_Aff_transformation2 t(
+						node.matrix(0,0), node.matrix(0,1), node.matrix(0,3),
+						node.matrix(1,0), node.matrix(1,1), node.matrix(1,3), node.matrix(3,3));
+					
+					DxfData *dd = N.convertToDxfData();
+					for (size_t i=0; i < dd->points.size(); i++) {
+						CGAL_Kernel2::Point_2 p = CGAL_Kernel2::Point_2(dd->points[i][0], dd->points[i][1]);
+						p = t.transform(p);
+						dd->points[i][0] = to_double(p.x());
+						dd->points[i][1] = to_double(p.y());
+					}
+					
+					PolySet ps;
+					ps.is2d = true;
+					dxf_tesselate(&ps, *dd, 0, true, false, 0);
+					
+					N = evaluateCGALMesh(ps);
+					delete dd;
+				}
 			}
 			else if (N.dim == 3) {
-				CGAL_Aff_transformation t(
-					node.matrix(0,0), node.matrix(0,1), node.matrix(0,2), node.matrix(0,3),
-					node.matrix(1,0), node.matrix(1,1), node.matrix(1,2), node.matrix(1,3),
-					node.matrix(2,0), node.matrix(2,1), node.matrix(2,2), node.matrix(2,3), node.matrix(3,3));
-				N.p3->transform(t);
+				if (node.matrix.matrix().determinant() == 0) {
+					PRINT("Warning: Scaling a 3D object with 0 - removing object");
+					N.p3.reset();
+				}
+				else {
+					CGAL_Aff_transformation t(
+						node.matrix(0,0), node.matrix(0,1), node.matrix(0,2), node.matrix(0,3),
+						node.matrix(1,0), node.matrix(1,1), node.matrix(1,2), node.matrix(1,3),
+						node.matrix(2,0), node.matrix(2,1), node.matrix(2,2), node.matrix(2,3), node.matrix(3,3));
+					N.p3->transform(t);
+				}
 			}
 		}
 		else {
@@ -349,8 +367,11 @@ void CGALEvaluator::addToParent(const State &state, const AbstractNode &node, co
 	else {
 		// Root node, insert into cache
 		if (!isCached(node)) {
-			CGALCache::instance()->insert(this->tree.getIdString(node), N);
+			if (!CGALCache::instance()->insert(this->tree.getIdString(node), N)) {
+				PRINT("WARNING: CGAL Evaluator: Root node didn't fit into cache");
+			}
 		}
+		this->root = N;
 	}
 }
 
@@ -432,7 +453,7 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 
 			void add_edges(int pn)
 			{
-				for (int j = 1; j <= this->polygons[pn].size(); j++) {
+				for (unsigned int j = 1; j <= this->polygons[pn].size(); j++) {
 					int a = this->polygons[pn][j-1];
 					int b = this->polygons[pn][j % this->polygons[pn].size()];
 					if (a > b) { a = a^b; b = a^b; a = a^b; }
@@ -447,7 +468,7 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 
 			void del_poly(int pn)
 			{
-				for (int j = 1; j <= this->polygons[pn].size(); j++) {
+				for (unsigned int j = 1; j <= this->polygons[pn].size(); j++) {
 					int a = this->polygons[pn][j-1];
 					int b = this->polygons[pn][j % this->polygons[pn].size()];
 					if (a > b) { a = a^b; b = a^b; a = a^b; }
@@ -494,11 +515,11 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 
 			int merge(int p1, int p1e, int p2, int p2e)
 			{
-				for (int i = 1; i < this->polygons[p1].size(); i++) {
+				for (unsigned int i = 1; i < this->polygons[p1].size(); i++) {
 					int j = (p1e + i) % this->polygons[p1].size();
 					this->polygons[this->poly_n].push_back(this->polygons[p1][j]);
 				}
-				for (int i = 1; i < this->polygons[p2].size(); i++) {
+				for (unsigned int i = 1; i < this->polygons[p2].size(); i++) {
 					int j = (p2e + i) % this->polygons[p2].size();
 					this->polygons[this->poly_n].push_back(this->polygons[p2][j]);
 				}
@@ -518,7 +539,7 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 					int poly1_n = work_queue.front();
 					work_queue.pop_front();
 					if (this->polygons.find(poly1_n) == this->polygons.end()) continue;
-					for (int j = 1; j <= this->polygons[poly1_n].size(); j++) {
+					for (unsigned int j = 1; j <= this->polygons[poly1_n].size(); j++) {
 						int a = this->polygons[poly1_n][j-1];
 						int b = this->polygons[poly1_n][j % this->polygons[poly1_n].size()];
 						if (a > b) { a = a^b; b = a^b; a = a^b; }
@@ -527,7 +548,7 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 							int poly2_n = this->edge_to_poly[std::pair<int,int>(a, b)].first +
 									this->edge_to_poly[std::pair<int,int>(a, b)].second - poly1_n;
 							int poly2_edge = -1;
-							for (int k = 1; k <= this->polygons[poly2_n].size(); k++) {
+							for (unsigned int k = 1; k <= this->polygons[poly2_n].size(); k++) {
 								int c = this->polygons[poly2_n][k-1];
 								int d = this->polygons[poly2_n][k % this->polygons[poly2_n].size()];
 								if (c > d) { c = c^d; d = c^d; c = c^d; }
@@ -557,7 +578,7 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 
 				BOOST_FOREACH(const PolygonMap::value_type &i, polygons) {
 					std::list<CGAL_Nef_polyhedron2::Point> plist;
-					for (int j = 0; j < i.second.size(); j++) {
+					for (unsigned int j = 0; j < i.second.size(); j++) {
 						int p = i.second[j];
 						plist.push_back(points[p]);
 					}
@@ -569,12 +590,7 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 		};
 
 		PolyReducer pr(ps);
-		int numpolygons_before = pr.polygons.size();
 		pr.reduce();
-		int numpolygons_after = pr.polygons.size();
-		if (numpolygons_after < numpolygons_before) {
-			PRINTF("reduce polygons: %d -> %d", numpolygons_before, numpolygons_after);
-		}
 		return CGAL_Nef_polyhedron(pr.toNef());
 #endif
 #if 0
@@ -622,7 +638,7 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 			}
 		}
 		catch (CGAL::Assertion_exception e) {
-			PRINTF("CGAL error in CGAL_Nef_polyhedron3(): %s", e.what());
+			PRINTB("CGAL error in CGAL_Nef_polyhedron3(): %s", e.what());
 		}
 		CGAL::set_error_behaviour(old_behaviour);
 		return CGAL_Nef_polyhedron(N);

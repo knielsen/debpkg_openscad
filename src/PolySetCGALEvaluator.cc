@@ -39,6 +39,8 @@ PolySet *PolySetCGALEvaluator::evaluatePolySet(const ProjectionNode &node)
 	ps->convexity = node.convexity;
 	ps->is2d = true;
 
+  // In cut mode, the model is intersected by a large but very thin box living on the 
+	// XY plane.
 	if (node.cut_mode)
 	{
 		PolySet cube;
@@ -82,15 +84,31 @@ PolySet *PolySetCGALEvaluator::evaluatePolySet(const ProjectionNode &node)
 		cube.append_vertex(x1, y2, z2);
 		CGAL_Nef_polyhedron Ncube = this->cgalevaluator.evaluateCGALMesh(cube);
 
-		// N.p3 *= CGAL_Nef_polyhedron3(CGAL_Plane(0, 0, 1, 0), CGAL_Nef_polyhedron3::INCLUDED);
 		sum *= Ncube;
+
+		// FIXME: Instead of intersecting with a thin volume, we could intersect
+		// with a plane. This feels like a better solution. However, as the result
+		// of such an intersection isn't simple, we cannot convert the resulting
+		// Nef polyhedron to a Polyhedron using convertToPolyset() and we need
+		// another way of extracting the result. kintel 20120203.
+//		*sum.p3 = sum.p3->intersection(CGAL_Nef_polyhedron3::Plane_3(0, 0, 1, 0), 
+//																	CGAL_Nef_polyhedron3::PLANE_ONLY);
+
+
 		if (!sum.p3->is_simple()) {
-			PRINTF("WARNING: Body of projection(cut = true) isn't valid 2-manifold! Modify your design..");
+			PRINT("WARNING: Body of projection(cut = true) isn't valid 2-manifold! Modify your design..");
 			goto cant_project_non_simple_polyhedron;
 		}
 
 		PolySet *ps3 = sum.convertToPolyset();
-		Grid2d<int> conversion_grid(GRID_COARSE);
+		if (!ps3) return NULL;
+
+		// Extract polygons in the XY plane, ignoring all other polygons
+    // FIXME: If the polyhedron is really thin, there might be unwanted polygons
+    // in the XY plane, causing the resulting 2D polygon to be self-intersection
+    // and cause a crash in CGALEvaluator::PolyReducer. The right solution is to
+    // filter these polygons here. kintel 20120203.
+		Grid2d<unsigned int> conversion_grid(GRID_COARSE);
 		for (size_t i = 0; i < ps3->polygons.size(); i++) {
 			for (size_t j = 0; j < ps3->polygons[i].size(); j++) {
 				double x = ps3->polygons[i][j][0];
@@ -113,14 +131,16 @@ PolySet *PolySetCGALEvaluator::evaluatePolySet(const ProjectionNode &node)
 		}
 		delete ps3;
 	}
+	// In projection mode all the triangles are projected manually into the XY plane
 	else
 	{
 		if (!sum.p3->is_simple()) {
-			PRINTF("WARNING: Body of projection(cut = false) isn't valid 2-manifold! Modify your design..");
+			PRINT("WARNING: Body of projection(cut = false) isn't valid 2-manifold! Modify your design..");
 			goto cant_project_non_simple_polyhedron;
 		}
 
 		PolySet *ps3 = sum.convertToPolyset();
+		if (!ps3) return NULL;
 		CGAL_Nef_polyhedron np;
 		for (size_t i = 0; i < ps3->polygons.size(); i++)
 		{
@@ -261,12 +281,14 @@ PolySet *PolySetCGALEvaluator::evaluatePolySet(const LinearExtrudeNode &node)
 		BOOST_FOREACH (AbstractNode * v, node.getChildren()) {
 			if (v->modinst->isBackground()) continue;
 			CGAL_Nef_polyhedron N = this->cgalevaluator.evaluateCGALMesh(*v);
-			if (N.dim != 2) {
-				PRINT("ERROR: linear_extrude() is not defined for 3D child objects!");
-			}
-			else {
-				if (sum.empty()) sum = N.copy();
-				else sum += N;
+			if (!N.empty()) {
+				if (N.dim != 2) {
+					PRINT("ERROR: linear_extrude() is not defined for 3D child objects!");
+				}
+				else {
+					if (sum.empty()) sum = N.copy();
+					else sum += N;
+				}
 			}
 		}
 
@@ -302,15 +324,15 @@ PolySet *PolySetCGALEvaluator::extrudeDxfData(const LinearExtrudeNode &node, Dxf
 		if (dxf.paths[i].is_closed)
 			continue;
 		if (first_open_path) {
-			PRINTF("WARNING: Open paths in dxf_linear_extrude(file = \"%s\", layer = \"%s\"):",
-					node.filename.c_str(), node.layername.c_str());
+			PRINTB("WARNING: Open paths in dxf_linear_extrude(file = \"%s\", layer = \"%s\"):",
+					node.filename % node.layername);
 			first_open_path = false;
 		}
-		PRINTF("   %9.5f %10.5f ... %10.5f %10.5f",
-					 dxf.points[dxf.paths[i].indices.front()][0] / node.scale + node.origin_x,
-					 dxf.points[dxf.paths[i].indices.front()][1] / node.scale + node.origin_y, 
-					 dxf.points[dxf.paths[i].indices.back()][0] / node.scale + node.origin_x,
-					 dxf.points[dxf.paths[i].indices.back()][1] / node.scale + node.origin_y);
+		PRINTB("   %9.5f %10.5f ... %10.5f %10.5f",
+					 (dxf.points[dxf.paths[i].indices.front()][0] / node.scale + node.origin_x) %
+					 (dxf.points[dxf.paths[i].indices.front()][1] / node.scale + node.origin_y) %
+					 (dxf.points[dxf.paths[i].indices.back()][0] / node.scale + node.origin_x) %
+					 (dxf.points[dxf.paths[i].indices.back()][1] / node.scale + node.origin_y));
 	}
 
 
@@ -359,12 +381,14 @@ PolySet *PolySetCGALEvaluator::evaluatePolySet(const RotateExtrudeNode &node)
 		BOOST_FOREACH (AbstractNode * v, node.getChildren()) {
 			if (v->modinst->isBackground()) continue;
 			CGAL_Nef_polyhedron N = this->cgalevaluator.evaluateCGALMesh(*v);
-			if (N.dim != 2) {
-				PRINT("ERROR: rotate_extrude() is not defined for 3D child objects!");
-			}
-			else {
-				if (sum.empty()) sum = N.copy();
-				else sum += N;
+			if (!N.empty()) {
+				if (N.dim != 2) {
+					PRINT("ERROR: rotate_extrude() is not defined for 3D child objects!");
+				}
+				else {
+					if (sum.empty()) sum = N.copy();
+					else sum += N;
+				}
 			}
 		}
 
@@ -385,7 +409,7 @@ PolySet *PolySetCGALEvaluator::evaluatePolySet(const CgaladvNode &node)
 	PolySet *ps = NULL;
 	if (!N.empty()) {
 		ps = N.convertToPolyset();
-		ps->convexity = node.convexity;
+		if (ps) ps->convexity = node.convexity;
 	}
 
 	return ps;
@@ -397,11 +421,11 @@ PolySet *PolySetCGALEvaluator::evaluatePolySet(const RenderNode &node)
 	PolySet *ps = NULL;
 	if (!N.empty()) {
 		if (N.dim == 3 && !N.p3->is_simple()) {
-			PRINTF("WARNING: Body of render() isn't valid 2-manifold!");
+			PRINT("WARNING: Body of render() isn't valid 2-manifold!");
 		}
 		else {
 			ps = N.convertToPolyset();
-			ps->convexity = node.convexity;
+			if (ps) ps->convexity = node.convexity;
 		}
 	}
 	return ps;
@@ -430,15 +454,10 @@ PolySet *PolySetCGALEvaluator::rotateDxfData(const RotateExtrudeNode &node, DxfD
 		}
 
 		for (int j = 0; j < fragments; j++) {
-			double a = (j*2*M_PI) / fragments;
+			double a = (j*2*M_PI) / fragments - M_PI/2; // start on the X axis
 			for (size_t k = 0; k < dxf.paths[i].indices.size(); k++) {
-				if (dxf.points[dxf.paths[i].indices[k]][0] == 0) {
-					points[j][k][0] = 0;
-					points[j][k][1] = 0;
-				} else {
-					points[j][k][0] = dxf.points[dxf.paths[i].indices[k]][0] * sin(a);
-					points[j][k][1] = dxf.points[dxf.paths[i].indices[k]][0] * cos(a);
-				}
+				points[j][k][0] = dxf.points[dxf.paths[i].indices[k]][0] * sin(a);
+			 	points[j][k][1] = dxf.points[dxf.paths[i].indices[k]][0] * cos(a);
 				points[j][k][2] = dxf.points[dxf.paths[i].indices[k]][1];
 			}
 		}
