@@ -13,7 +13,6 @@ Build-Depends:
     libglew-dev (>= 1.5.4) | libglew1.6-dev | libglew1.5-dev (>= 1.5.4),
     libgmp-dev | libgmp10-dev | libgmp3-dev,
     libmpfr-dev,
-    imagemagick,
     python,
     cmake,
     libboost-dev (>= 1.46.0),

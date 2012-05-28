@@ -1,3 +1,9 @@
+openscad (2012.05~.12-git67eb2ebe-2) UNRELEASED; urgency=low
+
+  * Removed build dependency on imagemagick (left over from icon generation)
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 28 May 2012 03:29:59 +0200
+
 openscad (2012.05~.12-git67eb2ebe-1) experimental; urgency=low
 
   * Build-depend on boost modules required by new version
