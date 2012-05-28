@@ -27,9 +27,13 @@ Files: src/cache.h
 Copyright: © 2009-2011 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>, 2010 Nokia Corporation and/or its subsidiary(-ies)
 License: QtCommercial or LGPL-2.1 with some exception or GPL-3
 
-Files: scripts/googlecode_upload.py
-Copyright: 2006-2007 Google Inc.
-License: Apache
+Files: src/boosty.h
+Copyright: 2012 don bright
+License: GPL-2+ with CGAL exception
+Comment: The exception is not mentioned explicitly in the file, where it says
+ "under the GPL 2, or later", but the addition "as described in [...]
+ 'COPYING'", where the exception is displayed prominently, makes the intention
+ clear.
 
 Files: contrib/scad.el
 Copyright: 2010-2011 Len Trigg <lenbok@gmail.com>
@@ -38,14 +42,6 @@ License: GPL-2+
 Files: contrib/OpenSCAD.xml
 Copyright: 2011 tjhowse <tjhowse@gmail.com>
 License: GPL-2+
-Comment:
- There is no note in the upstream tar ball that clarifies the license, but the
- author of the file (as indicated by the git history) has in the meantime
- requested an appropriate notice to be added, see
- https://github.com/tjhowse/openscad/commit/068632fe2bbe9a2f8fe1fcebe2d05a0eba94b0f0
- for the change requested and
- http://rocklinux.net/pipermail/openscad/2012-February/002625.html for an email
- with some more information.
 
 Files: tests/lodepng.*
 Copyright: 2005-2011 Lode Vandevenne
@@ -94,7 +90,7 @@ Copyright: 2011 Don Bright <hugh.m.bright@gmail.com>
 License: GPL-2+
 
 Files: debian/*
-Copyright: © 2010-2011 Christian M. Amsüss <chrysn@fsfe.org>
+Copyright: © 2010-2012 Christian M. Amsüss <chrysn@fsfe.org>
 License: GPL-2+ with CGAL exception
 
 License: GPL-2+
@@ -130,13 +126,6 @@ License: GPL-2+ with CGAL exception
  .
  A copy of the GNU General Public License can be found in
  /usr/share/common-licenses/GPL-2.
-
-License: Apache
- Licensed under the terms of the Apache Software License 2.0:
- http://www.apache.org/licenses/LICENSE-2.0
- .
- A copy of the Apache 2.0 License can be found in
- /usr/share/common-licenses/Apache-2.0.
 
 License: QtCommercial
  Licensees holding valid Qt Commercial licenses may use this file in

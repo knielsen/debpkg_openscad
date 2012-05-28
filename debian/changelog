@@ -7,6 +7,7 @@ openscad (2012.05~.12-git67eb2ebe-1) experimental; urgency=low
   * Include upstream git snapshot
     * copyright file not yet updated!
   * Drop custom .desktop file and icon generation, handled upstream
+  * Copyright file adaptions to new files
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 12 May 2012 16:52:26 +0200
 
