@@ -5,7 +5,11 @@ openscad (2012.05~.12-git67eb2ebe-1) experimental; urgency=low
   * Un-apply 1b98da3f (GL/glu.h includes), fixed upstream
   * Un-apply 1cd856be (CMakeList fix), fixed upstream
   * Include upstream git snapshot
-    * copyright file not yet updated!
+    - More configuration options for cache and performance
+    - Dot product
+    - Matrix multiplication
+    - New search function
+    - Bugfixes
   * Drop custom .desktop file and icon generation, handled upstream
   * Copyright file adaptions to new files
 
