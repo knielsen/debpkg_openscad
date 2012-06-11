@@ -1,6 +1,7 @@
 openscad (2012.05~.12-git67eb2ebe-2) UNRELEASED; urgency=low
 
   * Removed build dependency on imagemagick (left over from icon generation)
+  * Added reportbug helper (includes glxinfo data in bug reports)
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 28 May 2012 03:29:59 +0200
 
