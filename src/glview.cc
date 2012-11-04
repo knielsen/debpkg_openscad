@@ -69,6 +69,8 @@ GLView::GLView(const QGLFormat & format, QWidget *parent) : QGLWidget(format, pa
 	init();
 }
 
+static bool running_under_wine = false;
+
 void GLView::init()
 {
 	this->viewer_distance = 500;
@@ -99,6 +101,15 @@ void GLView::init()
 	this->opencsg_support = true;
 	static int sId = 0;
 	this->opencsg_id = sId++;
+#endif
+
+// see paintGL() + issue160 + wine FAQ
+#ifdef _WIN32
+#include <windows.h>
+	HMODULE hntdll = GetModuleHandle(L"ntdll.dll");
+	if (hntdll)
+		if ( (void *)GetProcAddress(hntdll, "wine_get_version") )
+			running_under_wine = true;
 #endif
 }
 
@@ -528,6 +539,8 @@ void GLView::paintGL()
 			fmodf(360 - object_rot_x + 90, 360), fmodf(360 - object_rot_y, 360), fmodf(360 - object_rot_z, 360), viewer_distance);
 		statusLabel->setText(msg);
 	}
+
+	if (running_under_wine) swapBuffers();
 }
 
 void GLView::keyPressEvent(QKeyEvent *event)
@@ -554,8 +567,6 @@ void GLView::mousePressEvent(QMouseEvent *event)
 {
 	mouse_drag_active = true;
 	last_mouse = event->globalPos();
-	grabMouse();
-	setFocus();
 }
 
 void GLView::normalizeAngle(GLdouble& angle)
@@ -600,7 +611,11 @@ void GLView::mouseMoveEvent(QMouseEvent *event)
       double mz = -(dy) * viewer_distance/1000;
 
 			double my = 0;
+#if (QT_VERSION < QT_VERSION_CHECK(4, 7, 0))
+			if (event->buttons() & Qt::MidButton) {
+#else
 			if (event->buttons() & Qt::MiddleButton) {
+#endif
 				my = mz;
 				mz = 0;
 				// actually lock the x-position

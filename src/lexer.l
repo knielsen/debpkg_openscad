@@ -80,6 +80,7 @@ void includefile();
 fs::path sourcepath();
 std::vector<fs::path> path_stack;
 std::vector<FILE*> openfiles;
+std::vector<std::string> openfilenames;
 
 std::string filename;
 std::string filepath;
@@ -118,14 +119,20 @@ use[ \t\r\n>]*"<"	{ BEGIN(cond_use); }
         else {
           usepath = sourcepath() / filename;
           if (!fs::exists(usepath)) {
-            usepath = boosty::absolute(fs::path(get_librarydir()) / filename);
+            usepath = locate_file(filename);
           }
         }
         /* Only accept regular files which exists */
-        if (usepath.has_parent_path() && fs::exists(usepath)) {
+        if (usepath.has_parent_path() && fs::exists(usepath) && !fs::is_directory(usepath)) {
           handle_dep(usepath.string());
           parserlval.text = strdup(usepath.string().c_str());
           return TOK_USE;
+        } else {
+          PRINTB("WARNING: Can't open 'use' file '%s'.", filename);
+          if ( filename.size() == 0 )
+            PRINT("WARNING: 'use' filename is blank");
+          else if ( fs::is_directory( usepath ) )
+            PRINTB("WARNING: 'use' file points to a directory: %s",filename);
         }
  }
 }
@@ -136,6 +143,7 @@ use[ \t\r\n>]*"<"	{ BEGIN(cond_use); }
 		assert(!openfiles.empty());
 		fclose(openfiles.back());
 		openfiles.pop_back();
+		openfilenames.pop_back();
 	}
 	yypop_buffer_state();
 	if (!YY_CURRENT_BUFFER)
@@ -214,22 +222,32 @@ void includefile()
 
   fs::path finfo = dirinfo / filename;
   if (!exists(finfo)) {
-    finfo = fs::path(get_librarydir()) / filepath / filename;
+    finfo = locate_file((fs::path(filepath) / filename).string());
+  }
+
+  if (finfo.empty()) {
+    PRINTB("WARNING: Can't find 'include' file '%s'.", filename);
+  }
+
+  std::string fullname = boosty::absolute(finfo).string();
+  // Detect circular includes
+  BOOST_FOREACH(std::string &s, openfilenames) {
+    if (s == fullname) return;
   }
 
   filepath.clear();
   path_stack.push_back(finfo.parent_path());
 
-  std::string fullname = boosty::absolute(finfo).string();
   handle_dep(fullname);
   currmodule->registerInclude(fullname);
   yyin = fopen(fullname.c_str(), "r");
   if (!yyin) {
-    PRINTB("WARNING: Can't open input file '%s'.", filename);
+    PRINTB("WARNING: Can't open 'include' file '%s'.", filename);
     path_stack.pop_back();
     return;
   }
   openfiles.push_back(yyin);
+  openfilenames.push_back(fullname);
   filename.clear();
   
   yypush_buffer_state(yy_create_buffer(yyin, YY_BUF_SIZE));
@@ -243,5 +261,6 @@ void lexerdestroy()
 {
   BOOST_FOREACH (FILE *f, openfiles) fclose(f);
   openfiles.clear();
+  openfilenames.clear();
   path_stack.clear();
 }

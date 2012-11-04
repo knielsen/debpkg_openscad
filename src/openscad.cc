@@ -58,6 +58,7 @@
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/foreach.hpp>
 #include "boosty.h"
 
 #ifdef _MSC_VER
@@ -152,7 +153,7 @@ int main(int argc, char **argv)
 	try {
 		po::store(po::command_line_parser(argc, argv).options(all_options).positional(p).run(), vm);
 	}
-	catch(std::exception &e) { // Catches e.g. unknown options
+	catch(const std::exception &e) { // Catches e.g. unknown options
 		fprintf(stderr, "%s\n", e.what());
 		help(argv[0]);
 	}
@@ -187,10 +188,8 @@ int main(int argc, char **argv)
 	}
 
 	if (vm.count("D")) {
-		const vector<string> &commands = vm["D"].as<vector<string> >();
-
-		for (vector<string>::const_iterator i = commands.begin(); i != commands.end(); i++) {
-			commandline_commands += *i;
+		BOOST_FOREACH(const string &cmd, vm["D"].as<vector<string> >()) {
+			commandline_commands += cmd;
 			commandline_commands += ";\n";
 		}
 	}
@@ -205,7 +204,7 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	currentdir = boosty::stringy( fs::current_path() );
+	currentdir = boosty::stringy(fs::current_path());
 
 	QDir exdir(QApplication::instance()->applicationDirPath());
 #ifdef Q_WS_MAC
@@ -294,6 +293,7 @@ int main(int argc, char **argv)
 				PRINTB("Can't open file \"%s\" for export", csg_output_file);
 			}
 			else {
+				fs::current_path(fparent); // Force exported filenames to be relative to document path
 				fstream << tree.getString(*root_node) << "\n";
 				fstream.close();
 			}

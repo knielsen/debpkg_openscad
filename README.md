@@ -1,4 +1,5 @@
 # What is OpenSCAD?
+[![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=openscad&url=http://openscad.org&title=OpenSCAD&language=&tags=github&category=software)
 
 OpenSCAD is a software for creating solid 3D CAD objects. It is free software
 and available for Linux/UNIX, MS Windows and Mac OS X.
@@ -78,23 +79,37 @@ To build OpenSCAD, you need some libraries and tools. The version
 numbers in brackets specify the versions which have been used for
 development. Other versions may or may not work as well.
 
-If you're using Ubuntu, you can install these libraries from
-aptitude. If you're using Mac, there is a build script that compiles
-the libraries from source. Follow the instructions for the platform
-you're compiling on below.
+If you're using a newer version of Ubuntu, you can install these 
+libraries from aptitude. If you're using Mac, or an older Linux, there 
+are build scripts that download and compile the libraries from source. 
+Follow the instructions for the platform you're compiling on below.
 
 * [Qt4 (4.4 - 4.7)](http://www.qt.nokia.com/)
-* [CGAL (3.6 - 3.9)](http://www.cgal.org/)
+* [CGAL (3.6 - 4.0.2)](http://www.cgal.org/)
  * [GMP (5.0.x)](http://www.gmplib.org/)
  * [cmake (2.6 - 2.8, required by CGAL and the test framework)](http://www.cmake.org/)
  * [MPFR (3.x)](http://www.mpfr.org/)
  * [boost (1.35 - 1.47)](http://www.boost.org/)
 * [OpenCSG (1.3.2)](http://www.opencsg.org/)
 * [GLEW (1.6 ->)](http://glew.sourceforge.net/)
-* [Eigen2 (2.0.13->)](http://eigen.tuxfamily.org/)
+* [Eigen (2.0.13->3.1.1)](http://eigen.tuxfamily.org/)
 * [GCC C++ Compiler (4.2 ->)](http://gcc.gnu.org/)
 * [Bison (2.4)](http://www.gnu.org/software/bison/)
 * [Flex (2.5.35)](http://flex.sourceforge.net/)
+
+### Getting the source code
+
+Install git (http://git-scm.com/) onto your system. Then run a clone:
+
+    git clone git://github.com/openscad/openscad.git
+
+This will download the latest sources into a directory named 'openscad'. 
+
+To pull the MCAD library (http://reprap.org/wiki/MCAD), do the following:
+
+    cd openscad
+    git submodule init
+    git submodule update
 
 ### Building for Mac OS X
 
@@ -116,15 +131,55 @@ compilation process.
 
 After that, follow the Compilation instructions below.
 
-### Building for Ubuntu
+### Building for newer Linux distributions
 
-If you have done this and want to contribute, fork the repo and
-contribute docs on how to build for windows!
+First, make sure that you have development tools installed to get GCC. 
+Then after you've cloned this git repository, use a package manager to 
+download packages for the dependency libraries listed above. Convenience 
+scripts are provided for some popular systems:
+
+    Ubuntu, Debian:    ./scripts/ubuntu-build-dependencies.sh
+    OpenSUSE:          ./scripts/opensuse-build-dependencies.sh
+    Fedora:            ./scripts/fedora-build-dependencies.sh
+
+Check your library versions to make sure they meet the minimum 
+requirements listed above. After that follow the Compilation 
+instructions below.
+
+### Building for older Linux or building without root access
+
+First, make sure that you have development tools installed to get GCC.
+Then after you've cloned this git repository, run the script that sets 
+up the environment variables.
+
+    source ./scripts/setenv-linbuild.sh
+
+Then run the script to download & compile all the prerequisite libraries above:
+
+    ./scripts/linux-build-dependencies.sh
+
+Then add LD_LIBRARY_PATH=$HOME/openscad_deps to your ~/.bashrc
+After that, follow the Compilation instructions below.
 
 ### Building for Windows
 
-If you have done this and want to contribute, fork the repo and
-contribute docs on how to build for windows!
+OpenSCAD for Windows is usually cross-compiled from Linux. If you wish to
+attempt an MSVC build on Windows, please see this site:
+http://en.wikibooks.org/wiki/OpenSCAD_User_Manual/Building_on_Windows
+
+To cross-build, first make sure that you have development tools 
+installed to get GCC. Then after you've cloned this git repository, run 
+the script that sets up the environment variables.
+
+    source ./scripts/setenv-mingw-xbuild.sh
+
+Then run the script to download & compile all the prerequisite libraries above:
+
+    ./scripts/mingw-x-build-dependencies.sh
+
+Then skip the compilation instructions below. Instead, build an installer:
+
+    OSTYPE=mingw-cross-env ./scripts/release-common.sh
 
 ### Compilation
 
@@ -137,3 +192,5 @@ Then run make. Finally you might run 'make install' as root or simply copy the
 If you had problems compiling from source, raise a new issue in the
 [issue tracker on the github page](https://github.com/openscad/openscad/issues).
 
+This site and it's subpages can also be helpful:
+http://en.wikibooks.org/wiki/OpenSCAD_User_Manual/Building_OpenSCAD_from_Sources

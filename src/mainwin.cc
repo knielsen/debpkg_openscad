@@ -39,6 +39,7 @@
 #include "builtin.h"
 #include "progress.h"
 #include "dxfdim.h"
+#include "AboutDialog.h"
 #ifdef ENABLE_OPENCSG
 #include "CSGTermEvaluator.h"
 #include "OpenCSGRenderer.h"
@@ -99,6 +100,8 @@
 #define OPENCSG_VERSION_STRING "unknown, <1.3.2"
 #endif
 
+extern QString examplesdir;
+
 // Global application state
 unsigned int GuiLocker::gui_locked = 0;
 
@@ -112,11 +115,11 @@ static char helptitle[] =
 #endif
 	"\nhttp://www.openscad.org\n\n";
 static char copyrighttext[] =
-	"Copyright (C) 2009-2011 Marius Kintel <marius@kintel.net> and Clifford Wolf <clifford@clifford.at>\n"
+	"Copyright (C) 2009-2012 Marius Kintel <marius@kintel.net> and Clifford Wolf <clifford@clifford.at>\n"
 	"\n"
-	"This program is free software; you can redistribute it and/or modify"
-	"it under the terms of the GNU General Public License as published by"
-	"the Free Software Foundation; either version 2 of the License, or"
+	"This program is free software; you can redistribute it and/or modify "
+	"it under the terms of the GNU General Public License as published by "
+	"the Free Software Foundation; either version 2 of the License, or "
 	"(at your option) any later version.";
 
 static void
@@ -706,7 +709,7 @@ void MainWindow::compileCSG(bool procevents)
 		PolySetCache::instance()->print();
 		CGALCache::instance()->print();
 	}
-	catch (ProgressCancelException e) {
+	catch (const ProgressCancelException &e) {
 		PRINT("CSG generation cancelled.");
 	}
 	progress_report_fin();
@@ -719,9 +722,9 @@ void MainWindow::compileCSG(bool procevents)
 		if (procevents)
 			QApplication::processEvents();
 		
-		CSGTermNormalizer normalizer;
 		size_t normalizelimit = 2 * Preferences::inst()->getValue("advanced/openCSGLimit").toUInt();
-		this->root_norm_term = normalizer.normalize(this->root_raw_term, normalizelimit);
+		CSGTermNormalizer normalizer(normalizelimit);
+		this->root_norm_term = normalizer.normalize(this->root_raw_term);
 		if (this->root_norm_term) {
 			this->root_chain = new CSGChain();
 			this->root_chain->import(this->root_norm_term);
@@ -741,7 +744,7 @@ void MainWindow::compileCSG(bool procevents)
 			
 			highlights_chain = new CSGChain();
 			for (unsigned int i = 0; i < highlight_terms.size(); i++) {
-				highlight_terms[i] = normalizer.normalize(highlight_terms[i], normalizelimit);
+				highlight_terms[i] = normalizer.normalize(highlight_terms[i]);
 				highlights_chain->import(highlight_terms[i]);
 			}
 		}
@@ -754,7 +757,7 @@ void MainWindow::compileCSG(bool procevents)
 			
 			background_chain = new CSGChain();
 			for (unsigned int i = 0; i < background_terms.size(); i++) {
-				background_terms[i] = normalizer.normalize(background_terms[i], normalizelimit);
+				background_terms[i] = normalizer.normalize(background_terms[i]);
 				background_chain->import(background_terms[i]);
 			}
 		}
@@ -799,7 +802,8 @@ void MainWindow::actionNew()
 
 void MainWindow::actionOpen()
 {
-	QString new_filename = QFileDialog::getOpenFileName(this, "Open File", "", "OpenSCAD Designs (*.scad)");
+	QString new_filename = QFileDialog::getOpenFileName(this, "Open File", "",
+																											"OpenSCAD Designs (*.scad *.csg)");
 #ifdef ENABLE_MDI
 	if (!new_filename.isEmpty()) {
 		new MainWindow(new_filename);
@@ -976,19 +980,17 @@ void MainWindow::updateTemporalVariables()
 {
 	this->root_ctx.set_variable("$t", Value(this->e_tval->text().toDouble()));
 	
-	Value vpt;
-	vpt.type = Value::VECTOR;
-	vpt.append(new Value(-this->glview->object_trans_x));
-	vpt.append(new Value(-this->glview->object_trans_y));
-	vpt.append(new Value(-this->glview->object_trans_z));
-	this->root_ctx.set_variable("$vpt", vpt);
+	Value::VectorType vpt;
+	vpt.push_back(Value(-this->glview->object_trans_x));
+	vpt.push_back(Value(-this->glview->object_trans_y));
+	vpt.push_back(Value(-this->glview->object_trans_z));
+	this->root_ctx.set_variable("$vpt", Value(vpt));
 	
-	Value vpr;
-	vpr.type = Value::VECTOR;
-	vpr.append(new Value(fmodf(360 - this->glview->object_rot_x + 90, 360)));
-	vpr.append(new Value(fmodf(360 - this->glview->object_rot_y, 360)));
-	vpr.append(new Value(fmodf(360 - this->glview->object_rot_z, 360)));
-	root_ctx.set_variable("$vpr", vpr);
+	Value::VectorType vpr;
+	vpr.push_back(Value(fmodf(360 - this->glview->object_rot_x + 90, 360)));
+	vpr.push_back(Value(fmodf(360 - this->glview->object_rot_y, 360)));
+	vpr.push_back(Value(fmodf(360 - this->glview->object_rot_z, 360)));
+	root_ctx.set_variable("$vpr", Value(vpr));
 }
 
 bool MainWindow::fileChangedOnDisk()
@@ -1359,7 +1361,7 @@ void MainWindow::actionExportSTLorOFF(bool)
 	}
 
 	if (!this->root_N->p3->is_simple()) {
-		PRINT("Object isn't a valid 2-manifold! Modify your design..");
+		PRINT("Object isn't a valid 2-manifold! Modify your design. See http://en.wikibooks.org/wiki/OpenSCAD_User_Manual/STL_Import_and_Export");
 		clearCurrentOutput();
 		return;
 	}
@@ -1735,7 +1737,9 @@ void
 MainWindow::helpAbout()
 {
 	qApp->setWindowIcon(QApplication::windowIcon());
-	QMessageBox::information(this, "About OpenSCAD", QString(helptitle) + QString(copyrighttext));
+	AboutDialog *dialog = new AboutDialog(this);
+	dialog->exec();
+	//QMessageBox::information(this, "About OpenSCAD", QString(helptitle) + QString(copyrighttext));
 }
 
 void

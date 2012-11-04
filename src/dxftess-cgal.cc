@@ -131,6 +131,7 @@ void dxf_tesselate(PolySet *ps, DxfData &dxf, double rot, bool up, bool /* do_tr
 				// ..maybe it would be better to assert here. But this would
 				// break compatibility with the glu tesselator that handled such
 				// cases just fine.
+				PRINT( "WARNING: Duplicate vertex found during Tessellation. Render may be incorrect." );
 				continue;
 			}
 
@@ -165,7 +166,7 @@ void dxf_tesselate(PolySet *ps, DxfData &dxf, double rot, bool up, bool /* do_tr
 	}
 
 	}
-	catch (CGAL::Assertion_exception e) {
+	catch (const CGAL::Assertion_exception &e) {
 		PRINTB("CGAL error in dxf_tesselate(): %s", e.what());
 		CGAL::set_error_behaviour(old_behaviour);
 		return;

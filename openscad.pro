@@ -3,7 +3,7 @@
 #   MPFRDIR
 #   BOOSTDIR
 #   CGALDIR
-#   EIGEN2DIR
+#   EIGENDIR
 #   GLEWDIR
 #   OPENCSGDIR
 #   OPENSCAD_LIBRARIES
@@ -81,9 +81,12 @@ win32 {
 CONFIG += qt
 QT += opengl
 
-# Fedora Linux + DSO fix
-linux*:exists(/usr/lib64/libGLU*)|linux*:exists(/usr/lib/libGLU*) {
-  LIBS += -lGLU
+# see http://fedoraproject.org/wiki/UnderstandingDSOLinkChange
+# and https://github.com/openscad/openscad/pull/119
+# ( QT += opengl does not automatically link glu on some DSO systems. )
+unix:!macx {
+  QMAKE_LIBS_OPENGL *= -lGLU
+  QMAKE_LIBS_OPENGL *= -lX11
 }
 
 netbsd* {
@@ -100,8 +103,19 @@ netbsd* {
   QMAKE_CXXFLAGS *= -fno-strict-aliasing
 }
 
-CONFIG(mingw-cross-env) {
-  include(mingw-cross-env.pri)
+*clang* {
+	# disable enormous amount of warnings about CGAL
+	QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-parameter
+	QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-variable
+	QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-function
+	QMAKE_CXXFLAGS_WARN_ON += -Wno-c++11-extensions
+	# might want to actually turn this on once in a while
+	QMAKE_CXXFLAGS_WARN_ON += -Wno-sign-compare
+}
+
+CONFIG(skip-version-check) {
+  # force the use of outdated libraries
+  DEFINES += OPENSCAD_SKIP_VERSION_CHECK
 }
 
 # Application configuration
@@ -109,7 +123,7 @@ macx:CONFIG += mdi
 CONFIG += cgal
 CONFIG += opencsg
 CONFIG += boost
-CONFIG += eigen2
+CONFIG += eigen
 
 #Uncomment the following line to enable QCodeEdit
 #CONFIG += qcodeedit
@@ -118,16 +132,14 @@ mdi {
   DEFINES += ENABLE_MDI
 }
 
-# FIXME: This can be made default by now
-CONFIG += progresswidget
-progresswidget {
-  DEFINES += USE_PROGRESSWIDGET
-  FORMS   += src/ProgressWidget.ui
-  HEADERS += src/ProgressWidget.h
-  SOURCES += src/ProgressWidget.cc
-}
+DEFINES += USE_PROGRESSWIDGET
 
 include(common.pri)
+
+# mingw has to come after other items so OBJECT_DIRS will work properly
+CONFIG(mingw-cross-env) {
+  include(mingw-cross-env.pri)
+}
 
 win32 {
   FLEXSOURCES = src/lexer.l
@@ -141,9 +153,13 @@ RESOURCES = openscad.qrc
 
 FORMS   += src/MainWindow.ui \
            src/Preferences.ui \
-           src/OpenCSGWarningDialog.ui
+           src/OpenCSGWarningDialog.ui \
+           src/AboutDialog.ui \
+           src/ProgressWidget.ui
 
-HEADERS += src/parsersettings.h \
+HEADERS += src/version_check.h \
+           src/ProgressWidget.h \
+           src/parsersettings.h \
            src/renderer.h \
            src/rendersettings.h \
            src/ThrownTogetherRenderer.h \
@@ -153,6 +169,7 @@ HEADERS += src/parsersettings.h \
            src/MainWindow.h \
            src/Preferences.h \
            src/OpenCSGWarningDialog.h \
+           src/AboutDialog.h \
            src/builtin.h \
            src/context.h \
            src/csgterm.h \
@@ -197,10 +214,13 @@ HEADERS += src/parsersettings.h \
            src/memory.h \
            src/linalg.h \
            src/system-gl.h \
-           src/stl-utils.h
+           src/stl-utils.h \
+           src/svg.h
 
-SOURCES += src/mathc99.cc \
-	   src/linalg.cc \
+SOURCES += src/version_check.cc \
+           src/ProgressWidget.cc \
+           src/mathc99.cc \
+           src/linalg.cc \
            src/handle_dep.cc \
            src/value.cc \
            src/expr.cc \
@@ -227,6 +247,7 @@ SOURCES += src/mathc99.cc \
            src/printutils.cc \
            src/progress.cc \
            src/parsersettings.cc \
+           src/stl-utils.cc \
            \
            src/nodedumper.cc \
            src/traverser.cc \
@@ -251,6 +272,7 @@ SOURCES += src/mathc99.cc \
            src/dxftess-glu.cc \
            src/dxftess-cgal.cc \
            src/CSGTermEvaluator.cc \
+           src/svg.cc \
            \
            src/openscad.cc \
            src/mainwin.cc

@@ -36,10 +36,9 @@
 #include <sstream>
 
 #include <boost/filesystem.hpp>
-using namespace boost::filesystem;
-
 boost::unordered_map<std::string,Value> dxf_dim_cache;
 boost::unordered_map<std::string,Value> dxf_cross_cache;
+namespace fs = boost::filesystem;
 
 Value builtin_dxf_dim(const Context *ctx, const std::vector<std::string> &argnames, const std::vector<Value> &args)
 {
@@ -52,21 +51,21 @@ Value builtin_dxf_dim(const Context *ctx, const std::vector<std::string> &argnam
 
 	for (size_t i = 0; i < argnames.size() && i < args.size(); i++) {
 		if (argnames[i] == "file")
-			filename = ctx->getAbsolutePath(args[i].text);
+			filename = ctx->getAbsolutePath(args[i].toString());
 		if (argnames[i] == "layer")
-			layername = args[i].text;
+			layername = args[i].toString();
 		if (argnames[i] == "origin")
-			args[i].getv2(xorigin, yorigin);
+			args[i].getVec2(xorigin, yorigin);
 		if (argnames[i] == "scale")
-			args[i].getnum(scale);
+			args[i].getDouble(scale);
 		if (argnames[i] == "name")
-			name = args[i].text;
+			name = args[i].toString();
 	}
 
 	std::stringstream keystream;
 	keystream << filename << "|" << layername << "|" << name << "|" << xorigin
-						<< "|" << yorigin <<"|" << scale << "|" << last_write_time(filename)
-						<< "|" << file_size(filename);
+						<< "|" << yorigin <<"|" << scale << "|" << fs::last_write_time(filename)
+						<< "|" << fs::file_size(filename);
 	std::string key = keystream.str();
 	if (dxf_dim_cache.find(key) != dxf_dim_cache.end())
 		return dxf_dim_cache.find(key)->second;
@@ -136,19 +135,19 @@ Value builtin_dxf_cross(const Context *ctx, const std::vector<std::string> &argn
 
 	for (size_t i = 0; i < argnames.size() && i < args.size(); i++) {
 		if (argnames[i] == "file")
-			filename = ctx->getAbsolutePath(args[i].text);
+			filename = ctx->getAbsolutePath(args[i].toString());
 		if (argnames[i] == "layer")
-			layername = args[i].text;
+			layername = args[i].toString();
 		if (argnames[i] == "origin")
-			args[i].getv2(xorigin, yorigin);
+			args[i].getVec2(xorigin, yorigin);
 		if (argnames[i] == "scale")
-			args[i].getnum(scale);
+			args[i].getDouble(scale);
 	}
 
 	std::stringstream keystream;
 	keystream << filename << "|" << layername << "|" << xorigin << "|" << yorigin
-						<< "|" << scale << "|" << last_write_time(filename)
-						<< "|" << file_size(filename);
+						<< "|" << scale << "|" << fs::last_write_time(filename)
+						<< "|" << fs::file_size(filename);
 	std::string key = keystream.str();
 
 	if (dxf_cross_cache.find(key) != dxf_cross_cache.end())
@@ -178,11 +177,10 @@ Value builtin_dxf_cross(const Context *ctx, const std::vector<std::string> &argn
 			// double ub = ((x2 - x1)*(y1 - y3) - (y2 - y1)*(x1 - x3)) / dem;
 			double x = x1 + ua*(x2 - x1);
 			double y = y1 + ua*(y2 - y1);
-			Value ret;
-			ret.type = Value::VECTOR;
-			ret.append(new Value(x));
-			ret.append(new Value(y));
-			return dxf_cross_cache[key] = ret;
+			Value::VectorType ret;
+			ret.push_back(Value(x));
+			ret.push_back(Value(y));
+			return dxf_cross_cache[key] = Value(ret);
 		}
 	}
 

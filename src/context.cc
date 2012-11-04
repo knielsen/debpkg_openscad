@@ -32,7 +32,7 @@
 #include "printutils.h"
 #include <boost/foreach.hpp>
 #include <boost/filesystem.hpp>
-using namespace boost::filesystem;
+namespace fs = boost::filesystem;
 #include "boosty.h"
 
 std::vector<const Context*> Context::ctx_stack;
@@ -43,6 +43,7 @@ std::vector<const Context*> Context::ctx_stack;
 Context::Context(const Context *parent, const Module *library)
 	: parent(parent), inst_p(NULL)
 {
+	if (parent) recursioncount = parent->recursioncount;
 	ctx_stack.push_back(this);
 	if (parent) document_path = parent->document_path;
 	if (library) {
@@ -130,10 +131,26 @@ Value Context::lookup_variable(const std::string &name, bool silent) const
 	return Value();
 }
 
+class RecursionGuard
+{
+public:
+	RecursionGuard(const Context &c, const std::string &name) : c(c), name(name) { c.recursioncount[name]++; }
+	~RecursionGuard() { if (--c.recursioncount[name] == 0) c.recursioncount.erase(name); }
+	bool recursion_detected() const { return (c.recursioncount[name] > 100); }
+private:
+	const Context &c;
+	const std::string &name;
+};
+
 Value Context::evaluate_function(const std::string &name, 
 																 const std::vector<std::string> &argnames, 
 																 const std::vector<Value> &argvalues) const
 {
+	RecursionGuard g(*this, name);
+	if (g.recursion_detected()) { 
+		PRINTB("Recursion detected calling function '%s'", name);
+		return Value();
+	}
 	if (this->functions_p && this->functions_p->find(name) != this->functions_p->end())
 		return this->functions_p->find(name)->second->evaluate(this, argnames, argvalues);
 	if (this->usedlibs_p) {
@@ -144,8 +161,7 @@ Value Context::evaluate_function(const std::string &name,
 			}
 		}
 	}
-	if (this->parent)
-		return this->parent->evaluate_function(name, argnames, argvalues);
+	if (this->parent) return this->parent->evaluate_function(name, argnames, argvalues);
 	PRINTB("WARNING: Ignoring unknown function '%s'.", name);
 	return Value();
 }
@@ -179,8 +195,8 @@ AbstractNode *Context::evaluate_module(const ModuleInstantiation &inst) const
  */
 std::string Context::getAbsolutePath(const std::string &filename) const
 {
-	if (!filename.empty()) {
-		return boosty::absolute(path(this->document_path) / filename).string();
+	if (!filename.empty() && !boosty::is_absolute(fs::path(filename))) {
+		return boosty::absolute(fs::path(this->document_path) / filename).string();
 	}
 	else {
 		return filename;
@@ -196,13 +212,13 @@ void register_builtin(Context &ctx)
 	ctx.set_variable("$fa", Value(12.0));
 	ctx.set_variable("$t", Value(0.0));
 	
-	Value zero3;
-	zero3.type = Value::VECTOR;
-	zero3.append(new Value(0.0));
-	zero3.append(new Value(0.0));
-	zero3.append(new Value(0.0));
-	ctx.set_variable("$vpt", zero3);
-	ctx.set_variable("$vpr", zero3);
+	Value::VectorType zero3;
+	zero3.push_back(Value(0.0));
+	zero3.push_back(Value(0.0));
+	zero3.push_back(Value(0.0));
+	Value zero3val(zero3);
+	ctx.set_variable("$vpt", zero3val);
+	ctx.set_variable("$vpr", zero3val);
 
 	ctx.set_constant("PI",Value(M_PI));
 }

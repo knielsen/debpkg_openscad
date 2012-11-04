@@ -233,6 +233,22 @@ ifelse_statement:
 	} ;
 
 module_instantiation:
+	'!' module_instantiation {
+		$$ = $2;
+		if ($$) $$->tag_root = true;
+	} |
+	'#' module_instantiation {
+		$$ = $2;
+		if ($$) $$->tag_highlight = true;
+	} |
+	'%' module_instantiation {
+		$$ = $2;
+		if ($$) $$->tag_background = true;
+	} |
+	'*' module_instantiation {
+		delete $2;
+		$$ = NULL;
+	} |
 	single_module_instantiation ';' {
 		$$ = $1;
 	} |
@@ -271,42 +287,17 @@ single_module_instantiation:
 		$$->argexpr = $3->argexpr;
 		free($1);
 		delete $3;
-	} |
-	'!' single_module_instantiation {
-		$$ = $2;
-		if ($$)
-			$$->tag_root = true;
-	} |
-	'#' single_module_instantiation {
-		$$ = $2;
-		if ($$)
-			$$->tag_highlight = true;
-	} |
-	'%' single_module_instantiation {
-		$$ = $2;
-		if ($$)
-			$$->tag_background = true;
-	} |
-	'*' single_module_instantiation {
-		delete $2;
-		$$ = NULL;
-	};
+	}
 
 expr:
 	TOK_TRUE {
-		$$ = new Expression();
-		$$->type = "C";
-		$$->const_value = new Value(true);
+          $$ = new Expression(Value(true));
 	} |
 	TOK_FALSE {
-		$$ = new Expression();
-		$$->type = "C";
-		$$->const_value = new Value(false);
+          $$ = new Expression(Value(false));
 	} |
 	TOK_UNDEF {
-		$$ = new Expression();
-		$$->type = "C";
-		$$->const_value = new Value();
+          $$ = new Expression(Value::undefined);
 	} |
 	TOK_ID {
 		$$ = new Expression();
@@ -322,20 +313,14 @@ expr:
 		free($3);
 	} |
 	TOK_STRING {
-		$$ = new Expression();
-		$$->type = "C";
-		$$->const_value = new Value(std::string($1));
-		free($1);
+          $$ = new Expression(Value(std::string($1)));
+          free($1);
 	} |
 	TOK_NUMBER {
-		$$ = new Expression();
-		$$->type = "C";
-		$$->const_value = new Value($1);
+          $$ = new Expression(Value($1));
 	} |
 	'[' expr ':' expr ']' {
-		Expression *e_one = new Expression();
-		e_one->type = "C";
-		e_one->const_value = new Value(1.0);
+		Expression *e_one = new Expression(Value(1.0));
 		$$ = new Expression();
 		$$->type = "R";
 		$$->children.push_back($2);
@@ -350,10 +335,7 @@ expr:
 		$$->children.push_back($6);
 	} |
 	'[' optional_commas ']' {
-		$$ = new Expression();
-		$$->type = "C";
-		$$->const_value = new Value();
-		$$->const_value->type = Value::VECTOR;
+          $$ = new Expression(Value(Value::VectorType()));
 	} |
 	'[' vector_expr optional_commas ']' {
 		$$ = $2;
@@ -581,11 +563,11 @@ Module *parse(const char *text, const char *path, int debug)
         //        PRINTB_NOCACHE("New module: %s %p", "root" % rootmodule);
 
 	parserdebug = debug;
-	parserparse();
+	int parserretval = parserparse();
         lexerdestroy();
 	lexerlex_destroy();
 
-	if (!rootmodule) return NULL;
+	if (parserretval != 0) return NULL;
 
 	parser_error_pos = -1;
 	return rootmodule;

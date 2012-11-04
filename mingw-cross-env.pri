@@ -8,6 +8,9 @@ CONFIG(mingw-cross-env) {
   LIBS += mingw-cross-env/lib/libglu32.a 
   LIBS += mingw-cross-env/lib/libopencsg.a 
   LIBS += mingw-cross-env/lib/libmpfr.a 
+  LIBS += mingw-cross-env/lib/libgmp.a 
   LIBS += mingw-cross-env/lib/libCGAL.a
   QMAKE_CXXFLAGS += -fpermissive
 }
+
+

@@ -28,6 +28,8 @@
 #include "grid.h"
 #include "CGAL_Nef_polyhedron.h"
 #include "cgal.h"
+#include "cgalutils.h"
+#include "svg.h"
 
 #ifdef ENABLE_CGAL
 
@@ -75,6 +77,16 @@ DxfData *CGAL_Nef_polyhedron::convertToDxfData() const
 
 	dxfdata->fixup_path_direction();
 	return dxfdata;
+}
+
+std::string CGAL_Nef_polyhedron::dump() const
+{
+	if (this->dim==2)
+		return OpenSCAD::dump_svg( *this->p2 );
+	else if (this->dim==3)
+		return OpenSCAD::dump_svg( *this->p3 );
+	else
+		return std::string("Nef Polyhedron with dimension != 2 or 3");
 }
 
 #endif // ENABLE_CGAL

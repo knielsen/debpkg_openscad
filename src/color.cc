@@ -63,11 +63,14 @@ AbstractNode *ColorModule::evaluate(const Context *ctx, const ModuleInstantiatio
 	c.args(argnames, argexpr, inst->argnames, inst->argvalues);
 
 	Value v = c.lookup_variable("c");
-	if (v.type == Value::VECTOR) {
-		for (size_t i = 0; i < 4; i++)
-			node->color[i] = i < v.vec.size() ? v.vec[i]->num : 1.0;
-	} else if (v.type == Value::STRING) {
-		std::string colorname = v.text;
+	if (v.type() == Value::VECTOR) {
+		for (size_t i = 0; i < 4; i++) {
+			node->color[i] = i < v.toVector().size() ? v.toVector()[i].toDouble() : 1.0;
+			if (node->color[i] > 1)
+				PRINTB_NOCACHE("WARNING: color() expects numbers between 0.0 and 1.0. Value of %.1f is too large.", node->color[i]);
+		}
+	} else if (v.type() == Value::STRING) {
+		std::string colorname = v.toString();
 		boost::algorithm::to_lower(colorname);
 		Color4f color;
 		if (colormap.find(colorname) != colormap.end())	{
@@ -81,8 +84,8 @@ AbstractNode *ColorModule::evaluate(const Context *ctx, const ModuleInstantiatio
 		}
 	}
 	Value alpha = c.lookup_variable("alpha");
-	if (alpha.type == Value::NUMBER) {
-		node->color[3] = alpha.num;
+	if (alpha.type() == Value::NUMBER) {
+		node->color[3] = alpha.toDouble();
 	}
 
 	std::vector<AbstractNode *> evaluatednodes = inst->evaluateChildren();
