@@ -5,6 +5,8 @@ openscad (2012.11~.04-gitb04734cb-1) UNRELEASED; urgency=low
   * Include upstream git snapshot
     - Use the OPENSCADPATH environment variable
   * Copyright file adaptions to new files
+  * Change Standards-Version to 3.9.4
+    - "-b" option added to Vcs-Git
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 04 Nov 2012 18:47:45 +0100
 
