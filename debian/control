@@ -20,7 +20,8 @@ Build-Depends:
     libboost-system-dev,
     libboost-filesystem-dev,
     chrpath,
-    pkg-config
+    pkg-config,
+    imagemagick
 Standards-Version: 3.9.4
 Section: graphics
 DM-Upload-Allowed: yes
@@ -58,7 +59,8 @@ Depends:
     openscad-testing-data,
     python,
     python-argparse,
-    cmake
+    cmake,
+    imagemagick
 Description: script file based graphical CAD environment (test suite)
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
  aspects rather than artistic ones.

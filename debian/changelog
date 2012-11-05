@@ -1,6 +1,5 @@
 openscad (2012.11~.04-gitb04734cb-1) UNRELEASED; urgency=low
 
-  * Removed build dependency on imagemagick (left over from icon generation)
   * Added reportbug helper (includes glxinfo data in bug reports)
   * Include upstream git snapshot
     - Use the OPENSCADPATH environment variable
