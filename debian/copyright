@@ -3,7 +3,7 @@ Upstream-Name: openscad
 Source: http://www.openscad.org/
 
 Files: *
-Copyright: © 2009-2011 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
+Copyright: © 2009-2013 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
 License: GPL-2+ with CGAL exception
 
 Files: src/OGL_helper.h
@@ -26,14 +26,6 @@ Comment: This used to be derived from the original QPL'd OGL_helper.h from the
 Files: src/cache.h
 Copyright: © 2009-2011 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>, 2010 Nokia Corporation and/or its subsidiary(-ies)
 License: QtCommercial or LGPL-2.1 with some exception or GPL-3
-
-Files: src/boosty.h
-Copyright: 2012 don bright
-License: GPL-2+ with CGAL exception
-Comment: The exception is not mentioned explicitly in the file, where it says
- "under the GPL 2, or later", but the addition "as described in [...]
- 'COPYING'", where the exception is displayed prominently, makes the intention
- clear.
 
 Files: contrib/scad-mode.el
 Copyright: 2010-2011 Len Trigg <lenbok@gmail.com>
@@ -85,10 +77,6 @@ License: X11
  AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Files: tests/test_pretty_print.py src/version_check.*
-Copyright: 2012 Don Bright <hugh.m.bright@gmail.com>
-License: GPL-2+
-
 Files: icons/flattr.png
 FIXME: while flattr seems to be ok with applications integrating this, there is
  no confirmation that the icon may be included too, and it probably doesn't
@@ -99,7 +87,7 @@ Copyright: Vytautas, intersol, chefkoch
 License: zlib
 
 Files: debian/*
-Copyright: © 2010-2012 Christian M. Amsüss <chrysn@fsfe.org>
+Copyright: © 2010-2013 Christian M. Amsüss <chrysn@fsfe.org>
 License: GPL-2+ with CGAL exception
 
 License: GPL-2+
