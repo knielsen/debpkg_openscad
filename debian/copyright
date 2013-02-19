@@ -1,6 +1,10 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: openscad
 Source: http://www.openscad.org/
+Comment: For the +dfsg version, icons/flattr.png was removed. It seems that the
+ company holding the flattr trademark is ok with applications integratin this,
+ but there is no explicit confirmation thereof, and if there was, it can be
+ expected that the terms of use violate DFSG.
 
 Files: *
 Copyright: © 2009-2013 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
@@ -77,11 +81,6 @@ License: X11
  AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Files: icons/flattr.png
-FIXME: while flattr seems to be ok with applications integrating this, there is
- no confirmation that the icon may be included too, and it probably doesn't
- qualify for DFSG.
-
 Files: scripts/mingw-file-association.nsh
 Copyright: Vytautas, intersol, chefkoch
 License: zlib
@@ -89,6 +88,22 @@ License: zlib
 Files: debian/*
 Copyright: © 2010-2013 Christian M. Amsüss <chrysn@fsfe.org>
 License: GPL-2+ with CGAL exception
+
+Files: debian/repack.sh debian/repack.stub
+Copyright: ryan52, gregor herrmann <gregoa@debian.org>
+License: perl
+ All rights reserved. This document is free software; you may redistribute it
+ and/or modify it under the same terms as Perl itself.
+ .
+ Perl is distributed under your choice of the GNU General Public License or the
+ Artistic License. On Debian systems, the complete text of version 1 of the GNU
+ General Public License can be found in /usr/share/common-licenses/GPL-1 and
+ the Artistic License in /usr/share/common-licenses/Artistic.
+FIXME: Files sourced from
+ <http://anonscm.debian.org/gitweb/?p=pkg-perl/scripts.git;a=summary>; they are
+ expected to be updated to contain a copyright notice soon. For the time being,
+ the license is inferred from the file history and
+ <http://pkg-perl.alioth.debian.org/howto/repacking.html>.
 
 License: GPL-2+
  This program is free software; you can redistribute it and/or modify it
