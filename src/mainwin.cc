@@ -115,7 +115,7 @@ static char helptitle[] =
 #endif
 	"\nhttp://www.openscad.org\n\n";
 static char copyrighttext[] =
-	"Copyright (C) 2009-2012 Marius Kintel <marius@kintel.net> and Clifford Wolf <clifford@clifford.at>\n"
+	"Copyright (C) 2009-2013 Marius Kintel <marius@kintel.net> and Clifford Wolf <clifford@clifford.at>\n"
 	"\n"
 	"This program is free software; you can redistribute it and/or modify "
 	"it under the terms of the GNU General Public License as published by "
@@ -462,6 +462,7 @@ void MainWindow::report_func(const class AbstractNode*, void *vp, int mark)
 		QApplication::processEvents();
 	}
 
+	// FIXME: Check if cancel was requested by e.g. Application quit
 	if (thisp->progresswidget->wasCanceled()) throw ProgressCancelException();
 }
 
@@ -588,7 +589,9 @@ void MainWindow::refreshDocument()
 						 this->fileName.toStdString() % file.errorString().toStdString());
 		}
 		else {
-			QString text = QTextStream(&file).readAll();
+			QTextStream reader(&file);
+			reader.setCodec("UTF-8");
+			QString text = reader.readAll();
 			PRINTB("Loaded design '%s'.", this->fileName.toStdString());
 			editor->setPlainText(text);
 		}
@@ -900,7 +903,9 @@ void MainWindow::actionSave()
 			PRINTB("Failed to open file for writing: %s (%s)", this->fileName.toStdString() % file.errorString().toStdString());
 		}
 		else {
-			QTextStream(&file) << this->editor->toPlainText();
+			QTextStream writer(&file);
+			writer.setCodec("UTF-8");
+			writer << this->editor->toPlainText();
 			PRINTB("Saved design '%s'.", this->fileName.toStdString());
 			this->editor->setContentModified(false);
 		}
@@ -1232,35 +1237,37 @@ void MainWindow::actionRenderCGALDone(CGAL_Nef_polyhedron *root_N)
 		PolySetCache::instance()->print();
 		CGALCache::instance()->print();
 
-		if (root_N->dim == 2) {
-			PRINT("   Top level object is a 2D object:");
-			PRINTB("   Empty:      %6s", (root_N->p2->is_empty() ? "yes" : "no"));
-			PRINTB("   Plane:      %6s", (root_N->p2->is_plane() ? "yes" : "no"));
-			PRINTB("   Vertices:   %6d", root_N->p2->explorer().number_of_vertices());
-			PRINTB("   Halfedges:  %6d", root_N->p2->explorer().number_of_halfedges());
-			PRINTB("   Edges:      %6d", root_N->p2->explorer().number_of_edges());
-			PRINTB("   Faces:      %6d", root_N->p2->explorer().number_of_faces());
-			PRINTB("   FaceCycles: %6d", root_N->p2->explorer().number_of_face_cycles());
-			PRINTB("   ConnComp:   %6d", root_N->p2->explorer().number_of_connected_components());
-		}
-
-		if (root_N->dim == 3) {
-			PRINT("   Top level object is a 3D object:");
-			PRINTB("   Simple:     %6s", (root_N->p3->is_simple() ? "yes" : "no"));
-			PRINTB("   Valid:      %6s", (root_N->p3->is_valid() ? "yes" : "no"));
-			PRINTB("   Vertices:   %6d", root_N->p3->number_of_vertices());
-			PRINTB("   Halfedges:  %6d", root_N->p3->number_of_halfedges());
-			PRINTB("   Edges:      %6d", root_N->p3->number_of_edges());
-			PRINTB("   Halffacets: %6d", root_N->p3->number_of_halffacets());
-			PRINTB("   Facets:     %6d", root_N->p3->number_of_facets());
-			PRINTB("   Volumes:    %6d", root_N->p3->number_of_volumes());
+		if (!root_N->isNull()) {
+			if (root_N->dim == 2) {
+				PRINT("   Top level object is a 2D object:");
+				PRINTB("   Empty:      %6s", (root_N->p2->is_empty() ? "yes" : "no"));
+				PRINTB("   Plane:      %6s", (root_N->p2->is_plane() ? "yes" : "no"));
+				PRINTB("   Vertices:   %6d", root_N->p2->explorer().number_of_vertices());
+				PRINTB("   Halfedges:  %6d", root_N->p2->explorer().number_of_halfedges());
+				PRINTB("   Edges:      %6d", root_N->p2->explorer().number_of_edges());
+				PRINTB("   Faces:      %6d", root_N->p2->explorer().number_of_faces());
+				PRINTB("   FaceCycles: %6d", root_N->p2->explorer().number_of_face_cycles());
+				PRINTB("   ConnComp:   %6d", root_N->p2->explorer().number_of_connected_components());
+			}
+			
+			if (root_N->dim == 3) {
+				PRINT("   Top level object is a 3D object:");
+				PRINTB("   Simple:     %6s", (root_N->p3->is_simple() ? "yes" : "no"));
+				PRINTB("   Valid:      %6s", (root_N->p3->is_valid() ? "yes" : "no"));
+				PRINTB("   Vertices:   %6d", root_N->p3->number_of_vertices());
+				PRINTB("   Halfedges:  %6d", root_N->p3->number_of_halfedges());
+				PRINTB("   Edges:      %6d", root_N->p3->number_of_edges());
+				PRINTB("   Halffacets: %6d", root_N->p3->number_of_halffacets());
+				PRINTB("   Facets:     %6d", root_N->p3->number_of_facets());
+				PRINTB("   Volumes:    %6d", root_N->p3->number_of_volumes());
+			}
 		}
 
 		int s = this->progresswidget->elapsedTime() / 1000;
 		PRINTB("Total rendering time: %d hours, %d minutes, %d seconds", (s / (60*60)) % ((s / 60) % 60) % (s % 60));
 
 		this->root_N = root_N;
-		if (!this->root_N->empty()) {
+		if (!this->root_N->isNull()) {
 			this->cgalRenderer = new CGALRenderer(*this->root_N);
 			// Go to CGAL view mode
 			if (viewActionCGALGrid->isChecked()) {
@@ -1762,11 +1769,13 @@ void MainWindow::helpLibrary()
 	libinfo.sprintf("Boost version: %s\n"
 									"Eigen version: %d.%d.%d\n"
 									"CGAL version: %s\n"
-									"OpenCSG version: %s\n\n",
+									"OpenCSG version: %s\n"
+									"Qt version: %s\n\n",
 									BOOST_LIB_VERSION,
 									EIGEN_WORLD_VERSION, EIGEN_MAJOR_VERSION, EIGEN_MINOR_VERSION,
 									TOSTRING(CGAL_VERSION),
-									OPENCSG_VERSION_STRING);
+									OPENCSG_VERSION_STRING,
+									qVersion());
 
 	if (!this->openglbox) {
 		this->openglbox = new QMessageBox(QMessageBox::Information, 
@@ -1839,6 +1848,7 @@ void MainWindow::quit()
 	QCloseEvent ev;
 	QApplication::sendEvent(QApplication::instance(), &ev);
 	if (ev.isAccepted()) QApplication::instance()->quit();
+  // FIXME: Cancel any CGAL calculations
 }
 
 void MainWindow::consoleOutput(const std::string &msg, void *userdata)
