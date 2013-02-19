@@ -24,7 +24,6 @@ Build-Depends:
     imagemagick
 Standards-Version: 3.9.4
 Section: graphics
-DM-Upload-Allowed: yes
 Homepage: http://openscad.org/
 Vcs-Browser: http://gitorious.org/openscad-debian/openscad/commits/debian
 Vcs-Git: git://gitorious.org/openscad-debian/openscad.git/ -b debian
