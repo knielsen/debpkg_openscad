@@ -1,3 +1,3 @@
 version=3
 
-https://github.com/openscad/openscad/downloads /downloads/openscad/openscad/openscad-([0-9.]+).src.tar.gz
+http://code.google.com/p/openscad/downloads/list?can=1 .*/openscad-([0-9.]*).src.tar.gz
