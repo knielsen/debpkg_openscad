@@ -1,7 +1,7 @@
-openscad (2013.01+dfsg-1) unstable; urgency=low
+openscad (2013.01+dfsg-1) experimental; urgency=low
 
   * Added reportbug helper (includes glxinfo data in bug reports)
-  * New upstream version, merging previously experimental changes to unstable
+  * New upstream version (still to experimental, lest #673694 resurface)
     - Use the OPENSCADPATH environment variable
   * Copyright file adaptions to new files
   * Change Standards-Version to 3.9.4
