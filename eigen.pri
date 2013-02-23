@@ -59,6 +59,11 @@ isEmpty(EIGEN_INCLUDEPATH) {
   }
 }
 
+!exists($$EIGEN_INCLUDEPATH/Eigen/Core) {
+  EIGEN_CFLAGS = $$system("pkg-config --cflags eigen2")
+  EIGEN_INCLUDEPATH = $$replace(EIGEN_CFLAGS,"-I","")
+}
+
 # disable Eigen SIMD optimizations for platforms where it breaks compilation
 !macx {
   !freebsd-g++ {

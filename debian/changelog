@@ -1,3 +1,9 @@
+openscad (2013.01+dfsg-2) UNRELEASED; urgency=low
+
+  * Fix eigen.pri to build on kfreebsd (Patch by Don Bright)
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sat, 23 Feb 2013 11:19:35 +0100
+
 openscad (2013.01+dfsg-1) experimental; urgency=low
 
   * Added reportbug helper (includes glxinfo data in bug reports)
