@@ -1,6 +1,7 @@
 openscad (2013.01+dfsg-3) UNRELEASED; urgency=low
 
   * Build-conflict against libgles2-dev (eg libgles2-mesa-dev)
+  * Patch out verbose mode through qmake
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 08 Mar 2013 13:29:28 +0100
 

@@ -34,7 +34,7 @@ include(version.pri)
 win32 {
   # QMAKE_LFLAGS += -VERBOSE
 }
-debug: DEFINES += DEBUG
+# debug: DEFINES += DEBUG
 
 TEMPLATE = app
 
