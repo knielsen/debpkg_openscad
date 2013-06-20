@@ -1,5 +1,16 @@
-openscad (2013.01+dfsg-3) UNRELEASED; urgency=low
+openscad (2013.06+dfsg-1) UNRELEASED; urgency=low
 
+  * New upstream version
+    - resize module
+    - scale parameter on linear_extrude
+    - recursive use of modules
+    - assignments can depend on previous assignments
+    - syntax highlighting
+    - user library path
+    - command line png output
+    - support for opening dxf files
+    - new behavior of preview and highlight operators
+    - bugfixes
   * Build-conflict against libgles2-dev (eg libgles2-mesa-dev)
   * Patch out verbose mode through qmake
 
