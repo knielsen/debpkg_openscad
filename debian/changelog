@@ -11,6 +11,8 @@ openscad (2013.06+dfsg-1) UNRELEASED; urgency=low
     - support for opening dxf files
     - new behavior of preview and highlight operators
     - bugfixes
+  * Patches dropped due to upstream inclusion:
+    - changes to eigen.pri
   * Build-conflict against libgles2-dev (eg libgles2-mesa-dev)
   * Patch out verbose mode through qmake
 
