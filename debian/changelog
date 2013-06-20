@@ -20,6 +20,7 @@ openscad (2013.06+dfsg-1) UNRELEASED; urgency=low
     path that is not present on installed systems anyway
   * Patch tests/test_pretty_print.py to use Debian package information instead
     of unavailable git information
+  * Drop scripts directory for +dfsg repackaging
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 08 Mar 2013 13:29:28 +0100
 

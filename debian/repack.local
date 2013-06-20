@@ -1,1 +1,5 @@
 rm icons/flattr.png
+
+# not completely nonfree, but several files without clear origin and license
+# indication (LogicLib.nsh, git-archive-all.py)
+rm scripts
