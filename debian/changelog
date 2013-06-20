@@ -15,6 +15,9 @@ openscad (2013.06+dfsg-1) UNRELEASED; urgency=low
     - changes to eigen.pri
   * Build-conflict against libgles2-dev (eg libgles2-mesa-dev)
   * Patch out verbose mode through qmake
+  * Patch tests/CTestCustom.template to use test_pretty_print.py instead of
+    the test_pretty_print.c wrapper that is just used to transport a hardcoded
+    path that is not present on installed systems anyway
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 08 Mar 2013 13:29:28 +0100
 
