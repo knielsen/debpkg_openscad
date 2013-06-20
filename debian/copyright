@@ -93,23 +93,11 @@ License:
      3. This notice may not be removed or altered from any source
      distribution.
 
-Files: scripts/mingw-file-association.nsh
-Copyright: Vytautas, intersol, chefkoch
-License: zlib
-
 Files: examples/example024.scad
 Copyright: 2013 Nathan Hellweg, Emmett Lalish and Marius Kintel
 License: CC-BY-SA
  CC-BY-SA license
 FIXME: No further explanation of the license is given
-
-Files: scripts/LogicLib.nsh
-Copyright: 2007 dselkirk@hotmail.com and eccles@users.sf.net
-FIXME: No license given at all
-
-Files: scripts/git-archive-all.py
-FIXME: from https://github.com/Kentzo/git-archive-all, but no authorship or
- license information in there at all
 
 Files: tests/test_upload.py
 Copyright: 2013 Don Bright <hugh.m.bright@gmail.com>
