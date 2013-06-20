@@ -25,6 +25,7 @@
  */
 
 #include "value.h"
+#include "printutils.h"
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
@@ -33,12 +34,14 @@
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/variant/static_visitor.hpp>
 #include <boost/format.hpp>
-
-#include <QtCore/QDir>
+#include "boost-utils.h"
+#include "boosty.h"
 
 std::ostream &operator<<(std::ostream &stream, const Filename &filename)
 {
-  stream << QuotedString(QDir::current().relativeFilePath(QString::fromStdString(filename)).toStdString());
+  fs::path fnpath = fs::path( (std::string)filename );
+  fs::path fpath = boostfs_uncomplete(fnpath, fs::current_path());
+  stream << QuotedString(boosty::stringy( fpath ));
   return stream;
 }
 
@@ -196,15 +199,18 @@ public:
     size_t dotpos = tmpstr.find('.');
     if (dotpos != std::string::npos) {
       if (tmpstr.size() - dotpos > 12) tmpstr.erase(dotpos + 12);
+      while (tmpstr[tmpstr.size()-1] == '0') tmpstr.erase(tmpstr.size()-1);
     }
+    if ( tmpstr.compare("-0") == 0 ) tmpstr = "0";
+    tmpstr = two_digit_exp_format( tmpstr );
     return tmpstr;
 #else
-		// attempt to emulate Qt's QString.sprintf("%g"); from old OpenSCAD.
-		// see https://github.com/openscad/openscad/issues/158
-		std::stringstream tmp;
-		tmp.unsetf(std::ios::floatfield);
-		tmp << op1;
-		return tmp.str();
+    // attempt to emulate Qt's QString.sprintf("%g"); from old OpenSCAD.
+    // see https://github.com/openscad/openscad/issues/158
+    std::stringstream tmp;
+    tmp.unsetf(std::ios::floatfield);
+    tmp << op1;
+    return tmp.str();
 #endif
   }
 

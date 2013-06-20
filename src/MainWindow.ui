@@ -38,7 +38,7 @@
           <property name="orientation">
            <enum>Qt::Vertical</enum>
           </property>
-          <widget class="GLView" name="glview" native="true"/>
+          <widget class="QGLView" name="qglview" native="true"/>
           <widget class="QTextEdit" name="console">
            <property name="readOnly">
             <bool>true</bool>
@@ -137,6 +137,7 @@
     <addaction name="fileActionOpen"/>
     <addaction name="menuOpenRecent"/>
     <addaction name="menuExamples"/>
+    <addaction name="fileShowLibraryFolder"/>
     <addaction name="separator"/>
     <addaction name="fileActionClose"/>
     <addaction name="fileActionSave"/>
@@ -176,14 +177,17 @@
     <addaction name="designActionReloadAndCompile"/>
     <addaction name="designActionCompile"/>
     <addaction name="designActionCompileAndRender"/>
+    <addaction name="separator"/>
     <addaction name="designActionDisplayAST"/>
     <addaction name="designActionDisplayCSGTree"/>
     <addaction name="designActionDisplayCSGProducts"/>
+    <addaction name="separator"/>
     <addaction name="designActionExportSTL"/>
     <addaction name="designActionExportOFF"/>
     <addaction name="designActionExportDXF"/>
     <addaction name="designActionExportCSG"/>
     <addaction name="designActionExportImage"/>
+    <addaction name="separator"/>
     <addaction name="designActionFlushCaches"/>
    </widget>
    <widget class="QMenu" name="menu_View">
@@ -223,6 +227,7 @@
     <addaction name="helpActionHomepage"/>
     <addaction name="helpActionManual"/>
     <addaction name="helpActionLibraryInfo"/>
+    <addaction name="appActionUpdateCheck"/>
    </widget>
    <addaction name="menu_File"/>
    <addaction name="menu_Edit"/>
@@ -611,13 +616,16 @@
    </property>
   </action>
   <action name="helpActionAbout">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>About</string>
    </property>
   </action>
   <action name="helpActionManual">
    <property name="text">
-    <string>OpenSCAD Manual</string>
+    <string>Documentation</string>
    </property>
   </action>
   <action name="fileActionClearRecent">
@@ -676,12 +684,25 @@
     <string>Library info</string>
    </property>
   </action>
+  <action name="appActionUpdateCheck">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Check for Update..</string>
+   </property>
+  </action>
+  <action name="fileShowLibraryFolder">
+   <property name="text">
+    <string>Show Library Folder...</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
-   <class>GLView</class>
+   <class>QGLView</class>
    <extends>QWidget</extends>
-   <header>GLView.h</header>
+   <header>QGLView.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

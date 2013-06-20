@@ -24,7 +24,7 @@ typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef CGAL::Triangulation_vertex_base_2<K> Vb;
 typedef CGAL::Delaunay_mesh_face_base_2<K> Fb;
 typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
-typedef CGAL::Constrained_Delaunay_triangulation_2<K, Tds> CDT;
+typedef CGAL::Constrained_Delaunay_triangulation_2<K, Tds, CGAL::Exact_predicates_tag > CDT;
 //typedef CGAL::Delaunay_mesh_criteria_2<CDT> Criteria;
 
 typedef CDT::Vertex_handle Vertex_handle;
@@ -101,7 +101,7 @@ void mark_inner_outer(std::vector<struct triangle> &tri, Grid2d<point_info_t> &p
 	}
 }
 
-void dxf_tesselate(PolySet *ps, DxfData &dxf, double rot, bool up, bool /* do_triangle_splitting */, double h)
+void dxf_tesselate(PolySet *ps, DxfData &dxf, double rot, Vector2d scale, bool up, bool /* do_triangle_splitting */, double h)
 {
 	CDT cdt;
 
@@ -109,6 +109,7 @@ void dxf_tesselate(PolySet *ps, DxfData &dxf, double rot, bool up, bool /* do_tr
 	Grid2d<point_info_t> point_info(GRID_FINE);
 	boost::unordered_map<edge_t,int> edge_to_triangle;
 	boost::unordered_map<edge_t,int> edge_to_path;
+	int duplicate_vertices = 0;
 
 	CGAL::Failure_behaviour old_behaviour = CGAL::set_error_behaviour(CGAL::THROW_EXCEPTION);
 	try {
@@ -131,7 +132,7 @@ void dxf_tesselate(PolySet *ps, DxfData &dxf, double rot, bool up, bool /* do_tr
 				// ..maybe it would be better to assert here. But this would
 				// break compatibility with the glu tesselator that handled such
 				// cases just fine.
-				PRINT( "WARNING: Duplicate vertex found during Tessellation. Render may be incorrect." );
+				duplicate_vertices++;
 				continue;
 			}
 
@@ -163,6 +164,11 @@ void dxf_tesselate(PolySet *ps, DxfData &dxf, double rot, bool up, bool /* do_tr
 
 			cdt.insert_constraint(prev, first);
 		}
+	}
+
+	if ( duplicate_vertices > 0 ) {
+		PRINT( "WARNING: Duplicate vertices and/or intersecting lines found during DXF Tessellation." );
+		PRINT( "WARNING: Modify the polygon to be a Simple Polygon. Render is incomplete." );
 	}
 
 	}
@@ -308,8 +314,8 @@ void dxf_tesselate(PolySet *ps, DxfData &dxf, double rot, bool up, bool /* do_tr
 			int idx = up ? j : (2-j);
 			double px = tri[i].p[idx].x;
 			double py = tri[i].p[idx].y;
-			ps->append_vertex(px * cos(rot*M_PI/180) + py * sin(rot*M_PI/180),
-					px * -sin(rot*M_PI/180) + py * cos(rot*M_PI/180), h);
+			ps->append_vertex(scale[0] * (px * cos(rot*M_PI/180) + py * sin(rot*M_PI/180)),
+												scale[1] * (px * -sin(rot*M_PI/180) + py * cos(rot*M_PI/180)), h);
 			path[j] = point_info.data(px, py).pathidx;
 			point[j] = point_info.data(px, py).pointidx;
 		}

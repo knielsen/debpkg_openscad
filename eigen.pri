@@ -15,10 +15,6 @@ OPENSCAD_LIBRARIES_DIR = $$(OPENSCAD_LIBRARIES)
 EIGEN2_DIR = $$(EIGEN2DIR)
 EIGEN_DIR = $$(EIGENDIR)
 
-CONFIG(mingw-cross-env) {
-  EIGEN_INCLUDEPATH = mingw-cross-env/include/eigen2
-}
-
 # Optionally specify location of Eigen3 using the 
 # OPENSCAD_LIBRARIES env. variable
 !isEmpty(OPENSCAD_LIBRARIES_DIR) {
@@ -64,6 +60,11 @@ isEmpty(EIGEN_INCLUDEPATH) {
   EIGEN_INCLUDEPATH = $$replace(EIGEN_CFLAGS,"-I","")
 }
 
+!exists($$EIGEN_INCLUDEPATH/Eigen/Core) {
+  EIGEN_CFLAGS = $$system("pkg-config --cflags eigen3")
+  EIGEN_INCLUDEPATH = $$replace(EIGEN_CFLAGS,"-I","")
+}
+
 # disable Eigen SIMD optimizations for platforms where it breaks compilation
 !macx {
   !freebsd-g++ {
@@ -72,7 +73,11 @@ isEmpty(EIGEN_INCLUDEPATH) {
 }
 
 # EIGEN being under 'include/eigen[2-3]' needs special prepending
-QMAKE_INCDIR_QT = $$EIGEN_INCLUDEPATH $$QMAKE_INCDIR_QT
+contains(QT_VERSION, ^5\\..*) {
+  QMAKE_INCDIR = $$EIGEN_INCLUDEPATH $$QMAKE_INCDIR
+} else {
+  QMAKE_INCDIR_QT = $$EIGEN_INCLUDEPATH $$QMAKE_INCDIR_QT
+}
 
 # qmakespecs on netbsd prepend system includes, we need eigen first. 
 netbsd* {

@@ -6,10 +6,11 @@
 # 
 # This script must be run from the OpenSCAD source root directory
 #
-# Usage: macosx-build-dependencies.sh [-6l]
+# Usage: macosx-build-dependencies.sh [-6lcd]
 #  -6   Build only 64-bit binaries
 #  -l   Force use of LLVM compiler
 #  -c   Force use of clang compiler
+#  -d   Build for deployment (if not specified, e.g. Sparkle won't be built)
 #
 # Prerequisites:
 # - MacPorts: curl, cmake
@@ -27,16 +28,17 @@ OPTION_32BIT=true
 OPTION_LLVM=false
 OPTION_CLANG=false
 OPTION_GCC=false
-DETECTED_LION=false
+OPTION_DEPLOY=false
 export QMAKESPEC=macx-g++
 
 printUsage()
 {
-  echo "Usage: $0 [-6lc]"
+  echo "Usage: $0 [-6lcd]"
   echo
   echo "  -6   Build only 64-bit binaries"
   echo "  -l   Force use of LLVM compiler"
   echo "  -c   Force use of clang compiler"
+  echo "  -d   Build for deployment"
 }
 
 # FIXME: Support gcc/llvm/clang flags. Use -platform <whatever> to make this work? kintel 20130117
@@ -51,6 +53,10 @@ build_qt()
   fi
   tar xzf qt-everywhere-opensource-src-$version.tar.gz
   cd qt-everywhere-opensource-src-$version
+  if $OPTION_CLANG; then
+    # FIX for clang
+    sed -i "" -e "s/::TabletProximityRec/TabletProximityRec/g"  src/gui/kernel/qt_cocoa_helpers_mac_p.h
+  fi
   if $OPTION_32BIT; then
     QT_32BIT="-arch x86"
   fi
@@ -188,7 +194,6 @@ build_mpfr()
   cp x86_64/include/mpf2mpfr.h include/
 }
 
-
 build_boost()
 {
   version=$1
@@ -233,8 +238,9 @@ build_cgal()
   cd $BASEDIR/src
   rm -rf CGAL-$version
   if [ ! -f CGAL-$version.tar.gz ]; then
-    # 4.1
-    curl -O https://gforge.inria.fr/frs/download.php/31641/CGAL-$version.tar.gz
+    # 4.2
+    curl -O https://gforge.inria.fr/frs/download.php/32359/CGAL-$version.tar.gz
+    # 4.1 curl -O https://gforge.inria.fr/frs/download.php/31641/CGAL-$version.tar.gz
     # 4.1-beta1 curl -O https://gforge.inria.fr/frs/download.php/31348/CGAL-$version.tar.gz
     # 4.0.2 curl -O https://gforge.inria.fr/frs/download.php/31175/CGAL-$version.tar.gz
     # 4.0 curl -O https://gforge.inria.fr/frs/download.php/30387/CGAL-$version.tar.gz
@@ -301,7 +307,9 @@ build_eigen()
 
   EIGENDIR="none"
   if [ $version = "2.0.17" ]; then EIGENDIR=eigen-eigen-b23437e61a07; fi
-  if [ $version = "3.1.2" ]; then EIGENDIR=eigen-eigen-5097c01bcdc4; fi
+  if [ $version = "3.1.2" ]; then EIGENDIR=eigen-eigen-5097c01bcdc4;
+  elif [ $version = "3.1.3" ]; then EIGENDIR=eigen-eigen-2249f9c22fe8; fi
+
   if [ $EIGENDIR = "none" ]; then
     echo Unknown eigen version. Please edit script.
     exit 1
@@ -325,26 +333,53 @@ build_eigen()
   make install
 }
 
+build_sparkle()
+{
+  # Let Sparkle use the default compiler
+  unset CC
+  unset CXX
+  version=$1
+  echo "Building Sparkle" $version "..."
+  cd $BASEDIR/src
+  rm -rf Sparkle-$version
+  if [ ! -f Sparkle-$version.zip ]; then
+      curl -o Sparkle-$version.zip https://nodeload.github.com/andymatuschak/Sparkle/zip/$version
+  fi
+  unzip -q Sparkle-$version.zip
+  cd Sparkle-$version
+  patch -p1 < $OPENSCADDIR/patches/sparkle.patch
+  if $OPTION_32BIT; then
+    SPARKLE_EXTRA_FLAGS="-arch i386"
+  fi
+  xcodebuild clean
+  xcodebuild -arch x86_64 $SPARKLE_EXTRA_FLAGS
+  rm -rf $DEPLOYDIR/lib/Sparkle.framework
+  cp -Rf build/Release/Sparkle.framework $DEPLOYDIR/lib/ 
+  install_name_tool -id $DEPLOYDIR/lib/Sparkle.framework/Versions/A/Sparkle $DEPLOYDIR/lib/Sparkle.framework/Sparkle
+}
+
 if [ ! -f $OPENSCADDIR/openscad.pro ]; then
   echo "Must be run from the OpenSCAD source root directory"
   exit 0
 fi
 
-while getopts '6lc' c
+while getopts '6lcd' c
 do
   case $c in
     6) OPTION_32BIT=false;;
     l) OPTION_LLVM=true;;
     c) OPTION_CLANG=true;;
+    d) OPTION_DEPLOY=true;;
   esac
 done
 
-OSVERSION=`sw_vers -productVersion | cut -d. -f2`
-if [[ $OSVERSION -ge 7 ]]; then
-  echo "Detected Lion or later"
-  DETECTED_LION=true
+OSX_VERSION=`sw_vers -productVersion | cut -d. -f2`
+if (( $OSX_VERSION >= 8 )); then
+  echo "Detected Mountain Lion (10.8) or later"
+elif (( $OSX_VERSION >= 7 )); then
+  echo "Detected Lion (10.7) or later"
 else
-  echo "Detected Snow Leopard or earlier"
+  echo "Detected Snow Leopard (10.6) or earlier"
 fi
 
 USING_LLVM=false
@@ -356,7 +391,7 @@ elif $OPTION_GCC; then
   USING_GCC=true
 elif $OPTION_CLANG; then
   USING_CLANG=true
-elif $DETECTED_LION; then
+elif (( $OSX_VERSION >= 7 )); then
   USING_GCC=true
 fi
 
@@ -380,14 +415,38 @@ elif $USING_CLANG; then
   export QMAKESPEC=unsupported/macx-clang
 fi
 
+if (( $OSX_VERSION >= 8 )); then
+  echo "Setting build target to 10.6 or later"
+  MAC_OSX_VERSION_MIN=10.6
+else
+  echo "Setting build target to 10.5 or later"
+  MAC_OSX_VERSION_MIN=10.5
+fi
+
+if $OPTION_DEPLOY; then
+  echo "Building deployment version of libraries"
+else
+  OPTION_32BIT=false
+fi
+
+if $OPTION_32BIT; then
+  echo "Building combined 32/64-bit binaries"
+else
+  echo "Building 64-bit binaries"
+fi
+
 echo "Using basedir:" $BASEDIR
 mkdir -p $SRCDIR $DEPLOYDIR
 build_qt 4.8.4
-build_eigen 3.1.2
-build_gmp 5.1.0
-build_mpfr 3.1.1
-build_boost 1.51.0
+# NB! For eigen, also update the path in the function
+build_eigen 3.1.3
+build_gmp 5.1.2
+build_mpfr 3.1.2
+build_boost 1.53.0
 # NB! For CGAL, also update the actual download URL in the function
-build_cgal 4.1
+build_cgal 4.2
 build_glew 1.9.0
 build_opencsg 1.3.2
+if $OPTION_DEPLOY; then
+  build_sparkle 0ed83cf9f2eeb425d4fdd141c01a29d843970c20
+fi

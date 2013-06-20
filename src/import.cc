@@ -28,11 +28,12 @@
 
 #include "module.h"
 #include "polyset.h"
-#include "context.h"
+#include "evalcontext.h"
 #include "builtin.h"
 #include "dxfdata.h"
 #include "dxftess.h"
 #include "printutils.h"
+#include "fileutils.h"
 #include "handle_dep.h" // handle_dep()
 
 #ifdef ENABLE_CGAL
@@ -52,32 +53,52 @@ namespace fs = boost::filesystem;
 using namespace boost::assign; // bring 'operator+=()' into scope
 #include "boosty.h"
 
+#include <boost/detail/endian.hpp>
+#include <boost/cstdint.hpp>
+
 class ImportModule : public AbstractModule
 {
 public:
 	import_type_e type;
 	ImportModule(import_type_e type = TYPE_UNKNOWN) : type(type) { }
-	virtual AbstractNode *evaluate(const Context *ctx, const ModuleInstantiation *inst) const;
+	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx) const;
 };
 
-AbstractNode *ImportModule::evaluate(const Context *ctx, const ModuleInstantiation *inst) const
+AbstractNode *ImportModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx) const
 {
-	std::vector<std::string> argnames;
-	argnames += "file", "layer", "convexity", "origin", "scale";
-	std::vector<Expression*> argexpr;
+	AssignmentList args;
+	args += Assignment("file", NULL), Assignment("layer", NULL), Assignment("convexity", NULL), Assignment("origin", NULL), Assignment("scale", NULL);
+	args += Assignment("filename",NULL), Assignment("layername", NULL);
 
+  // FIXME: This is broken. Tag as deprecated and fix
 	// Map old argnames to new argnames for compatibility
+	// To fix: 
+  // o after c.setVariables()
+	//   - if "filename" in evalctx: deprecated-warning && v.set_variable("file", value);
+	//   - if "layername" in evalctx: deprecated-warning && v.set_variable("layer", value);
+#if 0
 	std::vector<std::string> inst_argnames = inst->argnames;
 	for (size_t i=0; i<inst_argnames.size(); i++) {
 		if (inst_argnames[i] == "filename") inst_argnames[i] = "file";
 		if (inst_argnames[i] == "layername") inst_argnames[i] = "layer";
 	}
+#endif
 
 	Context c(ctx);
-	c.args(argnames, argexpr, inst_argnames, inst->argvalues);
+	c.setDocumentPath(evalctx->documentPath());
+	c.setVariables(args, evalctx);
+#if 0 && DEBUG
+	c.dump(this, inst);
+#endif
 
 	Value v = c.lookup_variable("file");
-	std::string filename = c.getAbsolutePath(v.isUndefined() ? "" : v.toString());
+	if (v.isUndefined()) {
+		v = c.lookup_variable("filename");
+		if (!v.isUndefined()) {
+			PRINT("DEPRECATED: filename= is deprecated. Please use file=");
+		}
+	}
+	std::string filename = lookup_file(v.isUndefined() ? "" : v.toString(), inst->path(), ctx->documentPath());
 	import_type_e actualtype = this->type;
 	if (actualtype == TYPE_UNKNOWN) {
 		std::string extraw = boosty::extension_str( fs::path(filename) );
@@ -95,6 +116,12 @@ AbstractNode *ImportModule::evaluate(const Context *ctx, const ModuleInstantiati
 
 	node->filename = filename;
 	Value layerval = c.lookup_variable("layer", true);
+	if (layerval.isUndefined()) {
+		layerval = c.lookup_variable("layername");
+		if (!layerval.isUndefined()) {
+			PRINT("DEPRECATED: layername= is deprecated. Please use layer=");
+		}
+	}
 	node->layername = layerval.isUndefined() ? ""  : layerval.toString();
 	node->convexity = c.lookup_variable("convexity", true).toDouble();
 
@@ -112,6 +139,49 @@ AbstractNode *ImportModule::evaluate(const Context *ctx, const ModuleInstantiati
 	return node;
 }
 
+#define STL_FACET_NUMBYTES 4*3*4+2
+// as there is no 'float32_t' standard, we assume the systems 'float'
+// is a 'binary32' aka 'single' standard IEEE 32-bit floating point type
+union stl_facet {
+	uint8_t data8[ STL_FACET_NUMBYTES ];
+	uint32_t data32[4*3];
+	struct facet_data {
+	  float i, j, k;
+	  float x1, y1, z1;
+	  float x2, y2, z2;
+	  float x3, y3, z3;
+	  uint16_t attribute_byte_count;
+	} data;
+};
+
+void uint32_byte_swap( uint32_t &x )
+{
+#if __GNUC__ >= 4 && __GNUC_MINOR__ >= 3
+	x = __builtin_bswap32( x );
+#elif defined(__clang__)
+	x = __builtin_bswap32( x );
+#elif defined(_MSC_VER)
+	x = _byteswap_ulong( x );
+#else
+	uint32_t b1 = ( 0x000000FF & x ) << 24;
+	uint32_t b2 = ( 0x0000FF00 & x ) << 8;
+	uint32_t b3 = ( 0x00FF0000 & x ) >> 8;
+	uint32_t b4 = ( 0xFF000000 & x ) >> 24;
+	x = b1 | b2 | b3 | b4;
+#endif
+}
+
+void read_stl_facet( std::ifstream &f, stl_facet &facet )
+{
+	f.read( (char*)facet.data8, STL_FACET_NUMBYTES );
+#ifdef BOOST_BIG_ENDIAN
+	for ( int i = 0; i < 12; i++ ) {
+		uint32_byte_swap( facet.data32[ i ] );
+	}
+	// we ignore attribute byte count
+#endif
+}
+
 PolySet *ImportNode::evaluate_polyset(class PolySetEvaluator *) const
 {
 	PolySet *p = NULL;
@@ -119,7 +189,8 @@ PolySet *ImportNode::evaluate_polyset(class PolySetEvaluator *) const
 	if (this->type == TYPE_STL)
 	{
 		handle_dep((std::string)this->filename);
-		std::ifstream f(this->filename.c_str(), std::ios::in | std::ios::binary);
+		// Open file and position at the end
+		std::ifstream f(this->filename.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
 		if (!f.good()) {
 			PRINTB("WARNING: Can't open import file '%s'.", this->filename);
 			return p;
@@ -132,9 +203,22 @@ PolySet *ImportNode::evaluate_polyset(class PolySetEvaluator *) const
 		boost::regex ex_vertex("vertex");
 		boost::regex ex_vertices("\\s*vertex\\s+([^\\s]+)\\s+([^\\s]+)\\s+([^\\s]+)");
 
+		bool binary = false;
+		std::streampos file_size = f.tellg();
+		f.seekg(80);
+		if (!f.eof()) {
+			uint32_t facenum = 0;
+			f.read((char *)&facenum, sizeof(uint32_t));
+#ifdef BOOST_BIG_ENDIAN
+			uint32_byte_swap( facenum );
+#endif
+			if (file_size == 80 + 4 + 50*facenum) binary = true;
+		}
+		f.seekg(0);
+
 		char data[5];
 		f.read(data, 5);
-		if (!f.eof() && !memcmp(data, "solid", 5)) {
+		if (!binary && !f.eof() && !memcmp(data, "solid", 5)) {
 			int i = 0;
 			double vdata[3][3];
 			std::string line;
@@ -175,30 +259,13 @@ PolySet *ImportNode::evaluate_polyset(class PolySetEvaluator *) const
 		{
 			f.ignore(80-5+4);
 			while (1) {
-#ifdef _MSC_VER
-#pragma pack(push,1)
-#endif
-				struct {
-					float i, j, k;
-					float x1, y1, z1;
-					float x2, y2, z2;
-					float x3, y3, z3;
-					unsigned short acount;
-				}
-#ifdef __GNUC__
-				__attribute__ ((packed))
-#endif
-				stldata;
-#ifdef _MSC_VER
-#pragma pack(pop)
-#endif
-
-				f.read((char*)&stldata, sizeof(stldata));
+				stl_facet facet;
+				read_stl_facet( f, facet );
 				if (f.eof()) break;
 				p->append_poly();
-				p->append_vertex(stldata.x1, stldata.y1, stldata.z1);
-				p->append_vertex(stldata.x2, stldata.y2, stldata.z2);
-				p->append_vertex(stldata.x3, stldata.y3, stldata.z3);
+				p->append_vertex(facet.data.x1, facet.data.y1, facet.data.z1);
+				p->append_vertex(facet.data.x2, facet.data.y2, facet.data.z2);
+				p->append_vertex(facet.data.x3, facet.data.y3, facet.data.z3);
 			}
 		}
 	}
@@ -208,10 +275,15 @@ PolySet *ImportNode::evaluate_polyset(class PolySetEvaluator *) const
 #ifdef ENABLE_CGAL
 		CGAL_Polyhedron poly;
 		std::ifstream file(this->filename.c_str(), std::ios::in | std::ios::binary);
-		file >> poly;
-		file.close();
-		
-		p = createPolySetFromPolyhedron(poly);
+		if (!file.good()) {
+			PRINTB("WARNING: Can't open import file '%s'.", this->filename);
+		}
+		else {
+			file >> poly;
+			file.close();
+			
+			p = createPolySetFromPolyhedron(poly);
+		}
 #else
   PRINT("WARNING: OFF import requires CGAL.");
 #endif
@@ -222,7 +294,7 @@ PolySet *ImportNode::evaluate_polyset(class PolySetEvaluator *) const
 		p = new PolySet();
 		DxfData dd(this->fn, this->fs, this->fa, this->filename, this->layername, this->origin_x, this->origin_y, this->scale);
 		p->is2d = true;
-		dxf_tesselate(p, dd, 0, true, false, 0);
+		dxf_tesselate(p, dd, 0, Vector2d(1,1), true, false, 0);
 		dxf_border_to_ps(p, dd);
 	}
 	else 

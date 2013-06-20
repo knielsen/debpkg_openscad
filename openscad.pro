@@ -31,7 +31,7 @@ isEmpty(QT_VERSION) {
 include(version.pri)
 
 # for debugging link problems (use nmake -f Makefile.Release > log.txt)
-win32 {
+win* {
   # QMAKE_LFLAGS += -VERBOSE
 }
 # debug: DEFINES += DEBUG
@@ -55,26 +55,40 @@ else {
   }
 }
 
-macx {
-  # add CONFIG+=deploy to the qmake command-line to make a deployment build
-  deploy {
-    message("Building deployment version")
+# add CONFIG+=deploy to the qmake command-line to make a deployment build
+deploy {
+  message("Building deployment version")
+  DEFINES += OPENSCAD_DEPLOY
+  macx {
     CONFIG += x86 x86_64
+    LIBS += -framework Sparkle
+    HEADERS += src/SparkleAutoUpdater.h
+    OBJECTIVE_SOURCES += src/SparkleAutoUpdater.mm
   }
+}
 
+macx {
   TARGET = OpenSCAD
   ICON = icons/OpenSCAD.icns
   QMAKE_INFO_PLIST = Info.plist
   APP_RESOURCES.path = Contents/Resources
-  APP_RESOURCES.files = OpenSCAD.sdef
+  APP_RESOURCES.files = OpenSCAD.sdef dsa_pub.pem icons/SCAD.icns
   QMAKE_BUNDLE_DATA += APP_RESOURCES
-  LIBS += -framework Carbon
+  LIBS += -framework Cocoa
+
+  # FIXME: Somehow, setting the deployment target to a lower version causes a
+  # seldom crash in debug mode (e.g. the minkowski2-test):
+  # frame #4: 0x00007fff8b7d5be5 libc++.1.dylib`std::runtime_error::~runtime_error() + 55
+  # frame #5: 0x0000000100150df5 OpenSCAD`CGAL::Uncertain_conversion_exception::~Uncertain_conversion_exception(this=0x0000000105044488) + 21 at Uncertain.h:78
+  # The reason for the crash appears to be linking with libgcc_s, 
+  # but it's unclear what's really going on
+  QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.6
 }
 else {
   TARGET = openscad
 }
 
-win32 {
+win* {
   RC_FILE = openscad_win32.rc
 }
 
@@ -93,6 +107,7 @@ netbsd* {
    QMAKE_LFLAGS += -L/usr/X11R7/lib
    QMAKE_LFLAGS += -Wl,-R/usr/X11R7/lib
    QMAKE_LFLAGS += -Wl,-R/usr/pkg/lib
+   !clang: { QMAKE_CXXFLAGS += -std=c++0x }
    !isEmpty(OPENSCAD_LIBDIR) {
      QMAKE_CFLAGS = -I$$OPENSCAD_LIBDIR/include $$QMAKE_CFLAGS
      QMAKE_CXXFLAGS = -I$$OPENSCAD_LIBDIR/include $$QMAKE_CXXFLAGS
@@ -118,7 +133,9 @@ netbsd* {
 }
 
 *clang* {
-	# disable enormous amount of warnings about CGAL
+	# http://llvm.org/bugs/show_bug.cgi?id=9182
+	QMAKE_CXXFLAGS_WARN_ON += -Wno-overloaded-virtual
+	# disable enormous amount of warnings about CGAL / boost / etc
 	QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-parameter
 	QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-variable
 	QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-function
@@ -155,7 +172,7 @@ CONFIG(mingw-cross-env) {
   include(mingw-cross-env.pri)
 }
 
-win32 {
+win* {
   FLEXSOURCES = src/lexer.l
   BISONSOURCES = src/parser.y
 } else {
@@ -171,7 +188,8 @@ FORMS   += src/MainWindow.ui \
            src/AboutDialog.ui \
            src/ProgressWidget.ui
 
-HEADERS += src/version_check.h \
+HEADERS += src/typedefs.h \
+           src/version_check.h \
            src/ProgressWidget.h \
            src/parsersettings.h \
            src/renderer.h \
@@ -179,6 +197,7 @@ HEADERS += src/version_check.h \
            src/ThrownTogetherRenderer.h \
            src/CGAL_renderer.h \
            src/OGL_helper.h \
+           src/QGLView.h \
            src/GLView.h \
            src/MainWindow.h \
            src/Preferences.h \
@@ -186,6 +205,8 @@ HEADERS += src/version_check.h \
            src/AboutDialog.h \
            src/builtin.h \
            src/context.h \
+           src/modcontext.h \
+           src/evalcontext.h \
            src/csgterm.h \
            src/csgtermnormalizer.h \
            src/dxfdata.h \
@@ -196,6 +217,7 @@ HEADERS += src/version_check.h \
            src/function.h \
            src/grid.h \
            src/highlighter.h \
+           src/localscope.h \
            src/module.h \
            src/node.h \
            src/csgnode.h \
@@ -211,6 +233,7 @@ HEADERS += src/version_check.h \
            src/handle_dep.h \
            src/polyset.h \
            src/printutils.h \
+           src/fileutils.h \
            src/value.h \
            src/progress.h \
            src/editor.h \
@@ -227,9 +250,22 @@ HEADERS += src/version_check.h \
            src/mathc99.h \
            src/memory.h \
            src/linalg.h \
+           src/Camera.h \
            src/system-gl.h \
            src/stl-utils.h \
-           src/svg.h
+           src/boost-utils.h \
+           src/svg.h \
+           \
+           src/lodepng.h \
+           src/OffscreenView.h \
+           src/OffscreenContext.h \
+           src/OffscreenContextAll.hpp \
+           src/fbo.h \
+           src/imageutils.h \
+           src/system-gl.h \
+           src/CsgInfo.h \
+           \
+           src/AutoUpdater.h
 
 SOURCES += src/version_check.cc \
            src/ProgressWidget.cc \
@@ -239,9 +275,12 @@ SOURCES += src/version_check.cc \
            src/value.cc \
            src/expr.cc \
            src/func.cc \
+           src/localscope.cc \
            src/module.cc \
            src/node.cc \
            src/context.cc \
+           src/modcontext.cc \
+           src/evalcontext.cc \
            src/csgterm.cc \
            src/csgtermnormalizer.cc \
            src/polyset.cc \
@@ -259,9 +298,12 @@ SOURCES += src/version_check.cc \
            src/linearextrude.cc \
            src/rotateextrude.cc \
            src/printutils.cc \
+           src/fileutils.cc \
            src/progress.cc \
            src/parsersettings.cc \
            src/stl-utils.cc \
+           src/boost-utils.cc \
+           src/PlatformUtils.cc \
            \
            src/nodedumper.cc \
            src/traverser.cc \
@@ -275,10 +317,13 @@ SOURCES += src/version_check.cc \
            src/Preferences.cc \
            src/OpenCSGWarningDialog.cc \
            src/editor.cc \
-           src/glview.cc \
+           src/GLView.cc \
+           src/QGLView.cc \
+           src/AutoUpdater.cc \
            \
            src/builtin.cc \
            src/export.cc \
+           src/export_png.cc \
            src/import.cc \
            src/renderer.cc \
            src/ThrownTogetherRenderer.cc \
@@ -287,9 +332,27 @@ SOURCES += src/version_check.cc \
            src/dxftess-cgal.cc \
            src/CSGTermEvaluator.cc \
            src/svg.cc \
+           src/OffscreenView.cc \
+           src/fbo.cc \
+           src/system-gl.cc \
+           src/imageutils.cc \
+           src/lodepng.cpp \
            \
            src/openscad.cc \
            src/mainwin.cc
+
+unix:!macx {
+  SOURCES += src/imageutils-lodepng.cc
+  SOURCES += src/OffscreenContextGLX.cc
+}
+macx {
+  SOURCES += src/imageutils-macosx.cc
+  OBJECTIVE_SOURCES += src/OffscreenContextCGL.mm
+}
+win* {
+  SOURCES += src/imageutils-lodepng.cc
+  SOURCES += src/OffscreenContextWGL.cc
+}
 
 opencsg {
   HEADERS += src/OpenCSGRenderer.h
@@ -320,8 +383,17 @@ SOURCES += src/cgalutils.cc \
 
 macx {
   HEADERS += src/AppleEvents.h \
-             src/EventFilter.h
+             src/EventFilter.h \
+             src/CocoaUtils.h
   SOURCES += src/AppleEvents.cc
+  OBJECTIVE_SOURCES += src/CocoaUtils.mm \
+                       src/PlatformUtils-mac.mm
+}
+unix:!macx {
+  SOURCES += src/PlatformUtils-posix.cc
+}
+win* {
+  SOURCES += src/PlatformUtils-win.cc
 }
 
 isEmpty(PREFIX):PREFIX = /usr/local
@@ -344,3 +416,8 @@ INSTALLS += applications
 icons.path = $$PREFIX/share/pixmaps
 icons.files = icons/openscad.png
 INSTALLS += icons
+
+CONFIG(winconsole) {
+  include(winconsole.pri)
+}
+

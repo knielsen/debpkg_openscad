@@ -122,7 +122,7 @@ OpenCSG-related
 o OpenCSG rendering: Coincident surfaces causes z-buffer fighting. Is this somehow
   avoidable tuning the depth tests in OpenCSG? 
 o When specifying a transparency with the color() statement,
-  the object is not sorted and will be rendered wrongly
+  the object is not sorted and will be rendered wrongly. See issue #310 for some good test models.
 o Bug: Using the background operator (%) on the only object in a scene triggers a
   CSG error: No top level object found
 
@@ -137,6 +137,8 @@ o Hollow donut problem
 o CGAL issues
   - CGAL doesn't handle almost planar polygons. Consider splitting into triangles ourselves. See WillamAdams/dodec.scad
 o Look at the EPEC kernel for improved performance (suggested by Giles)
+o Look at performance: Is CGAL doing proper bounding box calculation before testing all primitives?
+
 
 LANGUAGE && BUILTINS
 --------------------
@@ -190,6 +192,7 @@ o DXF Import/Export
     - Support for LEADER entity
     - Support for MTEXT entity ?
     - idea: DXF inline - convert from dxf to OpenSCAD syntax -> parametrize dxf content
+  - Progress when exporting large STLs
 o Mesh optimization on STL export
   - Remove super small triangles (all sides are short)
   - Replace super thin triangles (one h is short)
@@ -220,15 +223,11 @@ o Consider decoupling DXF-specific functionality from the 2D subsystem
 o Visitation refactoring
   - Make AbstractNode members private/protected?
 
-BUILD SYSTEM
-------------
-o Fedora is reported to ship with byacc, which doesn't support bison extensions (e.g. %debuig). Look into this, either be yacc-compatible or force the build system to use bison.
-
 DOCUMENTATION
 -------------
 o Auto-generate API documentation instead of, in addition to or combined with, the wikibooks docs.
 o Write checklists for typical extension work (add new module, add new function)
-  -> make sure new test files are added
+  -> syntax highlighter, test files, examples, documentation (external editor modes)
 o Clarify include/use better in the wikibook docs (e.g. that use'd modules have to be self-contained)
 
 TESTING

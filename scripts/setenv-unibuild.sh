@@ -34,10 +34,10 @@ setenv_common()
  echo OPENSCAD_LIBRARIES modified
  echo GLEWDIR modified
 
- if [ "`command -v qmake-qt4`" ]; then
- 	echo "Please re-run qmake-qt4 and run 'make clean' if necessary"
- else
- 	echo "Please re-run qmake and run 'make clean' if necessary"
+ if [ "`uname -m | grep sparc64`" ]; then
+   echo detected sparc64. forcing 32 bit with export ABI=32
+   ABI=32
+   export ABI
  fi
 }
 
@@ -54,7 +54,9 @@ setenv_netbsd()
  QMAKESPEC=netbsd-g++
  QTDIR=/usr/pkg/qt4
  PATH=/usr/pkg/qt4/bin:$PATH
- LD_LIBRARY_PATH=/usr/pkg/qt4/lib:/usr/X11R7/lib:$LD_LIBRARY_PATH
+ LD_LIBRARY_PATH=/usr/pkg/qt4/lib:$LD_LIBRARY_PATH
+ LD_LIBRARY_PATH=/usr/X11R7/lib:$LD_LIBRARY_PATH
+ LD_LIBRARY_PATH=/usr/pkg/lib:$LD_LIBRARY_PATH
 
  export QMAKESPEC
  export QTDIR
@@ -73,6 +75,49 @@ setenv_linux_clang()
  echo QMAKESPEC has been modified: $QMAKESPEC
 }
 
+clean_note()
+{
+ if [ $QT5_SETUP ]; then
+  QMAKEBIN=qmake
+ elif [ "`command -v qmake-qt4`" ]; then
+  QMAKEBIN=qmake-qt4
+ else
+  QMAKEBIN=qmake
+ fi
+ echo "Please re-run" $QMAKEBIN "and run 'make clean' if necessary"
+}
+
+setenv_qt5()
+{
+ QT5_SETUP=true
+ if [ ! $QTDIR ]; then
+  QTDIR=/opt/qt5
+  echo Please set QTDIR before running this qt5 script. Assuming $QTDIR
+ fi
+ PATH=$QTDIR/bin:$PATH
+ LD_LIBRARY_PATH=$QTDIR/lib:$LD_LIBRARY_PATH
+ LD_RUN_PATH=$QTDIR/lib:$LD_RUN_PATH
+ if [ "`echo $CC | grep clang`" ]; then
+  if [ "`uname | grep -i linux`" ]; then
+   QMAKESPEC=linux-clang
+   echo QMAKESPEC has been modified: $QMAKESPEC
+  fi
+ fi
+
+ export QTDIR
+ export PATH
+ export LD_LIBRARY_PATH
+ export LD_RUN_PATH
+ export QMAKESPEC
+
+ echo QTDIR is set to: $QTDIR
+ echo PATH has been modified with $QTDIR/bin
+ echo LD_LIBRARY_PATH has been modified with $QTDIR/lib
+ echo LD_RUN_PATH has been modified with $QTDIR/lib
+
+ export QT5_SETUP
+}
+
 if [ "`uname | grep -i 'linux\|debian'`" ]; then
  setenv_common
  if [ "`echo $* | grep clang`" ]; then
@@ -87,3 +132,17 @@ else
  setenv_common
  echo unknown system. guessed env variables. see 'setenv-unibuild.sh'
 fi
+
+if [ "`echo $* | grep qt5`" ]; then
+ setenv_qt5
+fi
+
+if [ -e $DEPLOYDIR/include/Qt ]; then
+  echo "Qt found under $DEPLOYDIR ... "
+  QTDIR=$DEPLOYDIR
+  export QTDIR
+  echo "QTDIR modified to $DEPLOYDIR"
+fi
+
+clean_note
+

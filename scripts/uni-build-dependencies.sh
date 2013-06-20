@@ -1,4 +1,4 @@
- #!/bin/sh -e
+#!/bin/sh -e
 
 # uni-build-dependencies by don bright 2012. copyright assigned to
 # Marius Kintel and Clifford Wolf, 2012. released under the GPL 2, or
@@ -24,18 +24,78 @@
 #
 # Prerequisites:
 # - wget or curl
-# - Qt4
+# - OpenGL (GL/gl.h)
+# - GLU (GL/glu.h)
 # - gcc
+# - Qt4
 #
-# Enable Clang (experimental, only works on linux):
+# If your system lacks qt4, build like this:
+#
+#   ./scripts/uni-build-dependencies.sh qt4
+#   . ./scripts/setenv-unibuild.sh
+#
+# If your system lacks glu, try to build like this:
+#
+#   ./scripts/uni-build-dependencies.sh glu
+#
+# If you want to try Clang compiler (experimental, only works on linux):
 #
 #   . ./scripts/setenv-unibuild.sh clang
+#
+# If you want to try Qt5 (experimental)
+#
+#   . ./scripts/setenv-unibuild.sh qt5
 #
 
 printUsage()
 {
   echo "Usage: $0"
   echo
+}
+
+build_glu()
+{
+  version=$1
+  if [ -e $DEPLOYDIR/lib/libGLU.so ]; then
+    echo "GLU already installed. not building"
+    return
+  fi
+  echo "Building GLU" $version "..."
+  cd $BASEDIR/src
+  rm -rf glu-$version
+  if [ ! -f glu-$version.tar.gz ]; then
+    curl -O http://cgit.freedesktop.org/mesa/glu/snapshot/glu-$version.tar.gz
+  fi
+  tar xzf glu-$version.tar.gz
+  cd glu-$version
+  ./autogen.sh --prefix=$DEPLOYDIR
+  make -j$NUMCPU
+  make install
+}
+
+build_qt4()
+{
+  version=$1
+  if [ -e $DEPLOYDIR/include/Qt ]; then
+    echo "qt already installed. not building"
+    return
+  fi
+  echo "Building Qt" $version "..."
+  cd $BASEDIR/src
+  rm -rf qt-everywhere-opensource-src-$version
+  if [ ! -f qt-everywhere-opensource-src-$version.tar.gz ]; then
+    curl -O http://releases.qt-project.org/qt4/source/qt-everywhere-opensource-src-$version.tar.gz
+  fi
+  tar xzf qt-everywhere-opensource-src-$version.tar.gz
+  cd qt-everywhere-opensource-src-$version
+  ./configure -prefix $DEPLOYDIR -opensource -confirm-license -fast -no-qt3support -no-svg -no-phonon -no-audio-backend -no-multimedia -no-javascript-jit -no-script -no-scripttools -no-declarative -no-xmlpatterns -nomake demos -nomake examples -nomake docs -nomake translations -no-webkit
+  make -j$NUMCPU
+  make install
+  QTDIR=$DEPLOYDIR
+  export QTDIR
+  echo "----------"
+  echo " Please set QTDIR to $DEPLOYDIR ( or run '. scripts/setenv-unibuild.sh' )"
+  echo "----------"
 }
 
 build_bison()
@@ -124,6 +184,7 @@ build_gmp()
   mkdir build
   cd build
   ../configure --prefix=$DEPLOYDIR --enable-cxx
+  make -j$NUMCPU
   make install
 }
 
@@ -145,6 +206,7 @@ build_mpfr()
   mkdir build
   cd build
   ../configure --prefix=$DEPLOYDIR --with-gmp=$DEPLOYDIR
+  make -j$NUMCPU
   make install
   cd ..
 }
@@ -163,6 +225,10 @@ build_boost()
   if [ ! -f boost_$bversion.tar.bz2 ]; then
     curl --insecure -LO http://downloads.sourceforge.net/project/boost/boost/$version/boost_$bversion.tar.bz2
   fi
+  if [ ! $? -eq 0 ]; then
+    echo download failed. 
+    exit 1
+  fi
   tar xjf boost_$bversion.tar.bz2
   cd boost_$bversion
   if [ "`gcc --version|grep 4.7`" ]; then
@@ -172,15 +238,37 @@ build_boost()
     fi
   fi
   # We only need certain portions of boost
-  ./bootstrap.sh --prefix=$DEPLOYDIR --with-libraries=thread,program_options,filesystem,system,regex
+  if [ -e ./bootstrap.sh ]; then
+    BSTRAPBIN=./bootstrap.sh
+  else
+    BSTRAPBIN=./configure
+  fi
+  $BSTRAPBIN --prefix=$DEPLOYDIR --with-libraries=thread,program_options,filesystem,system,regex
+	if [ -e ./b2 ]; then
+    BJAMBIN=./b2;
+  elif [ -e ./bjam ]; then
+    BJAMBIN=./bjam
+  elif [ -e ./Makefile ]; then
+    BJAMBIN=make
+  fi
   if [ $CXX ]; then
     if [ $CXX = "clang++" ]; then
-      ./b2 -j$NUMCPU toolset=clang install
-      # ./b2 -j$NUMCPU toolset=clang cxxflags="-stdlib=libc++" linkflags="-stdlib=libc++" install
+      $BJAMBIN -j$NUMCPU toolset=clang
     fi
   else
-    ./b2 -j$NUMCPU
-    ./b2 install
+    $BJAMBIN -j$NUMCPU
+  fi
+  if [ $? = 0 ]; then
+    $BJAMBIN install
+  else
+    echo boost build failed
+    exit 1
+  fi
+  if [ "`ls $DEPLOYDIR/include/ | grep boost.[0-9]`" ]; then
+    if [ ! -e $DEPLOYDIR/include/boost ]; then
+      echo "boost is old, make a symlink to $DEPLOYDIR/include/boost & rerun"
+      exit 1
+    fi
   fi
 }
 
@@ -194,20 +282,56 @@ build_cgal()
   echo "Building CGAL" $version "..."
   cd $BASEDIR/src
   rm -rf CGAL-$version
-  if [ ! -f CGAL-$version.tar.* ]; then
-    #4.0.2
-    curl --insecure -O https://gforge.inria.fr/frs/download.php/31174/CGAL-$version.tar.bz2
-    # 4.0 curl --insecure -O https://gforge.inria.fr/frs/download.php/30387/CGAL-$version.tar.gz
-    # 3.9 curl --insecure -O https://gforge.inria.fr/frs/download.php/29125/CGAL-$version.tar.gz
-    # 3.8 curl --insecure -O https://gforge.inria.fr/frs/download.php/28500/CGAL-$version.tar.gz
-    # 3.7 curl --insecure -O https://gforge.inria.fr/frs/download.php/27641/CGAL-$version.tar.gz
+  ver4_1="curl --insecure -O https://gforge.inria.fr/frs/download.php/31640/CGAL-4.1.tar.bz2"
+  ver4_0_2="curl --insecure -O https://gforge.inria.fr/frs/download.php/31174/CGAL-4.0.2.tar.bz2"
+  ver4_0="curl --insecure -O https://gforge.inria.fr/frs/download.php/30387/CGAL-4.0.tar.gz"
+  ver3_9="curl --insecure -O https://gforge.inria.fr/frs/download.php/29125/CGAL-3.9.tar.gz"
+  ver3_8="curl --insecure -O https://gforge.inria.fr/frs/download.php/28500/CGAL-3.8.tar.gz"
+  ver3_7="curl --insecure -O https://gforge.inria.fr/frs/download.php/27641/CGAL-3.7.tar.gz"
+  vernull="echo already downloaded..skipping"
+  download_cmd=ver`echo $version | sed s/"\."/"_"/`
+
+  if [ -e CGAL-$version.tar.gz ]; then
+    download_cmd=vernull;
   fi
-  tar jxf CGAL-$version.tar.bz2
+  if [ -e CGAL-$version.tar.bz2 ]; then
+    download_cmd=vernull;
+  fi
+
+  `eval echo "$"$download_cmd`
+
+  zipper=gzip
+  suffix=gz
+  if [ -e CGAL-$version.tar.bz2 ]; then
+    zipper=bzip2
+    suffix=bz2
+  fi
+
+  $zipper -f -d CGAL-$version.tar.$suffix;
+  tar xf CGAL-$version.tar
+
   cd CGAL-$version
-  if [ "`echo $2 | grep use-sys-libs`" ]; then
-    cmake -DCMAKE_INSTALL_PREFIX=$DEPLOYDIR -DWITH_CGAL_Qt3=OFF -DWITH_CGAL_Qt4=OFF -DWITH_CGAL_ImageIO=OFF -DCMAKE_BUILD_TYPE=Debug
+
+  # older cmakes have buggy FindBoost that can result in
+  # finding the system libraries but OPENSCAD_LIBRARIES include paths
+  FINDBOOST_CMAKE=$OPENSCAD_SCRIPTDIR/../tests/FindBoost.cmake
+  cp $FINDBOOST_CMAKE ./cmake/modules/
+
+  mkdir bin
+  cd bin
+  rm -rf ./*
+  if [ "`uname -a| grep ppc64`" ]; then
+    CGAL_BUILDTYPE="Release" # avoid assertion violation
   else
-    cmake -DCMAKE_INSTALL_PREFIX=$DEPLOYDIR -DGMP_INCLUDE_DIR=$DEPLOYDIR/include -DGMP_LIBRARIES=$DEPLOYDIR/lib/libgmp.so -DGMPXX_LIBRARIES=$DEPLOYDIR/lib/libgmpxx.so -DGMPXX_INCLUDE_DIR=$DEPLOYDIR/include -DMPFR_INCLUDE_DIR=$DEPLOYDIR/include -DMPFR_LIBRARIES=$DEPLOYDIR/lib/libmpfr.so -DWITH_CGAL_Qt3=OFF -DWITH_CGAL_Qt4=OFF -DWITH_CGAL_ImageIO=OFF -DBOOST_ROOT=$DEPLOYDIR -DCMAKE_BUILD_TYPE=Debug
+    CGAL_BUILDTYPE="Debug"
+  fi
+
+  DEBUGBOOSTFIND=0 # for debugging FindBoost.cmake (not for debugging boost)
+  Boost_NO_SYSTEM_PATHS=1
+  if [ "`echo $2 | grep use-sys-libs`" ]; then
+    cmake -DCMAKE_INSTALL_PREFIX=$DEPLOYDIR -DWITH_CGAL_Qt3=OFF -DWITH_CGAL_Qt4=OFF -DWITH_CGAL_ImageIO=OFF -DCMAKE_BUILD_TYPE=$CGAL_BUILDTYPE -DBoost_DEBUG=$DEBUGBOOSTFIND ..
+  else
+    cmake -DCMAKE_INSTALL_PREFIX=$DEPLOYDIR -DGMP_INCLUDE_DIR=$DEPLOYDIR/include -DGMP_LIBRARIES=$DEPLOYDIR/lib/libgmp.so -DGMPXX_LIBRARIES=$DEPLOYDIR/lib/libgmpxx.so -DGMPXX_INCLUDE_DIR=$DEPLOYDIR/include -DMPFR_INCLUDE_DIR=$DEPLOYDIR/include -DMPFR_LIBRARIES=$DEPLOYDIR/lib/libmpfr.so -DWITH_CGAL_Qt3=OFF -DWITH_CGAL_Qt4=OFF -DWITH_CGAL_ImageIO=OFF -DBOOST_LIBRARYDIR=$DEPLOYDIR/lib -DBOOST_INCLUDEDIR=$DEPLOYDIR/include -DCMAKE_BUILD_TYPE=$CGAL_BUILD_TYPE -DBoost_DEBUG=$DEBUGBOOSTFIND -DBoost_NO_SYSTEM_PATHS=1 ..
   fi
   make -j$NUMCPU
   make install
@@ -215,7 +339,14 @@ build_cgal()
 
 build_glew()
 {
-  if [ -e $DEPLOYDIR/include/GL/glew.h ]; then
+  GLEW_INSTALLED=
+  if [ -e $DEPLOYDIR/lib64/libGLEW.so ]; then
+    GLEW_INSTALLED=1
+  fi
+  if [ -e $DEPLOYDIR/lib/libGLEW.so ]; then
+    GLEW_INSTALLED=1
+  fi
+  if [ $GLEW_INSTALLED ]; then
     echo "glew already installed. not building"
     return
   fi
@@ -268,7 +399,7 @@ build_glew()
 
 build_opencsg()
 {
-  if [ -e $DEPLOYDIR/include/opencsg.h ]; then
+  if [ -e $DEPLOYDIR/lib/libopencsg.so ]; then
     echo "OpenCSG already installed. not building"
     return
   fi
@@ -292,8 +423,21 @@ build_opencsg()
     OPENCSG_QMAKE=qmake-qt4
   elif [ "`command -v qmake4`" ]; then
     OPENCSG_QMAKE=qmake4
-  else
+  elif [ "`command -v qmake`" ]; then
     OPENCSG_QMAKE=qmake
+  else
+    echo qmake not found... using standard OpenCSG makefiles
+    OPENCSG_QMAKE=make
+    cp Makefile Makefile.bak
+    cp src/Makefile src/Makefile.bak
+
+    cat Makefile.bak | sed s/example// |sed s/glew// > Makefile
+    cat src/Makefile.bak | sed s@^INCPATH.*@INCPATH\ =\ -I$BASEDIR/include\ -I../include\ -I..\ -I.@ > src/Makefile
+    cp src/Makefile src/Makefile.bak2
+    cat src/Makefile.bak2 | sed s@^LIBS.*@LIBS\ =\ -L$BASEDIR/lib\ -L/usr/X11R6/lib\ -lGLU\ -lGL@ > src/Makefile
+    tmp=$version
+    build_glu 9.0.0 # todo - autodetect the need for glu
+    version=$tmp
   fi
 
   cd $BASEDIR/src/OpenCSG-$version/src
@@ -361,7 +505,11 @@ build_eigen()
 # the 'dirname' command installed
 
 if [ "`command -v dirname`" ]; then
+  RUNDIR=$PWD
   OPENSCAD_SCRIPTDIR=`dirname $0`
+  cd $OPENSCAD_SCRIPTDIR
+  OPENSCAD_SCRIPTDIR=$PWD
+  cd $RUNDIR
 else
   if [ ! -f openscad.pro ]; then
     echo "Must be run from the OpenSCAD source root directory (dont have 'dirname')"
@@ -408,19 +556,29 @@ if [ "`cmake --version | grep 'version 2.[1-6][^0-9]'`" ]; then
   build_cmake 2.8.8
 fi
 
-# build_git 1.7.10.3
-
-# Singly build CGAL or OpenCSG
-# (Most systems have all libraries available as packages except CGAL/OpenCSG)
-# (They can be built singly here by passing a command line arg to the script)
+# Singly build certain tools or libraries
 if [ $1 ]; then
+  if [ $1 = "git" ]; then
+    build_git 1.7.10.3
+    exit $?
+  fi
   if [ $1 = "cgal" ]; then
-    build_cgal 4.0.2 use-sys-libs
-    exit
+    build_cgal 4.1 use-sys-libs
+    exit $?
   fi
   if [ $1 = "opencsg" ]; then
     build_opencsg 1.3.2
-    exit
+    exit $?
+  fi
+  if [ $1 = "qt4" ]; then
+    # such a huge build, put here by itself
+    build_qt4 4.8.4
+    exit $?
+  fi
+  if [ $1 = "glu" ]; then
+    # Mesa and GLU split in late 2012, so it's not on some systems
+    build_glu 9.0.0
+    exit $?
   fi
 fi
 
@@ -429,13 +587,12 @@ fi
 # Main build of libraries
 # edit version numbers here as needed.
 #
-
 build_eigen 3.1.1
 build_gmp 5.0.5
 build_mpfr 3.1.1
-build_boost 1.49.0
+build_boost 1.53.0
 # NB! For CGAL, also update the actual download URL in the function
-build_cgal 4.0.2
+build_cgal 4.1
 build_glew 1.9.0
 build_opencsg 1.3.2
 
