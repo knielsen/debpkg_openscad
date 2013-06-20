@@ -70,18 +70,19 @@ def ezsearch(pattern,str):
 	return ''
 	
 def read_gitinfo():
-	# won't work if run from outside of branch. 
-	try:
-		data = subprocess.Popen(['git','remote','-v'],stdout=subprocess.PIPE).stdout.read()
-		origin = ezsearch('^origin *?(.*?)\(fetch.*?$',data)
-		upstream = ezsearch('^upstream *?(.*?)\(fetch.*?$',data)
-		data = subprocess.Popen(['git','branch'],stdout=subprocess.PIPE).stdout.read()
-		branch = ezsearch('^\*(.*?)$',data)
-		out  = 'Git branch: ' + branch + ' from origin ' + origin + '\n'
-		out += 'Git upstream: ' + upstream + '\n'
-	except:
-		out = 'Problem running git'
-	return out
+	return 'Installed OpenSCAD Debian packages:\n' + subprocess.check_output(['dpkg-query', '-l', 'openscad-*'])
+#	# won't work if run from outside of branch. 
+#	try:
+#		data = subprocess.Popen(['git','remote','-v'],stdout=subprocess.PIPE).stdout.read()
+#		origin = ezsearch('^origin *?(.*?)\(fetch.*?$',data)
+#		upstream = ezsearch('^upstream *?(.*?)\(fetch.*?$',data)
+#		data = subprocess.Popen(['git','branch'],stdout=subprocess.PIPE).stdout.read()
+#		branch = ezsearch('^\*(.*?)$',data)
+#		out  = 'Git branch: ' + branch + ' from origin ' + origin + '\n'
+#		out += 'Git upstream: ' + upstream + '\n'
+#	except:
+#		out = 'Problem running git'
+#	return out
 
 def read_sysinfo(filename):
 	data = tryread(filename)
