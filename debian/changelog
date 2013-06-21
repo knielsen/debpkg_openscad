@@ -22,6 +22,8 @@ openscad (2013.06+dfsg-1) UNRELEASED; urgency=low
     of unavailable git information
   * Drop scripts directory for +dfsg repackaging
   * Explicitly set OpenSCAD version from upstream version
+  * Patch tests/test_cmdline_tool.py to use absolute paths (because openscad
+    and echotest have different behaviors in that respect)
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 08 Mar 2013 13:29:28 +0100
 

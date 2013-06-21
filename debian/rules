@@ -24,6 +24,8 @@ override_dh_auto_build:
 
 	# fix absolute paths in ctest scripts
 	cd tests && perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s/$$here/./g' *.cmake
+	# fix relative paths to plain binary names
+	cd tests && sed 's@\./\.\./openscad@openscad@' -i *.cmake
 
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
