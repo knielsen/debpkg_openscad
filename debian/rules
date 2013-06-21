@@ -59,7 +59,8 @@ override_dh_auto_install:
 		dumptest \
 		echotest \
 		opencsgtest \
-		throwntogethertest\
+		throwntogethertest \
+		moduledumptest \
 		; do chrpath -d tests/$$x; done
 
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))

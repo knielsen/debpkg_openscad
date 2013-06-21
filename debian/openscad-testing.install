@@ -8,6 +8,7 @@ tests/dumptest /usr/lib/openscad/testprograms/
 tests/echotest /usr/lib/openscad/testprograms/
 tests/opencsgtest /usr/lib/openscad/testprograms/
 tests/cgaltest /usr/lib/openscad/testprograms/
+tests/moduledumptest /usr/lib/openscad/testprograms/
 
 # i suppose we don't want proper python installation procedures, do we?
 tests/test_pretty_print.py /usr/lib/openscad/testprograms/
