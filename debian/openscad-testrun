@@ -23,6 +23,7 @@ TESTPROGRAMS = "/usr/lib/openscad/testprograms"
 EXAMPLES = "/usr/share/openscad/examples"
 TESTDATA = "/usr/share/openscad/testdata"
 REGRESSION = "/usr/share/openscad/regression"
+LIBRARIES = "/usr/share/openscad/libraries"
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -42,6 +43,7 @@ def main():
     os.symlink(EXAMPLES, join(dirname, "examples"))
     os.symlink(TESTDATA, join(dirname, "testdata"))
     os.symlink(REGRESSION, join(builddir, "regression"))
+    os.symlink(LIBRARIES, join(dirname, "libraries"))
 
     for f in os.listdir(TESTPROGRAMS):
         os.symlink(join(TESTPROGRAMS, f), join(builddir, f))
