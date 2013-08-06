@@ -51,16 +51,8 @@ override_dh_auto_install:
 	# so i'll accept not getting the extra score for finding out what's
 	# wrong exactly
 	for x in \
-		cgalpngtest \
-		cgalstlsanitytest \
-		cgaltest \
-		csgtermtest \
 		csgtexttest \
-		dumptest \
-		echotest \
-		opencsgtest \
 		throwntogethertest \
-		moduledumptest \
 		; do chrpath -d tests/$$x; done
 
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
