@@ -267,7 +267,7 @@ TESTLOG
 		s = s.replace(key,str(dic[key]))
 
 	for t in tests_to_report:
-		if t.type=='txt':
+		if t.type in ('txt', 'ast', 'csg', 'term'):
 			newchunk = re.sub('FTESTNAME',t.fullname,repeat2)
 			newchunk = newchunk.replace('TESTLOG',t.fulltestlog)
 			s = s.replace(repeat2, newchunk+repeat2)
@@ -289,6 +289,8 @@ TESTLOG
 			newchunk = newchunk.replace('EXPECTEDFILE',wikiname_e)
 			newchunk = newchunk.replace('TESTLOG',t.fulltestlog)
 			s = s.replace(repeat1, newchunk+repeat1)
+		else:
+			raise Exception("Unknown test type %r"%t.type)
 
 	makefiles_wikinames = {}
 	for mf in sorted(makefiles.keys()):
@@ -368,7 +370,7 @@ def tohtml(wiki_rootpath, startdate, tests, enddate, sysinfo, sysid, makefiles):
 		s+= '<p>none</p>'
 
 	for t in tests_to_report:
-		if t.type=='txt':
+		if t.type in ('txt', 'ast', 'csg', 'term'):
 			s+='\n<pre>'+t.fullname+'</pre>\n'
 			s+='<p><pre>'+t.fulltestlog+'</pre>\n\n'
 		elif t.type=='png':
@@ -389,6 +391,8 @@ def tohtml(wiki_rootpath, startdate, tests, enddate, sysinfo, sysid, makefiles):
 			s+='\n<pre>'
 			s+=t.fulltestlog
 			s+='\n</pre>'
+		else:
+			raise Exception("Unknown test type %r"%t.type)
 
 	s+='\n\n<p>\n\n'
 
