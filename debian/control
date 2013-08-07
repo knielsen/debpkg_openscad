@@ -31,7 +31,8 @@ Build-Depends:
     imagemagick,
     libgl1-mesa-swx11-dev | libgl1-dev,
     xvfb | xserver-xorg-core,
-    libgl1-mesa-swx11 | xserver-xorg-core
+    libgl1-mesa-swx11 | xserver-xorg-core,
+    openscad-mcad
 # openscad is not gles compatible yet. this line makes builds abort before they
 # faile at compile time. libqt4-opengl-dev currently pulls libgles2-mesa-dev in
 # on ubuntu arm{el,hf}.
@@ -48,13 +49,13 @@ Architecture: any
 Depends:
     ${shlibs:Depends},
     ${misc:Depends}
-# not in archive yet
-# Recommends:
-#     openscad-mcad (>= 2011.12)
+Recommends:
+    openscad-mcad
 Suggests:
     meshlab,
     geomview,
-    librecad
+    librecad,
+    openscad-testing
 Description: script file based graphical CAD environment
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
  aspects rather than artistic ones.
@@ -70,6 +71,7 @@ Architecture: any
 Depends:
     ${shlibs:Depends},
     ${misc:Depends},
+    openscad,
     openscad-testing-data,
     python,
     python-argparse,

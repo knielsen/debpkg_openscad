@@ -28,6 +28,7 @@ openscad (2013.06+git20130702+dfsg-1) UNRELEASED; urgency=low
   * Patch tests/test_cmdline_tool.py to use absolute paths (because openscad
     and echotest have different behaviors in that respect)
   * Add build dependencies to run the test suite at build time
+  * Depend on openscad-mcad for building to run the test suite
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 06 Aug 2013 23:48:00 +0200
 
