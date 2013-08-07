@@ -51,9 +51,9 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 endif()
 
 # MCAD
-if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../libraries/MCAD/__init__.py)
-  message(FATAL_ERROR "MCAD not found. You can install from the OpenSCAD root as follows: \n  git submodule update --init")
-endif()
+#if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../libraries/MCAD/__init__.py)
+#  message(FATAL_ERROR "MCAD not found. You can install from the OpenSCAD root as follows: \n  git submodule update --init")
+#endif()
 
 #
 # Windows
