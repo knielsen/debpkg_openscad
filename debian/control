@@ -1,6 +1,13 @@
 Source: openscad
 Priority: optional
 Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
+# while it is common to have libgl1-mesa-dev as the default option for
+# libgl1-dev, libgl1-mesa-swx11-dev is chosen here to avoid that an installer
+# for a build server gets the idea of installing xserver-xorg-core; also, this
+# is why the sequence of xserver-xorg-core and xvfb is flipped here relative to
+# openscad-testing, where they come from.
+#
+# for the time being, this is difficult to fullfill due to #718992
 Build-Depends:
     debhelper (>= 9),
     qt4-qmake (>=4.4),
@@ -21,7 +28,10 @@ Build-Depends:
     libboost-filesystem-dev,
     chrpath,
     pkg-config,
-    imagemagick
+    imagemagick,
+    libgl1-mesa-swx11-dev | libgl1-dev,
+    xvfb | xserver-xorg-core,
+    libgl1-mesa-swx11 | xserver-xorg-core
 # openscad is not gles compatible yet. this line makes builds abort before they
 # faile at compile time. libqt4-opengl-dev currently pulls libgles2-mesa-dev in
 # on ubuntu arm{el,hf}.
@@ -64,7 +74,9 @@ Depends:
     python,
     python-argparse,
     cmake,
-    imagemagick
+    imagemagick,
+    xserver-xorg-core | xvfb,
+    xserver-xorg-core | libgl1-mesa-swx11
 Description: script file based graphical CAD environment (test suite)
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
  aspects rather than artistic ones.
