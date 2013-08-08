@@ -35,7 +35,12 @@ override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	# FIXME: ignoring the tests is not a nice thing to do, but it seems
 	# they are too much under construction atm
-	cd tests && PATH=..:$$PATH ctest || echo "Not failing just because some tests went wrong..."
+	#
+	# PATH has to be set as the explicit ../openscad reference was removed above.
+	# OPENSCADPATH has to be set because the default library dir is
+	# determined based on the openscad binary's path (will be ok after
+	# installation).
+	cd tests && PATH=..:$$PATH OPENSCADPATH=/usr/share/openscad/libraries ctest || echo "Not failing just because some tests went wrong..."
 else
 	@echo "Skipping test suite as requested in DEB_BUILD_OPTIONS"
 endif
