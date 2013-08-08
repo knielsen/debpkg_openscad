@@ -48,6 +48,17 @@ def main():
     for f in os.listdir(TESTPROGRAMS):
         os.symlink(join(TESTPROGRAMS, f), join(builddir, f))
 
+    # this is a workaround while the throwntogethertest handles includes subtly
+    # different from openscad's includes. in the build time tests, this does
+    # not surface as OPENSCADPATH has to be set anyway due to the default
+    # library include path depending on the binary location, which is not final
+    # in those tests.
+    #
+    # the tests that failed were throwntogethertest_text-search-test,
+    # throwntogethertest_include-tests and throwntogethertest_use-tests; it
+    # seems the importing failed in the second level of MCAD includes.
+    os.environ['OPENSCADPATH'] = '/usr/share/openscad/libraries'
+
     if args.no_run:
         print "Skipping test run"
     else:
