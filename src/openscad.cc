@@ -50,6 +50,7 @@
 
 #include "csgterm.h"
 #include "CSGTermEvaluator.h"
+#include "CsgInfo.h"
 
 #include <QApplication>
 #include <QString>
@@ -97,6 +98,43 @@ static void version()
 {
 	printf("OpenSCAD version %s\n", TOSTRING(OPENSCAD_VERSION));
 	exit(1);
+}
+
+static void buildinfo()
+{
+	CsgInfo csgInfo = CsgInfo();
+
+#ifdef __GNUG__
+#define compiler_info "GCC " << __VERSION__
+#elif defined(_MSC_VER)
+#define compiler_info "MSVC " << _MSC_FULL_VER
+#else
+#define compiler_info "unknown compiler"
+#endif
+
+#ifndef OPENCSG_VERSION_STRING
+#define OPENCSG_VERSION_STRING "unknown, <1.3.2"
+#endif
+
+	std::cout << "\nOpenSCAD Version: " << TOSTRING(OPENSCAD_VERSION)
+            << "\nCompiled by: " << compiler_info
+	    << "\nCompile date: " << __DATE__
+	    << "\nBoost version: " << BOOST_LIB_VERSION
+	    << "\nEigen version: " << EIGEN_WORLD_VERSION << "."
+	    << EIGEN_MAJOR_VERSION << "." << EIGEN_MINOR_VERSION
+	    << "\nCGAL version: " << TOSTRING(CGAL_VERSION)
+	    << "\nOpenCSG version: " << OPENCSG_VERSION_STRING << "\n";
+
+	try {
+		csgInfo.glview = new OffscreenView(512,512);
+	} catch (int error) {
+		fprintf(stderr,"Can't create OpenGL OffscreenView. Code: %i. Exiting.\n", error);
+		exit(1);
+	}
+
+	std::cout << csgInfo.glview->getRendererInfo() << "\n";
+
+	exit(0);
 }
 
 std::string commandline_commands;
@@ -199,6 +237,7 @@ int main(int argc, char **argv)
 	desc.add_options()
 		("help,h", "help message")
 		("version,v", "print the version")
+		("buildinfo", "print information about the building process")
 		("render", "if exporting a png image, do a full CGAL render")
 		("camera", po::value<string>(), "parameters for camera when exporting png")
 	        ("imgsize", po::value<string>(), "=width,height for exporting png")
@@ -231,6 +270,7 @@ int main(int argc, char **argv)
 
 	if (vm.count("help")) help(argv[0]);
 	if (vm.count("version")) version();
+	if (vm.count("buildinfo")) buildinfo();
 
 	if (vm.count("o")) {
 		// FIXME: Allow for multiple output files?
