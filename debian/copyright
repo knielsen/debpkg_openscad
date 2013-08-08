@@ -58,11 +58,6 @@ Comment: given no other indication, it is assumed that most of the file stems
  AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Files: src/SparkleAutoUpdater.h src/SparkleAutoUpdater.mm
-Copyright: (C) 2008 Remko Troncon, 2013 Marius Kintel
-License: BSD
-FIXME: BSD is not a license
-
 Files: contrib/scad-mode.el
 Copyright: 2010-2011 Len Trigg <lenbok@gmail.com>
 License: GPL-2+
