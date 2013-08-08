@@ -22,9 +22,13 @@ override_dh_auto_build:
 		.
 	cd tests && make
 
-	# fix absolute paths in ctest scripts
+	# fix absolute paths in ctest scripts (relative paths will work during
+	# the build time tests, and are catered for by the openscad-testrun
+	# script).
 	cd tests && perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s/\Q$$here\E/./g' *.cmake
-	# fix relative paths to plain binary names
+	# fix relative paths to plain binary names (the $PATH will be
+	# explicitly set during build time tests, and with openscad-testrun, it
+	# will have been installed).
 	cd tests && sed 's@\./\.\./openscad@openscad@' -i *.cmake
 
 override_dh_auto_test:
@@ -35,6 +39,12 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 else
 	@echo "Skipping test suite as requested in DEB_BUILD_OPTIONS"
 endif
+
+	# fix absolute paths in generated scad files. this step logically
+	# belongs to the similar lines in the dh_auto_build override, but can
+	# first be done here becaus for the build time tests, the original
+	# paths are still required.
+	find testdata -name \*.scad  -exec perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s[\Q$$here\E/tests/../testdata][/usr/share/openscad/testdata]g' {} +
 
 override_dh_auto_install:
 	dh_auto_install --destdir=debian/openscad
