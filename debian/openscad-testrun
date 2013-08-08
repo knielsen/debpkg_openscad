@@ -29,6 +29,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("-d", "--directory", help="Where to set up the files")
     p.add_argument("-n", "--no-run", help="Just set up the files, don't run", action="store_true")
+    p.add_argument("--virtual", help="Run the tests on a virtual X server (xvfb-run)", action="store_true")
     p.add_argument("additional", nargs="*", help="remaining arguments will be passed to ctest")
 
     args = p.parse_args()
@@ -63,7 +64,10 @@ def main():
         print "Skipping test run"
     else:
         os.chdir(builddir)
-        os.execvp("ctest", ["ctest"] + args.additional)
+        invocation = ["ctest"] + args.additional
+        if args.virtual:
+            invocation = ['xvfb-run', '-s', '-screen 0 800x600x24'] + invocation
+        os.execvp(invocation[0], invocation)
 
 if __name__ == "__main__":
     main()
