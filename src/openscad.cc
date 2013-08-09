@@ -100,7 +100,7 @@ static void version()
 	exit(1);
 }
 
-static void buildinfo()
+static void info()
 {
 	CsgInfo csgInfo = CsgInfo();
 
@@ -237,7 +237,7 @@ int main(int argc, char **argv)
 	desc.add_options()
 		("help,h", "help message")
 		("version,v", "print the version")
-		("buildinfo", "print information about the building process")
+		("info", "print information about the building process")
 		("render", "if exporting a png image, do a full CGAL render")
 		("camera", po::value<string>(), "parameters for camera when exporting png")
 	        ("imgsize", po::value<string>(), "=width,height for exporting png")
@@ -270,7 +270,7 @@ int main(int argc, char **argv)
 
 	if (vm.count("help")) help(argv[0]);
 	if (vm.count("version")) version();
-	if (vm.count("buildinfo")) buildinfo();
+	if (vm.count("info")) info();
 
 	if (vm.count("o")) {
 		// FIXME: Allow for multiple output files?
