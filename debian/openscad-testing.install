@@ -1,5 +1,4 @@
 # compiled programs
-tests/throwntogethertest /usr/lib/openscad/testprograms/
 tests/csgtexttest /usr/lib/openscad/testprograms/
 
 # helper scripts

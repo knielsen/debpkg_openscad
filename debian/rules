@@ -67,7 +67,6 @@ override_dh_auto_install:
 	# wrong exactly
 	for x in \
 		csgtexttest \
-		throwntogethertest \
 		; do chrpath -d tests/$$x; done
 
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
