@@ -32,11 +32,11 @@
 #include "value.h"
 #include "export.h"
 #include "builtin.h"
-#include "nodedumper.h"
 #include "printutils.h"
 #include "handle_dep.h"
 #include "parsersettings.h"
 #include "rendersettings.h"
+#include "PlatformUtils.h"
 
 #include <string>
 #include <vector>
@@ -83,12 +83,13 @@ static void help(const char *progname)
 {
 	int tab = int(strlen(progname))+8;
 	fprintf(stderr,"Usage: %s [ -o output_file [ -d deps_file ] ]\\\n"
-	        "%*s[ -m make_command ] [ -D var=val [..] ] [ --render ] \\\n"
+	        "%*s[ -m make_command ] [ -D var=val [..] ] \\\n"
 	        "%*s[ --camera=translatex,y,z,rotx,y,z,dist | \\\n"
 	        "%*s  --camera=eyex,y,z,centerx,y,z ] \\\n"
 	        "%*s[ --imgsize=width,height ] [ --projection=(o)rtho|(p)ersp] \\\n"
+	        "%*s[ --render | --preview[=throwntogether] ] \\\n"
 	        "%*sfilename\n",
-					progname, tab, "", tab, "", tab, "", tab, "", tab, "");
+					progname, tab, "", tab, "", tab, "", tab, "", tab, "", tab, "");
 	exit(1);
 }
 
@@ -102,29 +103,9 @@ static void version()
 
 static void info()
 {
+	std::cout << PlatformUtils::info() << "\n\n";
+
 	CsgInfo csgInfo = CsgInfo();
-
-#ifdef __GNUG__
-#define compiler_info "GCC " << __VERSION__
-#elif defined(_MSC_VER)
-#define compiler_info "MSVC " << _MSC_FULL_VER
-#else
-#define compiler_info "unknown compiler"
-#endif
-
-#ifndef OPENCSG_VERSION_STRING
-#define OPENCSG_VERSION_STRING "unknown, <1.3.2"
-#endif
-
-	std::cout << "\nOpenSCAD Version: " << TOSTRING(OPENSCAD_VERSION)
-            << "\nCompiled by: " << compiler_info
-	    << "\nCompile date: " << __DATE__
-	    << "\nBoost version: " << BOOST_LIB_VERSION
-	    << "\nEigen version: " << EIGEN_WORLD_VERSION << "."
-	    << EIGEN_MAJOR_VERSION << "." << EIGEN_MINOR_VERSION
-	    << "\nCGAL version: " << TOSTRING(CGAL_VERSION)
-	    << "\nOpenCSG version: " << OPENCSG_VERSION_STRING << "\n";
-
 	try {
 		csgInfo.glview = new OffscreenView(512,512);
 	} catch (int error) {
@@ -163,6 +144,10 @@ Camera get_camera( po::variables_map vm )
 			fprintf(stderr,"or 6 numbers for Vector Camera\n");
 			exit(1);
 		}
+	}
+
+	if (camera.type == Camera::GIMBAL) {
+		camera.gimbalDefaultTranslate();
 	}
 
 	if (vm.count("projection")) {
@@ -239,6 +224,7 @@ int main(int argc, char **argv)
 		("version,v", "print the version")
 		("info", "print information about the building process")
 		("render", "if exporting a png image, do a full CGAL render")
+		("preview", po::value<string>(), "if exporting a png image, do an OpenCSG(default) or ThrownTogether preview")
 		("camera", po::value<string>(), "parameters for camera when exporting png")
 	        ("imgsize", po::value<string>(), "=width,height for exporting png")
 		("projection", po::value<string>(), "(o)rtho or (p)erspective when exporting png")
@@ -340,9 +326,6 @@ int main(int argc, char **argv)
 
 	parser_init(QApplication::instance()->applicationDirPath().toLocal8Bit().constData());
 
-	// Initialize global visitors
-	NodeCache nodecache;
-	NodeDumper dumper(nodecache);
 	Tree tree;
 #ifdef ENABLE_CGAL
 	CGALEvaluator cgalevaluator(tree);
@@ -553,6 +536,8 @@ int main(int argc, char **argv)
 				else {
 					if (vm.count("render")) {
 						export_png_with_cgal(&root_N, camera, fstream);
+					} else if (vm.count("preview") && vm["preview"].as<string>() == "throwntogether" ) {
+						export_png_with_throwntogether(tree, camera, fstream);
 					} else {
 						export_png_with_opencsg(tree, camera, fstream);
 					}

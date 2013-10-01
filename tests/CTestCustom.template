@@ -58,9 +58,9 @@ endif()
 
 # Part 1. Pretty Printing
 
-message("running 'openscad --buildinfo' to generate sysinfo.txt")
-execute_process(COMMAND __wine__ __gui_binpath__ --buildinfo OUTPUT_FILE sysinfo.txt)
-set(CTEST_CUSTOM_POST_TEST ${CTEST_CUSTOM_POST_TEST} "__cmake_current_binary_dir__/test_pretty_print.py")
+message("running '__gui_binpath__ --info' to generate sysinfo.txt")
+execute_process(COMMAND __wine__ __gui_binpath__ --info OUTPUT_FILE sysinfo.txt)
+set(CTEST_CUSTOM_POST_TEST ${CTEST_CUSTOM_POST_TEST} "__cmake_current_binary_dir__/test_pretty_print")
 
 if ( ${debug_openscad_template} )
   foreach(post_test ${CTEST_CUSTOM_POST_TEST} )

@@ -188,7 +188,7 @@ endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 # Turn off Eigen SIMD optimization
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+  if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "^FreeBSD")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DEIGEN_DONT_ALIGN")
   endif()
 endif()
@@ -541,14 +541,6 @@ set_target_properties(cgalcachetest PROPERTIES COMPILE_FLAGS "-DENABLE_CGAL ${CG
 target_link_libraries(cgalcachetest tests-cgal ${TESTS-CGAL-LIBRARIES} ${GLEW_LIBRARY} ${COCOA_LIBRARY})
 
 #
-# throwntogethertest
-#
-
-add_executable(throwntogethertest throwntogethertest.cc csgtestcore.cc ../src/OpenCSGRenderer.cc ../src/ThrownTogetherRenderer.cc ../src/renderer.cc ../src/rendersettings.cc)
-set_target_properties(throwntogethertest PROPERTIES COMPILE_FLAGS "-DENABLE_OPENCSG -DENABLE_CGAL ${CGAL_CXX_FLAGS_INIT}")
-target_link_libraries(throwntogethertest tests-offscreen tests-cgal ${OPENCSG_LIBRARY} ${TESTS-CGAL-LIBRARIES} ${GLEW_LIBRARY} ${COCOA_LIBRARY})
-
-#
 # GUI binary tests
 #
 if(APPLE)
@@ -849,8 +841,8 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake ${TMP})
 
 # Add tests
 
-add_cmdline_test(echotest SUFFIX txt ARGS ${GUI_BINPATH} FILES ${ECHO_FILES})
-add_cmdline_test(dumptest SUFFIX csg ARGS ${GUI_BINPATH} FILES ${DUMPTEST_FILES})
+add_cmdline_test(echotest EXE ${CMAKE_SOURCE_DIR}/echotest SUFFIX txt ARGS ${GUI_BINPATH} FILES ${ECHO_FILES})
+add_cmdline_test(dumptest EXE ${CMAKE_SOURCE_DIR}/dumptest SUFFIX csg ARGS ${GUI_BINPATH} FILES ${DUMPTEST_FILES})
 add_cmdline_test(moduledumptest EXE ${GUI_BINPATH} ARGS -o SUFFIX ast FILES
                  ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/allmodules.scad
                  ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/allfunctions.scad
@@ -865,10 +857,10 @@ add_cmdline_test(csgtermtest EXE ${GUI_BINPATH} ARGS -o SUFFIX term FILES
                              ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/allmodules.scad)
 add_cmdline_test(cgalpngtest EXE ${GUI_BINPATH} ARGS --render -o SUFFIX png FILES ${CGALPNGTEST_FILES})
 add_cmdline_test(opencsgtest EXE ${GUI_BINPATH} ARGS -o SUFFIX png FILES ${OPENCSGTEST_FILES})
-add_cmdline_test(throwntogethertest SUFFIX png FILES ${THROWNTOGETHERTEST_FILES})
+add_cmdline_test(throwntogethertest EXE ${GUI_BINPATH} ARGS --preview=throwntogether -o SUFFIX png FILES ${THROWNTOGETHERTEST_FILES})
 # FIXME: We don't actually need to compare the output of cgalstlsanitytest
 # with anything. It's self-contained and returns != 0 on error
-add_cmdline_test(cgalstlsanitytest SUFFIX txt ARGS ${GUI_BINPATH} FILES ${CGALSTLSANITYTEST_FILES})
+add_cmdline_test(cgalstlsanitytest EXE ${CMAKE_SOURCE_DIR}/cgalstlsanitytest SUFFIX txt ARGS ${GUI_BINPATH} FILES ${CGALSTLSANITYTEST_FILES})
 
 # Tests using the actual OpenSCAD binary
 
@@ -892,19 +884,19 @@ add_cmdline_test(openscad-imgstretch2 EXE ${GUI_BINPATH}
                  SUFFIX png 
                  FILES ${CMAKE_SOURCE_DIR}/../examples/example001.scad)
 add_cmdline_test(openscad-camdist EXE ${GUI_BINPATH} 
-                 ARGS --imgsize=500,500 --camera=0,0,0,0,0,0,300  examples/example001.scad -o
+                 ARGS --imgsize=500,500 --camera=0,0,0,90,0,90,300  examples/example001.scad -o
                  SUFFIX png
                  FILES ${CMAKE_SOURCE_DIR}/../examples/example001.scad)
 add_cmdline_test(openscad-camrot EXE ${GUI_BINPATH}
-                 ARGS --imgsize=500,500 --camera=0,0,0,10,22.5,45,300  examples/example001.scad -o
+                 ARGS --imgsize=500,500 --camera=0,0,0,440,337.5,315,300  examples/example001.scad -o
                  SUFFIX png
                  FILES ${CMAKE_SOURCE_DIR}/../examples/example001.scad)
 add_cmdline_test(openscad-camtrans EXE ${GUI_BINPATH}
-                 ARGS --imgsize=500,500 --camera=20,100,10,0,0,0,300  examples/example001.scad -o
+                 ARGS --imgsize=500,500 --camera=100,-20,-10,90,0,90,300  examples/example001.scad -o
                  SUFFIX png
                  FILES ${CMAKE_SOURCE_DIR}/../examples/example001.scad)
 add_cmdline_test(openscad-camortho EXE ${GUI_BINPATH}
-                 ARGS --imgsize=500,500 --camera=20,100,10,0,0,0,300  examples/example001.scad --projection=o -o
+                 ARGS --imgsize=500,500 --camera=100,-20,-10,90,0,90,300  examples/example001.scad --projection=o -o
                  SUFFIX png
                  FILES ${CMAKE_SOURCE_DIR}/../examples/example001.scad)
 add_cmdline_test(openscad-cameye EXE ${GUI_BINPATH}
