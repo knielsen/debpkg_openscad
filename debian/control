@@ -29,7 +29,7 @@ Build-Depends:
     chrpath,
     pkg-config,
     imagemagick,
-    libgl1-mesa-swx11-dev | libgl1-dev,
+    libgl1-mesa-swx11-dev | libgl-dev,
     xvfb | xserver-xorg-core,
     libgl1-mesa-swx11 | xserver-xorg-core,
     openscad-mcad
