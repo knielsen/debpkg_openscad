@@ -5,10 +5,26 @@ Comment: For the +dfsg version, icons/flattr.png was removed. It seems that the
  company holding the flattr trademark is ok with applications integratin this,
  but there is no explicit confirmation thereof, and if there was, it can be
  expected that the terms of use violate DFSG.
+ .
+ Also, the complet scripts/ directory was removed, as it contains files of
+ uncertain origin. This decision has been made 2013-07-02 and not been reviwed
+ since.
 
 Files: *
 Copyright: © 2009-2013 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
 License: GPL-2+ with CGAL exception
+
+Files: openscad.appdata.xml
+Copyright: 2013 Miro Hrončok <miro@hroncok.cz>
+License: CC0
+ See the complete license on http://creativecommons.org/publicdomain/zero/1.0/legalcode
+Comment:
+ According to the file format description referenced by the author at
+ <https://github.com/openscad/openscad/issues/494>,
+ <http://people.freedesktop.org/~hughsient/appdata/>, "<license>CC0</license>"
+ has to be looked up in Fedora's list of well-known licenses at
+ <https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing>, which finally
+ mentions the creativecommons.org URL in the license text section.
 
 Files: src/OGL_helper.h
 Copyright: © 1997-2002 Max-Planck-Institute Saarbruecken (Germany)
