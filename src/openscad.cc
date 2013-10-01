@@ -32,11 +32,11 @@
 #include "value.h"
 #include "export.h"
 #include "builtin.h"
-#include "nodedumper.h"
 #include "printutils.h"
 #include "handle_dep.h"
 #include "parsersettings.h"
 #include "rendersettings.h"
+#include "PlatformUtils.h"
 
 #include <string>
 #include <vector>
@@ -50,6 +50,7 @@
 
 #include "csgterm.h"
 #include "CSGTermEvaluator.h"
+#include "CsgInfo.h"
 
 #include <QApplication>
 #include <QString>
@@ -82,12 +83,13 @@ static void help(const char *progname)
 {
 	int tab = int(strlen(progname))+8;
 	fprintf(stderr,"Usage: %s [ -o output_file [ -d deps_file ] ]\\\n"
-	        "%*s[ -m make_command ] [ -D var=val [..] ] [ --render ] \\\n"
+	        "%*s[ -m make_command ] [ -D var=val [..] ] \\\n"
 	        "%*s[ --camera=translatex,y,z,rotx,y,z,dist | \\\n"
 	        "%*s  --camera=eyex,y,z,centerx,y,z ] \\\n"
 	        "%*s[ --imgsize=width,height ] [ --projection=(o)rtho|(p)ersp] \\\n"
+	        "%*s[ --render | --preview[=throwntogether] ] \\\n"
 	        "%*sfilename\n",
-					progname, tab, "", tab, "", tab, "", tab, "", tab, "");
+					progname, tab, "", tab, "", tab, "", tab, "", tab, "", tab, "");
 	exit(1);
 }
 
@@ -97,6 +99,23 @@ static void version()
 {
 	printf("OpenSCAD version %s\n", TOSTRING(OPENSCAD_VERSION));
 	exit(1);
+}
+
+static void info()
+{
+	std::cout << PlatformUtils::info() << "\n\n";
+
+	CsgInfo csgInfo = CsgInfo();
+	try {
+		csgInfo.glview = new OffscreenView(512,512);
+	} catch (int error) {
+		fprintf(stderr,"Can't create OpenGL OffscreenView. Code: %i. Exiting.\n", error);
+		exit(1);
+	}
+
+	std::cout << csgInfo.glview->getRendererInfo() << "\n";
+
+	exit(0);
 }
 
 std::string commandline_commands;
@@ -125,6 +144,10 @@ Camera get_camera( po::variables_map vm )
 			fprintf(stderr,"or 6 numbers for Vector Camera\n");
 			exit(1);
 		}
+	}
+
+	if (camera.type == Camera::GIMBAL) {
+		camera.gimbalDefaultTranslate();
 	}
 
 	if (vm.count("projection")) {
@@ -199,7 +222,9 @@ int main(int argc, char **argv)
 	desc.add_options()
 		("help,h", "help message")
 		("version,v", "print the version")
+		("info", "print information about the building process")
 		("render", "if exporting a png image, do a full CGAL render")
+		("preview", po::value<string>(), "if exporting a png image, do an OpenCSG(default) or ThrownTogether preview")
 		("camera", po::value<string>(), "parameters for camera when exporting png")
 	        ("imgsize", po::value<string>(), "=width,height for exporting png")
 		("projection", po::value<string>(), "(o)rtho or (p)erspective when exporting png")
@@ -231,6 +256,7 @@ int main(int argc, char **argv)
 
 	if (vm.count("help")) help(argv[0]);
 	if (vm.count("version")) version();
+	if (vm.count("info")) info();
 
 	if (vm.count("o")) {
 		// FIXME: Allow for multiple output files?
@@ -300,9 +326,6 @@ int main(int argc, char **argv)
 
 	parser_init(QApplication::instance()->applicationDirPath().toLocal8Bit().constData());
 
-	// Initialize global visitors
-	NodeCache nodecache;
-	NodeDumper dumper(nodecache);
 	Tree tree;
 #ifdef ENABLE_CGAL
 	CGALEvaluator cgalevaluator(tree);
@@ -513,6 +536,8 @@ int main(int argc, char **argv)
 				else {
 					if (vm.count("render")) {
 						export_png_with_cgal(&root_N, camera, fstream);
+					} else if (vm.count("preview") && vm["preview"].as<string>() == "throwntogether" ) {
+						export_png_with_throwntogether(tree, camera, fstream);
 					} else {
 						export_png_with_opencsg(tree, camera, fstream);
 					}
