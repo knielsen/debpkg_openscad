@@ -1,3 +1,10 @@
+openscad (2013.01+dfsg-3) unstable; urgency=low
+
+  [ Anton Gladky ]
+  * Replace libeigen2-dev by libeigen3-dev. (Closes: #726157)
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 06 Nov 2013 18:48:09 +0100
+
 openscad (2013.01+dfsg-2) unstable; urgency=low
 
   * Fix eigen.pri to build on kfreebsd. (Patch by Don Bright)
