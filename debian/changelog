@@ -36,6 +36,7 @@ openscad (2014.03~rc2+dfsg-1) UNRELEASED; urgency=low
   * Add build dependencies to run the test suite at build time
   * Depend on openscad-mcad for building to run the test suite
     - Patch out check for MCAD subtree
+  * Change Standards-Version to 3.9.5 (no further changes)
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 06 Aug 2013 23:48:00 +0200
 
