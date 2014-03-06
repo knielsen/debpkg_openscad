@@ -7,9 +7,14 @@ openscad (2014.03~rc2+dfsg-1) UNRELEASED; urgency=low
     - assignments can depend on previous assignments
     - syntax highlighting
     - user library path
-    - command line png output
     - support for opening dxf files
     - new behavior of preview and highlight operators
+    - new diameter arguments
+    - parent_module() and children() functions
+    - Unicode handling
+    - negative steps in ranges
+    - norm() and cross() functions
+    - new command line options
     - bugfixes
     - drops many test programs which caused issues when ran outside the build
       directory
