@@ -414,8 +414,9 @@ if (NOT $ENV{OPENSCAD_LIBRARIES} STREQUAL "")
   set(ENV{PKG_CONFIG_LIBDIR} "$ENV{OPENSCAD_LIBRARIES}/lib/pkgconfig")
 endif()
 
-# Find libraries (system installed or dependency built) using pkg-config
-find_package(PkgConfig REQUIRED)
+find_package(GLIB2 2.2.0 REQUIRED)
+add_definitions(${GLIB2_DEFINITIONS})
+inclusion(GLIB2_DIR GLIB2_INCLUDE_DIRS)
 
 # Imagemagick
 
