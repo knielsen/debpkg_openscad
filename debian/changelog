@@ -1,4 +1,4 @@
-openscad (2013.06+git20130702+dfsg-1) UNRELEASED; urgency=low
+openscad (2014.03~rc2+dfsg-1) UNRELEASED; urgency=low
 
   * New upstream version
     - resize module
@@ -11,12 +11,13 @@ openscad (2013.06+git20130702+dfsg-1) UNRELEASED; urgency=low
     - support for opening dxf files
     - new behavior of preview and highlight operators
     - bugfixes
-  * Pulled in a snapshot shortly after the 2013.06 release
     - drops many test programs which caused issues when ran outside the build
       directory
+  * Copyright file updates
+  * Build-depend on glib
+  * Build-conflict against libgles2-dev (eg libgles2-mesa-dev)
   * Patches dropped due to upstream inclusion:
     - changes to eigen.pri
-  * Build-conflict against libgles2-dev (eg libgles2-mesa-dev)
   * Patch out verbose mode through qmake
   * Patch tests/CTestCustom.template to use test_pretty_print.py instead of
     the test_pretty_print.c wrapper that is just used to transport a hardcoded
