@@ -33,11 +33,15 @@
 #include <QStatusBar>
 #include "PolySetCache.h"
 #include "AutoUpdater.h"
+#include "feature.h"
 #ifdef ENABLE_CGAL
 #include "CGALCache.h"
 #endif
 
 Preferences *Preferences::instance = NULL;
+
+const char * Preferences::featurePropertyName = "FeatureProperty";
+Q_DECLARE_METATYPE(Feature *);
 
 Preferences::Preferences(QWidget *parent) : QMainWindow(parent)
 {
@@ -46,11 +50,11 @@ Preferences::Preferences(QWidget *parent) : QMainWindow(parent)
 	// Editor pane
 	// Setup default font (Try to use a nice monospace font)
 	QString fontfamily;
-#ifdef Q_WS_X11
+#ifdef Q_OS_X11
 	fontfamily = "Mono";
-#elif defined (Q_WS_WIN)
+#elif defined (Q_OS_WIN)
 	fontfamily = "Console";
-#elif defined (Q_WS_MAC)
+#elif defined (Q_OS_MAC)
 	fontfamily = "Monaco";
 #endif
 	QFont font;
@@ -59,6 +63,7 @@ Preferences::Preferences(QWidget *parent) : QMainWindow(parent)
 	QString found_family(QFontInfo(font).family());
 	this->defaultmap["editor/fontfamily"] = found_family;
  	this->defaultmap["editor/fontsize"] = 12;
+	this->defaultmap["editor/syntaxhighlight"] = "For Light Background";
 
 	uint savedsize = getValue("editor/fontsize").toUInt();
 	QFontDatabase db;
@@ -86,13 +91,21 @@ Preferences::Preferences(QWidget *parent) : QMainWindow(parent)
 	this->defaultmap["advanced/openCSGLimit"] = RenderSettings::inst()->openCSGTermLimit;
 	this->defaultmap["advanced/forceGoldfeather"] = false;
 
-
 	// Toolbar
 	QActionGroup *group = new QActionGroup(this);
-	group->addAction(prefsAction3DView);
-	group->addAction(prefsActionEditor);
-	group->addAction(prefsActionUpdate);
-	group->addAction(prefsActionAdvanced);
+	addPrefPage(group, prefsAction3DView, page3DView);
+	addPrefPage(group, prefsActionEditor, pageEditor);
+#if defined(OPENSCAD_DEPLOY) && defined(Q_OS_MAC)
+	addPrefPage(group, prefsActionUpdate, pageUpdate);
+#else
+	this->toolBar->removeAction(prefsActionUpdate);
+#endif
+#ifdef ENABLE_EXPERIMENTAL
+	addPrefPage(group, prefsActionFeatures, pageFeatures);
+#else
+	this->toolBar->removeAction(prefsActionFeatures);
+#endif
+	addPrefPage(group, prefsActionAdvanced, pageAdvanced);
 	connect(group, SIGNAL(triggered(QAction*)), this, SLOT(actionTriggered(QAction*)));
 
 	prefsAction3DView->setChecked(true);
@@ -140,6 +153,7 @@ Preferences::Preferences(QWidget *parent) : QMainWindow(parent)
 	this->polysetCacheSizeEdit->setValidator(validator);
 	this->opencsgLimitEdit->setValidator(validator);
 
+	setupFeaturesPage();
 	updateGUI();
 
 	RenderSettings::inst()->setColors(this->colorschemes[getValue("3dview/colorscheme").toString()]);
@@ -150,21 +164,102 @@ Preferences::~Preferences()
 	removeDefaultSettings();
 }
 
+/**
+ * Add a page for the preferences GUI. This handles both the action grouping
+ * and the registration of the widget for each action to have a generalized
+ * callback to switch pages.
+ * 
+ * @param group The action group for all page actions. This one will have the
+ *              callback attached after creating all actions/pages.
+ * @param action The action specific for the added page.
+ * @param widget The widget that should be shown when the action is triggered.
+ *               This must be a child page of the stackedWidget.
+ */
+void
+Preferences::addPrefPage(QActionGroup *group, QAction *action, QWidget *widget)
+{
+	group->addAction(action);
+	prefPages[action] = widget;
+}
+
+/**
+ * Callback to switch pages in the preferences GUI.
+ * 
+ * @param action The action triggered by the user.
+ */
 void
 Preferences::actionTriggered(QAction *action)
 {
-	if (action == this->prefsAction3DView) {
-		this->stackedWidget->setCurrentWidget(this->page3DView);
+	this->stackedWidget->setCurrentWidget(prefPages[action]);
+}
+
+/**
+ * Callback for the dynamically created checkboxes on the features
+ * page. The specific Feature object is associated as property with
+ * the callback.
+ * 
+ * @param state the state of the checkbox.
+ */
+void Preferences::featuresCheckBoxToggled(bool state)
+{
+	const QObject *sender = QObject::sender();
+	if (sender == NULL) {
+		return;
 	}
-	else if (action == this->prefsActionEditor) {
-		this->stackedWidget->setCurrentWidget(this->pageEditor);
+	QVariant v = sender->property(featurePropertyName);
+	if (!v.isValid()) {
+		return;
 	}
-	else if (action == this->prefsActionUpdate) {
-		this->stackedWidget->setCurrentWidget(this->pageUpdate);
+	Feature *feature = v.value<Feature *>();
+	feature->enable(state);
+	QSettings settings;
+	settings.setValue(QString("feature/%1").arg(QString::fromStdString(feature->get_name())), state);
+}
+
+/**
+ * Setup feature GUI and synchronize the Qt settings with the feature values.
+ * 
+ * When running in GUI mode, the feature setting that might have been set
+ * from commandline is ignored. This always uses the value coming from the
+ * QSettings.
+ */
+void
+Preferences::setupFeaturesPage()
+{
+	int row = 0;
+	for (Feature::iterator it = Feature::begin();it != Feature::end();it++) {
+		Feature *feature = *it;
+		
+		QString featurekey = QString("feature/%1").arg(QString::fromStdString(feature->get_name()));
+		this->defaultmap[featurekey] = false;
+
+		// spacer item between the features, just for some optical separation
+		gridLayoutExperimentalFeatures->addItem(new QSpacerItem(1, 8, QSizePolicy::Expanding, QSizePolicy::Fixed), row, 1, 1, 1, Qt::AlignCenter);
+		row++;
+
+		QCheckBox *cb = new QCheckBox(QString::fromStdString(feature->get_name()), pageFeatures);
+		QFont bold_font(cb->font());
+		bold_font.setBold(true);
+		cb->setFont(bold_font);
+		// synchronize Qt settings with the feature settings
+		bool value = getValue(featurekey).toBool();
+		feature->enable(value);
+		cb->setChecked(value);
+		cb->setProperty(featurePropertyName, QVariant::fromValue<Feature *>(feature));
+		connect(cb, SIGNAL(toggled(bool)), this, SLOT(featuresCheckBoxToggled(bool)));		
+		gridLayoutExperimentalFeatures->addWidget(cb, row, 0, 1, 2, Qt::AlignLeading);
+		row++;
+		
+		QLabel *l = new QLabel(QString::fromStdString(feature->get_description()), pageFeatures);
+		l->setTextFormat(Qt::RichText);
+		gridLayoutExperimentalFeatures->addWidget(l, row, 1, 1, 1, Qt::AlignLeading);
+		row++;
 	}
-	else if (action == this->prefsActionAdvanced) {
-		this->stackedWidget->setCurrentWidget(this->pageAdvanced);
-	}
+	// Force fixed indentation, the checkboxes use column span of 2 so 
+	// first row is not constrained in size by the visible controls. The
+	// fixed size space essentially gives the first row the width of the
+	// spacer item itself.
+	gridLayoutExperimentalFeatures->addItem(new QSpacerItem(20, 0, QSizePolicy::Fixed, QSizePolicy::Fixed), 1, 0, 1, 1, Qt::AlignLeading);
 }
 
 void Preferences::on_colorSchemeChooser_itemSelectionChanged()
@@ -191,6 +286,13 @@ void Preferences::on_fontSize_editTextChanged(const QString &size)
 	QSettings settings;
 	settings.setValue("editor/fontsize", intsize);
 	emit fontChanged(getValue("editor/fontfamily").toString(), intsize);
+}
+
+void Preferences::on_syntaxHighlight_currentIndexChanged(const QString &s)
+{
+	QSettings settings;
+	settings.setValue("editor/syntaxhighlight", s);
+	emit syntaxHighlightChanged(s);
 }
 
 void unimplemented_msg()
@@ -273,7 +375,7 @@ void Preferences::on_forceGoldfeatherBox_toggled(bool state)
 
 void Preferences::keyPressEvent(QKeyEvent *e)
 {
-#ifdef Q_WS_MAC
+#ifdef Q_OS_MAC
 	if (e->modifiers() == Qt::ControlModifier && e->key() == Qt::Key_Period) {
 		close();
 	} else
@@ -309,7 +411,6 @@ QVariant Preferences::getValue(const QString &key) const
 
 void Preferences::updateGUI()
 {
-	QSettings settings;
 	QList<QListWidgetItem *> found = 
 		this->colorSchemeChooser->findItems(getValue("3dview/colorscheme").toString(),
 																				Qt::MatchExactly);
@@ -329,6 +430,10 @@ void Preferences::updateGUI()
 	else {
 		this->fontSize->setEditText(fontsize);
 	}
+
+	QString shighlight = getValue("editor/syntaxhighlight").toString();
+	int shidx = this->syntaxHighlight->findText(shighlight);
+	if (shidx >= 0) this->syntaxHighlight->setCurrentIndex(shidx);
 
 	if (AutoUpdater *updater = AutoUpdater::updater()) {
 		this->updateCheckBox->setChecked(updater->automaticallyChecksForUpdates());

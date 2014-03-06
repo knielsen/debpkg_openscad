@@ -95,7 +95,12 @@ void ModuleContext::registerBuiltin()
 const AbstractFunction *ModuleContext::findLocalFunction(const std::string &name) const
 {
 	if (this->functions_p && this->functions_p->find(name) != this->functions_p->end()) {
-		return this->functions_p->find(name)->second;
+		AbstractFunction *f = this->functions_p->find(name)->second;
+		if (!f->is_enabled()) {
+			PRINTB("WARNING: Experimental builtin function '%s' is not enabled.", name);
+			return NULL;
+		}
+		return f;
 	}
 	return NULL;
 }
@@ -104,9 +109,13 @@ const AbstractModule *ModuleContext::findLocalModule(const std::string &name) co
 {
 	if (this->modules_p && this->modules_p->find(name) != this->modules_p->end()) {
 		AbstractModule *m = this->modules_p->find(name)->second;
+		if (!m->is_enabled()) {
+			PRINTB("WARNING: Experimental builtin module '%s' is not enabled.", name);
+			return NULL;
+		}
 		std::string replacement = Builtins::instance()->isDeprecated(name);
 		if (!replacement.empty()) {
-			PRINTB("DEPRECATED: The %s() module will be removed in future releases. Use %s() instead.", name % replacement);
+			PRINT_DEPRECATION("DEPRECATED: The %s() module will be removed in future releases. Use %s() instead.", name % replacement);
 		}
 		return m;
 	}
@@ -162,7 +171,7 @@ void ModuleContext::dump(const AbstractModule *mod, const ModuleInstantiation *i
 #endif
 
 FileContext::FileContext(const class FileModule &module, const Context *parent)
-	: usedlibs(module.usedlibs), ModuleContext(parent)
+	: ModuleContext(parent), usedlibs(module.usedlibs)
 {
 	if (!module.modulePath().empty()) this->document_path = module.modulePath();
 }

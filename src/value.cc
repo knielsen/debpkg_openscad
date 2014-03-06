@@ -36,6 +36,10 @@
 #include <boost/format.hpp>
 #include "boost-utils.h"
 #include "boosty.h"
+/*Unicode support for string lengths and array accesses*/
+#include <glib.h>
+
+#include <boost/math/special_functions/fpclassify.hpp>
 
 std::ostream &operator<<(std::ostream &stream, const Filename &filename)
 {
@@ -115,11 +119,6 @@ Value::Value(const VectorType &v) : value(v)
 Value::Value(const RangeType &v) : value(v)
 {
   //  std::cout << "creating range\n";
-}
-
-Value::Value(double begin, double step, double end) : value(RangeType(begin, step, end))
-{
-  //  std::cout << "creating range from numbers\n";
 }
 
 Value::ValueType Value::type() const
@@ -237,7 +236,7 @@ public:
   }
 
   std::string operator()(const Value::RangeType &v) const {
-    return (boost::format("[%1% : %2% : %3%]") % v.begin % v.step % v.end).str();
+    return (boost::format("[%1% : %2% : %3%]") % v.begin_val % v.step_val % v.end_val).str();
   }
 };
 
@@ -584,14 +583,28 @@ Value Value::operator-() const
   }
 */
 
+/*
+ * bracket operation [] detecting multi-byte unicode.
+ * If the string is multi-byte unicode then the index will offset to the character (2 or 4 byte) and not to the byte.
+ * A 'normal' string with byte chars are a subset of unicode and still work.
+ */
 class bracket_visitor : public boost::static_visitor<Value>
 {
 public:
   Value operator()(const std::string &str, const double &idx) const {
     int i = int(idx);
     Value v;
-    if (i >= 0 && i < str.size()) {
-      v = Value(str[int(idx)]);
+    //Check that the index is positive and less than the size in bytes
+    if ((i >= 0) && (i < (int)str.size())) {
+	  //Ensure character (not byte) index is inside the character/glyph array
+	  if( (unsigned) i < g_utf8_strlen( str.c_str(), str.size() ) )	{
+		  gchar utf8_of_cp[6] = ""; //A buffer for a single unicode character to be copied into
+		  gchar* ptr = g_utf8_offset_to_pointer(str.c_str(), i);
+		  if(ptr) {
+		    g_utf8_strncpy(utf8_of_cp, ptr, 1);
+		  }
+		  v = std::string(utf8_of_cp);
+	  }
       //      std::cout << "bracket_visitor: " <<  v << "\n";
     }
     return v;
@@ -599,15 +612,15 @@ public:
 
   Value operator()(const Value::VectorType &vec, const double &idx) const {
     int i = int(idx);
-    if (i >= 0 && i < vec.size()) return vec[int(idx)];
+    if ((i >= 0) && (i < (int)vec.size())) return vec[int(idx)];
     return Value::undefined;
   }
 
   Value operator()(const Value::RangeType &range, const double &idx) const {
     switch(int(idx)) {
-    case 0: return Value(range.begin);
-    case 1: return Value(range.step);
-    case 2: return Value(range.end);
+    case 0: return Value(range.begin_val);
+    case 1: return Value(range.step_val);
+    case 2: return Value(range.end_val);
     }
     return Value::undefined;
   }
@@ -621,4 +634,102 @@ public:
 Value Value::operator[](const Value &v)
 {
   return boost::apply_visitor(bracket_visitor(), this->value, v.value);
+}
+
+void Value::RangeType::normalize() {
+  if ((step_val>0) && (end_val < begin_val)) {
+    std::swap(begin_val,end_val);
+    printDeprecation("DEPRECATED: Using ranges of the form [begin:end] with begin value greater than the end value is deprecated.");
+  }
+}
+
+uint32_t Value::RangeType::nbsteps() const {
+  if (boost::math::isnan(step_val) || boost::math::isinf(begin_val) || (boost::math::isinf(end_val))) {
+    return std::numeric_limits<uint32_t>::max();
+  }
+
+  if ((begin_val == end_val) || boost::math::isinf(step_val)) {
+    return 0;
+  }
+  
+  if (step_val == 0) { 
+    return std::numeric_limits<uint32_t>::max();
+  }
+
+  double steps;
+  if (step_val < 0) {
+    if (begin_val < end_val) {
+      return 0;
+    }
+    steps = (begin_val - end_val) / (-step_val);
+  } else {
+    if (begin_val > end_val) {
+      return 0;
+    }
+    steps = (end_val - begin_val) / step_val;
+  }
+  
+  return steps;
+}
+
+Value::RangeType::iterator::iterator(Value::RangeType &range, type_t type) : range(range), val(range.begin_val)
+{
+    this->type = type;
+    update_type();
+}
+
+void Value::RangeType::iterator::update_type()
+{
+    if (range.step_val == 0) {
+        type = RANGE_TYPE_END;
+    } else if (range.step_val < 0) {
+        if (val < range.end_val) {
+            type = RANGE_TYPE_END;
+        }
+    } else {
+        if (val > range.end_val) {
+            type = RANGE_TYPE_END;
+        }
+    }
+}
+
+Value::RangeType::iterator::reference Value::RangeType::iterator::operator*()
+{
+    return val;
+}
+
+Value::RangeType::iterator::pointer Value::RangeType::iterator::operator->()
+{
+    return &(operator*());
+}
+
+Value::RangeType::iterator::self_type Value::RangeType::iterator::operator++()
+{
+    if (type < 0) {
+        type = RANGE_TYPE_RUNNING;
+    }
+    val += range.step_val;
+    update_type();
+    return *this;
+}
+
+Value::RangeType::iterator::self_type Value::RangeType::iterator::operator++(int)
+{
+    self_type tmp(*this);
+    operator++();
+    return tmp;
+}
+
+bool Value::RangeType::iterator::operator==(const self_type &other) const
+{
+    if (type == RANGE_TYPE_RUNNING) {
+        return (type == other.type) && (val == other.val) && (range == other.range);
+    } else {
+        return (type == other.type) && (range == other.range);
+    }
+}
+
+bool Value::RangeType::iterator::operator!=(const self_type &other) const
+{
+    return !(*this == other);
 }

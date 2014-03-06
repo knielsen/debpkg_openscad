@@ -2,17 +2,22 @@
 #define HIGHLIGHTER_H_
 
 #include <QSyntaxHighlighter>
+#include <QTextDocument>
 #include <QTextFormat>
+#include <QTextEdit>
 #include <QHash>
 
 class Highlighter : public QSyntaxHighlighter
 {
+	Q_OBJECT
 public:
 	enum state_e {NORMAL=-1,QUOTE,COMMENT};
 	QHash<QString, QTextCharFormat> tokenFormats;
-	QTextCharFormat errorFormat, commentFormat, quoteFormat, numberFormat;
+	QTextCharFormat errorFormat;
 	Highlighter(QTextDocument *parent);
 	void highlightBlock(const QString &text);
+	void assignFormatsToTokens(const QString &);
+	void portable_rehighlightBlock( const QTextBlock &text );
 	void highlightError(int error_pos);
 	void unhighlightLastError();
 private:
@@ -22,7 +27,6 @@ private:
 	QMap<QString,QStringList> tokentypes;
 	QMap<QString,QTextCharFormat> typeformats;
 	int lastDocumentPos();
-	void portable_rehighlightBlock( const QTextBlock &text );
 };
 
 #endif

@@ -1,10 +1,20 @@
 #include "PlatformUtils.h"
 #include "boosty.h"
 
+std::string PlatformUtils::pathSeparatorChar()
+{
+	return ":";
+}
+
 std::string PlatformUtils::documentsPath()
 {
-	fs::path docpath(getenv("HOME"));
-	docpath = docpath / ".local" / "share";
-
-	return boosty::stringy(docpath);
+	const char *home = getenv("HOME");
+	if (home) {
+		fs::path docpath(home);
+		docpath = docpath / ".local" / "share";
+		return boosty::stringy(docpath);
+	}
+	else {
+		return "";
+	}
 }

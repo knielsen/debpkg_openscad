@@ -1,6 +1,12 @@
 #include "editor.h"
 #include "Preferences.h"
 
+Editor::Editor(QWidget *parent) : QTextEdit(parent)
+{
+	setAcceptRichText(false);
+	this->highlighter = new Highlighter(this->document());
+}
+
 void Editor::indentSelection()
 {
 	QTextCursor cursor = textCursor();
@@ -108,3 +114,41 @@ void Editor::wheelEvent ( QWheelEvent * event )
 	}
 }
 
+void Editor::setPlainText(const QString &text)
+{
+	int y = verticalScrollBar()->sliderPosition();
+	// Save current cursor position
+	QTextCursor cursor = textCursor();
+	int n = cursor.position();
+	QTextEdit::setPlainText(text);
+	// Restore cursor position
+	if (n < text.length()) {
+		cursor.setPosition(n);
+		setTextCursor(cursor);
+		verticalScrollBar()->setSliderPosition(y);
+	}
+}
+
+void Editor::highlightError(int error_pos)
+{
+	highlighter->highlightError( error_pos );
+        QTextCursor cursor = this->textCursor();
+        cursor.setPosition( error_pos );
+        this->setTextCursor( cursor );
+}
+
+void Editor::unhighlightLastError()
+{
+	highlighter->unhighlightLastError();
+}
+
+void Editor::setHighlightScheme(const QString &name)
+{
+	highlighter->assignFormatsToTokens( name );
+	highlighter->rehighlight(); // slow on large files
+}
+
+Editor::~Editor()
+{
+	delete highlighter;
+}

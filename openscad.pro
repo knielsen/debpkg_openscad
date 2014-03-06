@@ -8,10 +8,14 @@
 #   OPENCSGDIR
 #   OPENSCAD_LIBRARIES
 #
-# Please see the 'Buildling' sections of the OpenSCAD user manual 
+# Please see the 'Building' sections of the OpenSCAD user manual 
 # for updated tips & workarounds.
 #
 # http://en.wikibooks.org/wiki/OpenSCAD_User_Manual
+
+!experimental {
+  message("If you're building a development binary, consider adding CONFIG+=experimental")
+}
 
 isEmpty(QT_VERSION) {
   error("Please use qmake for Qt 4 (probably qmake-qt4)")
@@ -39,11 +43,13 @@ debug: DEFINES += DEBUG
 TEMPLATE = app
 
 INCLUDEPATH += src
+DEPENDPATH += src
 
 # Handle custom library location.
 # Used when manually installing 3rd party libraries
 OPENSCAD_LIBDIR = $$(OPENSCAD_LIBRARIES)
 !isEmpty(OPENSCAD_LIBDIR) {
+  INCLUDEPATH += $$OPENSCAD_LIBDIR/include
   QMAKE_INCDIR_QT = $$OPENSCAD_LIBDIR/include $$QMAKE_INCDIR_QT 
   QMAKE_LIBDIR = $$OPENSCAD_LIBDIR/lib $$QMAKE_LIBDIR
 }
@@ -60,10 +66,8 @@ deploy {
   message("Building deployment version")
   DEFINES += OPENSCAD_DEPLOY
   macx {
-    CONFIG += x86 x86_64
-    LIBS += -framework Sparkle
-    HEADERS += src/SparkleAutoUpdater.h
-    OBJECTIVE_SOURCES += src/SparkleAutoUpdater.mm
+    CONFIG += x86_64
+    CONFIG += sparkle
   }
 }
 
@@ -74,15 +78,7 @@ macx {
   APP_RESOURCES.path = Contents/Resources
   APP_RESOURCES.files = OpenSCAD.sdef dsa_pub.pem icons/SCAD.icns
   QMAKE_BUNDLE_DATA += APP_RESOURCES
-  LIBS += -framework Cocoa
-
-  # FIXME: Somehow, setting the deployment target to a lower version causes a
-  # seldom crash in debug mode (e.g. the minkowski2-test):
-  # frame #4: 0x00007fff8b7d5be5 libc++.1.dylib`std::runtime_error::~runtime_error() + 55
-  # frame #5: 0x0000000100150df5 OpenSCAD`CGAL::Uncertain_conversion_exception::~Uncertain_conversion_exception(this=0x0000000105044488) + 21 at Uncertain.h:78
-  # The reason for the crash appears to be linking with libgcc_s, 
-  # but it's unclear what's really going on
-  QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.6
+  LIBS += -framework Cocoa -framework ApplicationServices
 }
 else {
   TARGET = openscad
@@ -90,6 +86,7 @@ else {
 
 win* {
   RC_FILE = openscad_win32.rc
+  QTPLUGIN += qtaccessiblewidgets
 }
 
 CONFIG += qt
@@ -155,9 +152,15 @@ CONFIG += cgal
 CONFIG += opencsg
 CONFIG += boost
 CONFIG += eigen
+CONFIG += glib-2.0
 
 #Uncomment the following line to enable QCodeEdit
 #CONFIG += qcodeedit
+
+# Make experimental features available
+experimental {
+  DEFINES += ENABLE_EXPERIMENTAL
+}
 
 mdi {
   DEFINES += ENABLE_MDI
@@ -204,6 +207,7 @@ HEADERS += src/typedefs.h \
            src/OpenCSGWarningDialog.h \
            src/AboutDialog.h \
            src/builtin.h \
+           src/calc.h \
            src/context.h \
            src/modcontext.h \
            src/evalcontext.h \
@@ -219,6 +223,7 @@ HEADERS += src/typedefs.h \
            src/highlighter.h \
            src/localscope.h \
            src/module.h \
+           src/feature.h \
            src/node.h \
            src/csgnode.h \
            src/linearextrudenode.h \
@@ -277,6 +282,7 @@ SOURCES += src/version_check.cc \
            src/func.cc \
            src/localscope.cc \
            src/module.cc \
+           src/feature.cc \
            src/node.cc \
            src/context.cc \
            src/modcontext.cc \
@@ -322,6 +328,7 @@ SOURCES += src/version_check.cc \
            src/AutoUpdater.cc \
            \
            src/builtin.cc \
+           src/calc.cc \
            src/export.cc \
            src/export_png.cc \
            src/import.cc \
@@ -368,6 +375,7 @@ HEADERS += src/cgal.h \
            src/PolySetCGALEvaluator.h \
            src/CGALRenderer.h \
            src/CGAL_Nef_polyhedron.h \
+           src/CGAL_Nef3_workaround.h \
            src/cgalworker.h
 
 SOURCES += src/cgalutils.cc \
@@ -413,9 +421,17 @@ applications.path = $$PREFIX/share/applications
 applications.files = icons/openscad.desktop
 INSTALLS += applications
 
+appdata.path = $$PREFIX/share/appdata
+appdata.files = openscad.appdata.xml
+INSTALLS += appdata
+
 icons.path = $$PREFIX/share/pixmaps
 icons.files = icons/openscad.png
 INSTALLS += icons
+
+man.path = $$PREFIX/share/man/man1
+man.files = doc/openscad.1
+INSTALLS += man
 
 CONFIG(winconsole) {
   include(winconsole.pri)

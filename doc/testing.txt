@@ -3,10 +3,8 @@ Running regression tests:
 
 Prerequisites: cmake, python, ImageMagick 6.5.9.3 or newer
 
-First, get a working qmake GUI build of the main openscad binary. It is 
-used by the tests. Next, get MCAD installed by using 
-
-  'git submodule update --init'
+First, get a working qmake GUI build of the main openscad binary and install MCAD.
+See the main README.
 
 A) Building test environment
 
@@ -38,10 +36,21 @@ $ ctest -C <configs>  Adds extended tests belonging to configs.
                       Default  - Run default tests
                       Heavy    - Run more time consuming tests (> ~10 seconds)
                       Examples - test all examples
+                      Bugs     - test known bugs (tests will fail)
                       All      - test everything
 
-Adding a new regression test:
-------------------------------
+
+C) Automatically upload test results (experimental)
+
+It's possible to automatically upload tests results to an external
+server. This is good for CI, as well as being able to easily report
+bugs.
+
+To enable this feature, add '-DOPENSCAD_UPLOAD_TESTS=1' to the cmake cmd-line, e.g.:
+cmake -DOPENSCAD_UPLOAD_TESTS=1 .
+
+Adding a new test:
+------------------
 
 1) create a test file at an appropriate location under testdata/
 2) if the test is non-obvious, create a human readable description as comments in the test (or in another file in the same directory in case the file isn't human readable)
@@ -69,11 +78,9 @@ This is almost the same as adding a new regression test:
 Migration away from dedicated regression tests:
 -----------------------------------------------
 
-Two tests still need an intermediate script that mangles away timestamps and
+This test still needs an intermediate script that mangles away timestamps and
 near-zero floating point numbers:
 
-* dumptest
-* echotest
 * cgalstlsanitytest
 
 Some tests are yet to be converted:
@@ -84,15 +91,6 @@ These look like tests, but are not actually in use:
 
 * modulecachetest
 * cgalcachetest
-
-In the course of migration, the possibilities of using the OPENSCAD_TESTING
-compile time flag go away; that flag used to strip timestamps out of files,
-to unify float output, and to tweak the file inclusion paths. With that flag
-unused, we get better coverage of the primary code paths, at the cost of
-having to do some normalization in the unit testing process (thus the dumptest
-and echo test scripts). Especially, having a nonstandard MCAD library in the
-user include path can now break things -- but so can having misbehaving
-programs in your PATH.
 
 Troubleshooting:
 ------------------------------
