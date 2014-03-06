@@ -14,6 +14,7 @@ Build-Depends:
     libcgal-dev (>=3.6),
     libopencsg-dev (>=1.3.0),
     libeigen3-dev,
+    libglib2.0-dev,
     bison (>= 2.4),
     flex (>=2.5.35),
     libqt4-opengl-dev,
