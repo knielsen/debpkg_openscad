@@ -11,8 +11,18 @@ Comment: For the +dfsg version, icons/flattr.png was removed. It seems that the
  since.
 
 Files: *
-Copyright: © 2009-2013 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
+Copyright: © 2009-2014 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
 License: GPL-2+ with CGAL exception
+
+Files: icons/prefsFeatures.png
+Copyright: Jakub Steiner
+License: PD
+ http://creativecommons.org/licenses/publicdomain/
+Comment: The origin of this file is described in icons/license.txt as
+ taken from http://tango.freedesktop.org/Tango_Icon_Library, version 0.8.90 /
+ public domain. The source file (also available in the tango-icon-theme
+ package) was used to specify the author and the wording of the license.
+
 
 Files: openscad.appdata.xml
 Copyright: 2013 Miro Hrončok <miro@hroncok.cz>
@@ -29,10 +39,6 @@ Comment:
 Files: src/OGL_helper.h
 Copyright: © 1997-2002 Max-Planck-Institute Saarbruecken (Germany)
 License: GPL-3+
- This file is part of CGAL (www.cgal.org).
- You can redistribute it and/or modify it under the terms of the GNU
- General Public License as published by the Free Software Foundation,
- either version 3 of the License, or (at your option) any later version.
 Comment: This used to be derived from the original QPL'd OGL_helper.h from the
  CGAL library. The library got re-licensed to GPL-3+ (or LGPL-3+, for other
  parts) in its 4.0 version, with no significant changes to the OGL_helper.h
@@ -42,6 +48,10 @@ Comment: This used to be derived from the original QPL'd OGL_helper.h from the
  https://gforge.inria.fr/frs/download.php/30225/CGAL-4.0-beta1.tar.gz
  and states in its current license section exactly what is here shown in this
  DEP5 file's License: section.
+
+Files: src/CGAL_Nef3_workaround.h
+Copyright: © 1997-2002,2005 Max-Planck-Institute Saarbruecken (Germany)
+License: GPL-3+
 
 Files: src/cache.h
 Copyright: © 2009-2011 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>, 2010 Nokia Corporation and/or its subsidiary(-ies)
@@ -225,6 +235,12 @@ License: GPL-3
  .
  A copy of the GNU General Public License can be found in
  /usr/share/common-licenses/GPL-3.
+
+License: GPL-3+
+ This file is part of CGAL (www.cgal.org).
+ You can redistribute it and/or modify it under the terms of the GNU
+ General Public License as published by the Free Software Foundation,
+ either version 3 of the License, or (at your option) any later version.
 
 License: zlib
  This software is provided 'as-is', without any express or implied warranty. In
