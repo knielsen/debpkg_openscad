@@ -1,9 +1,16 @@
-openscad (2013.01+dfsg-3) unstable; urgency=low
+openscad (2013.01+dfsg-2.2) unstable; urgency=medium
 
-  [ Anton Gladky ]
+  * Non-maintainer upload.
+  * Fix for bad boost libraries. (Closes: #736544)
+
+ -- Anton Gladky <gladk@debian.org>  Fri, 24 Jan 2014 20:12:03 +0100
+
+openscad (2013.01+dfsg-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
   * Replace libeigen2-dev by libeigen3-dev. (Closes: #726157)
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Wed, 06 Nov 2013 18:48:09 +0100
+ -- Anton Gladky <gladk@debian.org>  Sat, 18 Jan 2014 22:01:18 +0100
 
 openscad (2013.01+dfsg-2) unstable; urgency=low
 
