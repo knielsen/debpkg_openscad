@@ -378,6 +378,33 @@ if(${CMAKE_CXX_COMPILER} MATCHES ".*clang.*" AND NOT ${CGAL_CXX_FLAGS_INIT} STRE
 	string(REPLACE "--param=ssp-buffer-size=4" "" CGAL_CXX_FLAGS_INIT ${CGAL_CXX_FLAGS_INIT})
 endif()
 
+#Get rid of bad libraries suggested for BOOST dependencies (they don't exist on some machines and cause build failures).
+#/usr/lib/libboost_thread.so;/usr/lib/libboost_system.so;
+string(FIND "${CGAL_3RD_PARTY_LIBRARIES}" "/usr/lib/libboost_system.so" FIND_POSITION  )
+if(NOT "-1" STREQUAL ${FIND_POSITION} )
+if(NOT EXISTS "/usr/lib/libboost_system.so")
+  MESSAGE( WARNING "CGAL_3RD_PARTY_LIBRARIES:Found erroneous /usr/lib/libboost_system.so -- stripping" )
+  string(REPLACE "/usr/lib/libboost_system.so" "" CGAL_3RD_PARTY_LIBRARIES ${CGAL_3RD_PARTY_LIBRARIES})
+endif()
+endif() 
+string(FIND "${CGAL_3RD_PARTY_LIBRARIES}" "/usr/lib/libboost_thread.so" FIND_POSITION  )
+if(NOT "-1" STREQUAL ${FIND_POSITION} )
+if(NOT EXISTS "/usr/lib/libboost_thread.so")
+  MESSAGE( WARNING "CGAL_3RD_PARTY_LIBRARIES:Found erroneous /usr/lib/libboost_thread.so -- stripping" )
+  string(REPLACE "/usr/lib/libboost_thread.so" "" CGAL_3RD_PARTY_LIBRARIES ${CGAL_3RD_PARTY_LIBRARIES})
+endif()
+endif() 
+
+if (NOT $ENV{OPENSCAD_LIBRARIES} STREQUAL "")
+  # Force pkg-config to look _only_ in the local library folder
+  # in case OPENSCAD_LIBRARIES is set.
+  set(ENV{PKG_CONFIG_PATH} "$ENV{OPENSCAD_LIBRARIES}/lib/pkgconfig")
+  set(ENV{PKG_CONFIG_LIBDIR} "$ENV{OPENSCAD_LIBRARIES}/lib/pkgconfig")
+endif()
+
+# Find libraries (system installed or dependency built) using pkg-config
+find_package(PkgConfig REQUIRED)
+
 # Imagemagick
 
 if (SKIP_IMAGEMAGICK)
