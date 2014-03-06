@@ -10,6 +10,7 @@
 #include "memory.h"
 #include <vector>
 #include <QMutex>
+#include <QSet>
 
 class MainWindow : public QMainWindow, public Ui::MainWindow
 {
@@ -19,7 +20,6 @@ public:
 	static void requestOpenFile(const QString &filename);
 
 	QString fileName;
-	class Highlighter *highlighter;
 
 	class Preferences *prefs;
 
@@ -54,6 +54,7 @@ public:
 	std::vector<shared_ptr<CSGTerm> > background_terms;
 	CSGChain *background_chain;
 	QString last_compiled_doc;
+	static QString qexamplesdir;
 
 	static const int maxRecentFiles = 10;
 	QAction *actionRecentFile[maxRecentFiles];
@@ -86,6 +87,8 @@ private:
 	static void consoleOutput(const std::string &msg, void *userdata);
 	void loadViewSettings();
 	void loadDesignSettings();
+	void saveBackup();
+	void writeBackup(class QFile *file);
 
   class QMessageBox *openglbox;
 
@@ -115,6 +118,19 @@ private slots:
 
 private slots:
 	void actionRenderCSG();
+	void selectFindType(int);
+	void find();
+	void findAndReplace();
+	void findNext();
+	void findPrev();
+	void useSelectionForFind();
+	void replace();
+	void replaceAll();
+protected:
+	bool findOperation(QTextDocument::FindFlags options = 0);
+	virtual bool eventFilter(QObject* obj, QEvent *event);
+
+private slots:
 	void csgRender();
 	void csgReloadRender();
 #ifdef ENABLE_CGAL
@@ -122,6 +138,7 @@ private slots:
 	void actionRenderCGALDone(class CGAL_Nef_polyhedron *);
 	void cgalRender();
 #endif
+	void actionCheckValidity();
 	void actionDisplayAST();
 	void actionDisplayCSGTree();
 	void actionDisplayCSGProducts();
@@ -134,6 +151,8 @@ private slots:
 	void actionFlushCaches();
 
 public:
+	static QSet<MainWindow*> *windows;
+	static void setExamplesDir(const QString &dir) { MainWindow::qexamplesdir = dir; }
 	void viewModeActionsUncheck();
 	void setCurrentOutput();
 	void clearCurrentOutput();
@@ -162,6 +181,7 @@ public slots:
 	void viewCenter();
 	void viewPerspective();
 	void viewOrthogonal();
+        void viewResetView();
 	void hideConsole();
 	void animateUpdateDocChanged();
 	void animateUpdate();
@@ -178,13 +198,17 @@ public slots:
 
 private:
 	static void report_func(const class AbstractNode*, void *vp, int mark);
-
+	
 	char const * afterCompileSlot;
 	bool procevents;
-	
+	class QTemporaryFile *tempFile;
+
 	class ProgressWidget *progresswidget;
 	class CGALWorker *cgalworker;
 	QMutex consolemutex;
+signals:
+	void highlightError(int);
+	void unhighlightLastError();
 };
 
 class GuiLocker
@@ -201,7 +225,7 @@ public:
 	static void unlock() { gui_locked--; }
 
 private:
-	static unsigned int gui_locked;
+ 	static unsigned int gui_locked;
 };
 
 #endif

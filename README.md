@@ -1,3 +1,5 @@
+[![Travis CI](https://api.travis-ci.org/openscad/openscad.png)](https://travis-ci.org/openscad/openscad)
+
 # What is OpenSCAD?
 [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=openscad&url=http://openscad.org&title=OpenSCAD&language=&tags=github&category=software)
 
@@ -92,10 +94,12 @@ Follow the instructions for the platform you're compiling on below.
  * [boost (1.35 - 1.53)](http://www.boost.org/)
 * [OpenCSG (1.3.2)](http://www.opencsg.org/)
 * [GLEW (1.5.4 ->)](http://glew.sourceforge.net/)
-* [Eigen (2.0.x->3.x)](http://eigen.tuxfamily.org/)
+* [Eigen (3.0 - 3.2)](http://eigen.tuxfamily.org/)
+* [glib2 (2.2.0)](https://developer.gnome.org/glib/)
 * [GCC C++ Compiler (4.2 ->)](http://gcc.gnu.org/)
 * [Bison (2.4)](http://www.gnu.org/software/bison/)
 * [Flex (2.5.35)](http://flex.sourceforge.net/)
+* [pkg-config (0.26)](http://www.freedesktop.org/wiki/Software/pkg-config/)
 
 ### Getting the source code
 
@@ -114,7 +118,8 @@ To pull the MCAD library (http://reprap.org/wiki/MCAD), do the following:
 
 Prerequisites:
 * XCode, including XCode command-line tools (install from XCode Preferences).
-* [CMake](http://cmake.org), which can be installed manually or through MacPorts/homebrew.
+* [CMake](http://cmake.org) and [pkg-config](http://www.freedesktop.org/wiki/Software/pkg-config/),
+   both can be installed manually or through MacPorts/homebrew.
 
 Then after you've cloned this git repository, run the script that sets up the
 environment variables.
@@ -141,7 +146,7 @@ the dependency packages listed above using your system's package
 manager. A convenience script is provided that can help with this 
 process on some systems:
 
-    ./scripts/uni-get-dependencies.sh
+    sudo ./scripts/uni-get-dependencies.sh
 
 After installing dependencies, check their versions. You can run this 
 script to help you:

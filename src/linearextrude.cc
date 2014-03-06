@@ -32,7 +32,7 @@
 #include "fileutils.h"
 #include "builtin.h"
 #include "PolySetEvaluator.h"
-#include "openscad.h" // get_fragments_from_r()
+#include "calc.h"
 #include "mathc99.h" 
 
 #include <sstream>
@@ -74,7 +74,7 @@ AbstractNode *LinearExtrudeModule::instantiate(const Context *ctx, const ModuleI
 	Value slices = c.lookup_variable("slices", true);
 
 	if (!file.isUndefined() && file.type() == Value::STRING) {
-		PRINT("DEPRECATED: Support for reading files in linear_extrude will be removed in future releases. Use a child import() instead.");
+		printDeprecation("DEPRECATED: Support for reading files in linear_extrude will be removed in future releases. Use a child import() instead.");
 		node->filename = lookup_file(file.toString(), inst->path(), c.documentPath());
 	}
 
@@ -113,7 +113,7 @@ AbstractNode *LinearExtrudeModule::instantiate(const Context *ctx, const ModuleI
 		if (slices.type() == Value::NUMBER) {
 			node->slices = (int)slices.toDouble();
 		} else {
-			node->slices = (int)fmax(2, fabs(get_fragments_from_r(node->height,
+			node->slices = (int)fmax(2, fabs(Calc::get_fragments_from_r(node->height,
 					node->fn, node->fs, node->fa) * node->twist / 360));
 		}
 		node->has_twist = true;

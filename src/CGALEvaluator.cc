@@ -61,6 +61,11 @@ void CGALEvaluator::process(CGAL_Nef_polyhedron &target, const CGAL_Nef_polyhedr
  	if (target.dim != 2 && target.dim != 3) {
  		assert(false && "Dimension of Nef polyhedron must be 2 or 3");
  	}
+    // Intersecting something with nothing results in nothing
+	if (src.isEmpty() && op == CGE_INTERSECTION) {
+        target = src;
+        return;
+    }
 	if (src.isEmpty()) return; // Empty polyhedron. This can happen for e.g. square([0,0])
 	if (target.isEmpty() && op != CGE_UNION) return; // empty op <something> => empty
 	if (target.dim != src.dim) return; // If someone tries to e.g. union 2d and 3d objects
@@ -126,7 +131,7 @@ CGAL_Nef_polyhedron CGALEvaluator::applyHull(const CgaladvNode &node)
 	CGAL_Nef_polyhedron N;
 	std::list<CGAL_Nef_polyhedron2*> polys;
 	std::list<CGAL_Nef_polyhedron2::Point> points2d;
-	std::list<CGAL_Polyhedron::Vertex::Point_3> points3d;
+	std::vector<CGAL_Polyhedron::Vertex::Point_3> points3d;
 	int dim = 0;
 	BOOST_FOREACH(const ChildItem &item, this->visitedchildren[node.index()]) {
 		const AbstractNode *chnode = item.first;
@@ -154,14 +159,8 @@ CGAL_Nef_polyhedron CGALEvaluator::applyHull(const CgaladvNode &node)
 			}
 		}
 		else if (dim == 3) {
-			CGAL_Polyhedron P;
-			if (!chN.p3->is_simple()) {
-				PRINT("Hull() currently requires a valid 2-manifold. Please modify your design. See http://en.wikibooks.org/wiki/OpenSCAD_User_Manual/STL_Import_and_Export");
-			}
-			else {
-				chN.p3->convert_to_Polyhedron(P);
-				std::transform(P.vertices_begin(), P.vertices_end(), std::back_inserter(points3d), 
-											 boost::bind(static_cast<const CGAL_Polyhedron::Vertex::Point_3&(CGAL_Polyhedron::Vertex::*)() const>(&CGAL_Polyhedron::Vertex::point), _1));
+			for (CGAL_Nef_polyhedron3::Vertex_const_iterator i = chN.p3->vertices_begin(); i != chN.p3->vertices_end(); ++i) {
+				points3d.push_back(i->point());
 			}
 		}
 		chnode->progress_report();
@@ -174,10 +173,28 @@ CGAL_Nef_polyhedron CGALEvaluator::applyHull(const CgaladvNode &node)
 																										 CGAL_Nef_polyhedron2::INCLUDED));
 	}
 	else if (dim == 3) {
-		CGAL_Polyhedron P;
-		if (points3d.size()>3)
-			CGAL::convex_hull_3(points3d.begin(), points3d.end(), P);
-		N = CGAL_Nef_polyhedron(new CGAL_Nef_polyhedron3(P));
+		if (points3d.size() > 3) {
+
+    // Remove all duplicated points (speeds up the convex_hull computation significantly)
+			std::vector<CGAL_Polyhedron::Vertex::Point_3> unique_points;
+			Grid3d<int> grid(GRID_FINE);
+			
+			BOOST_FOREACH(CGAL_Polyhedron::Vertex::Point_3 const& p, points3d) {
+				double x = to_double(p.x()), y = to_double(p.y()), z = to_double(p.z());
+				int& v = grid.align(x,y,z);
+				if (v == 0) {
+					unique_points.push_back(CGAL_Polyhedron::Vertex::Point_3(x,y,z));
+					v = 1;
+				}
+			}
+
+			// Apply hull
+			if (points3d.size() >= 4) {
+				CGAL_Polyhedron P;
+				CGAL::convex_hull_3(unique_points.begin(), unique_points.end(), P);
+				N = CGAL_Nef_polyhedron(new CGAL_Nef_polyhedron3(P));
+			}
+		}
 	}
 	return N;
 }
@@ -668,19 +685,35 @@ CGAL_Nef_polyhedron CGALEvaluator::evaluateCGALMesh(const PolySet &ps)
 	else // not (this->is2d)
 	{
 		CGAL_Nef_polyhedron3 *N = NULL;
+		bool plane_error = false;
 		CGAL::Failure_behaviour old_behaviour = CGAL::set_error_behaviour(CGAL::THROW_EXCEPTION);
 		try {
-			// FIXME: Are we leaking memory for the CGAL_Polyhedron object?
-			CGAL_Polyhedron *P = createPolyhedronFromPolySet(ps);
-			if (P) {
-				N = new CGAL_Nef_polyhedron3(*P);
-			}
+			CGAL_Polyhedron P;
+			bool err = createPolyhedronFromPolySet(ps,P);
+			if (!err) N = new CGAL_Nef_polyhedron3(P);
 		}
 		catch (const CGAL::Assertion_exception &e) {
-			PRINTB("CGAL error in CGAL_Nef_polyhedron3(): %s", e.what());
+			if (std::string(e.what()).find("Plane_constructor")!=std::string::npos) {
+				if (std::string(e.what()).find("has_on")!=std::string::npos) {
+					PRINT("PolySet has nonplanar faces. Attempting alternate construction");
+					plane_error=true;
+				}
+			} else {
+				PRINTB("CGAL error in CGAL_Nef_polyhedron3(): %s", e.what());
+			}
+		}
+		if (plane_error) try {
+			PolySet ps2;
+			CGAL_Polyhedron P;
+			tessellate_3d_faces( ps, ps2 );
+			bool err = createPolyhedronFromPolySet(ps2,P);
+			if (!err) N = new CGAL_Nef_polyhedron3(P);
+		}
+		catch (const CGAL::Assertion_exception &e) {
+			PRINTB("Alternate construction failed. CGAL error in CGAL_Nef_polyhedron3(): %s", e.what());
 		}
 		CGAL::set_error_behaviour(old_behaviour);
-		return CGAL_Nef_polyhedron(N);
+		if (N) return CGAL_Nef_polyhedron(N);
 	}
-	return CGAL_Nef_polyhedron();
+	return CGAL_Nef_polyhedron(ps.is2d?2:3);
 }

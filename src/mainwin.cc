@@ -27,7 +27,6 @@
 #include "PolySetCache.h"
 #include "ModuleCache.h"
 #include "MainWindow.h"
-#include "openscad.h" // examplesdir
 #include "parsersettings.h"
 #include "Preferences.h"
 #include "printutils.h"
@@ -76,6 +75,7 @@
 #include <QSettings>
 #include <QProgressDialog>
 #include <QMutexLocker>
+#include <QTemporaryFile>
 
 #include <fstream>
 
@@ -103,10 +103,12 @@
 
 #include "boosty.h"
 
-extern QString examplesdir;
+// Keeps track of open window
+QSet<MainWindow*> *MainWindow::windows = NULL;
 
 // Global application state
 unsigned int GuiLocker::gui_locked = 0;
+QString MainWindow::qexamplesdir;
 
 #define QUOTE(x__) # x__
 #define QUOTED(x__) QUOTE(x__)
@@ -118,7 +120,7 @@ static char helptitle[] =
 #endif
 	"\nhttp://www.openscad.org\n\n";
 static char copyrighttext[] =
-	"Copyright (C) 2009-2013 The OpenSCAD Developers\n"
+	"Copyright (C) 2009-2014 The OpenSCAD Developers\n"
 	"\n"
 	"This program is free software; you can redistribute it and/or modify "
 	"it under the terms of the GNU General Public License as published by "
@@ -157,9 +159,13 @@ settings_valueList(const QString &key, const QList<int> &defaultList = QList<int
 }
 
 MainWindow::MainWindow(const QString &filename)
-	: root_inst("group"), progresswidget(NULL)
+	: root_inst("group"), tempFile(NULL), progresswidget(NULL)
 {
 	setupUi(this);
+	this->setAttribute(Qt::WA_DeleteOnClose);
+
+	if (!MainWindow::windows) MainWindow::windows = new QSet<MainWindow*>;
+	MainWindow::windows->insert(this);
 
 #ifdef ENABLE_CGAL
 	this->cgalworker = new CGALWorker();
@@ -190,7 +196,8 @@ MainWindow::MainWindow(const QString &filename)
 	fps = 0;
 	fsteps = 1;
 
-	highlighter = new Highlighter(editor->document());
+	connect(this, SIGNAL(highlightError(int)), editor, SLOT(highlightError(int)));
+	connect(this, SIGNAL(unhighlightLastError()), editor, SLOT(unhighlightLastError()));
 	editor->setTabStopWidth(30);
 	editor->setLineWrapping(true); // Not designable
 
@@ -214,6 +221,7 @@ MainWindow::MainWindow(const QString &filename)
 	connect(this->e_fps, SIGNAL(textChanged(QString)), this, SLOT(updatedFps()));
 
 	animate_panel->hide();
+	find_panel->hide();
 
 	// Application menu
 #ifdef DEBUG
@@ -253,10 +261,9 @@ MainWindow::MainWindow(const QString &filename)
 	this->menuOpenRecent->addAction(this->fileActionClearRecent);
 	connect(this->fileActionClearRecent, SIGNAL(triggered()),
 					this, SLOT(clearRecentFiles()));
-
-	if (!examplesdir.isEmpty()) {
+	if (!qexamplesdir.isEmpty()) {
 		bool found_example = false;
-		QStringList examples = QDir(examplesdir).entryList(QStringList("*.scad"), 
+		QStringList examples = QDir(qexamplesdir).entryList(QStringList("*.scad"), 
 		QDir::Files | QDir::Readable, QDir::Name);
 		foreach (const QString &ex, examples) {
 			this->menuExamples->addAction(ex, this, SLOT(actionOpenExample()));
@@ -287,6 +294,12 @@ MainWindow::MainWindow(const QString &filename)
 	connect(this->editActionZoomOut, SIGNAL(triggered()), editor, SLOT(zoomOut()));
 	connect(this->editActionHide, SIGNAL(triggered()), this, SLOT(hideEditor()));
 	connect(this->editActionPreferences, SIGNAL(triggered()), this, SLOT(preferences()));
+	// Edit->Find
+	connect(this->editActionFind, SIGNAL(triggered()), this, SLOT(find()));
+	connect(this->editActionFindAndReplace, SIGNAL(triggered()), this, SLOT(findAndReplace()));
+	connect(this->editActionFindNext, SIGNAL(triggered()), this, SLOT(findNext()));
+	connect(this->editActionFindPrevious, SIGNAL(triggered()), this, SLOT(findPrev()));
+	connect(this->editActionUseSelectionForFind, SIGNAL(triggered()), this, SLOT(useSelectionForFind()));
 
 	// Design menu
 	connect(this->designActionAutoReload, SIGNAL(toggled(bool)), this, SLOT(autoReloadSet(bool)));
@@ -297,6 +310,7 @@ MainWindow::MainWindow(const QString &filename)
 #else
 	this->designActionCompileAndRender->setVisible(false);
 #endif
+	connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
 	connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
 	connect(this->designActionDisplayCSGTree, SIGNAL(triggered()), this, SLOT(actionDisplayCSGTree()));
 	connect(this->designActionDisplayCSGProducts, SIGNAL(triggered()), this, SLOT(actionDisplayCSGProducts()));
@@ -337,6 +351,7 @@ MainWindow::MainWindow(const QString &filename)
 	connect(this->viewActionBack, SIGNAL(triggered()), this, SLOT(viewAngleBack()));
 	connect(this->viewActionDiagonal, SIGNAL(triggered()), this, SLOT(viewAngleDiagonal()));
 	connect(this->viewActionCenter, SIGNAL(triggered()), this, SLOT(viewCenter()));
+	connect(this->viewActionResetView, SIGNAL(triggered()), this, SLOT(viewResetView()));
 	connect(this->viewActionPerspective, SIGNAL(triggered()), this, SLOT(viewPerspective()));
 	connect(this->viewActionOrthogonal, SIGNAL(triggered()), this, SLOT(viewOrthogonal()));
 	connect(this->viewActionHide, SIGNAL(triggered()), this, SLOT(hideConsole()));
@@ -371,7 +386,20 @@ MainWindow::MainWindow(const QString &filename)
 					this, SLOT(setFont(const QString&,uint)));
 	connect(Preferences::inst(), SIGNAL(openCSGSettingsChanged()),
 					this, SLOT(openCSGSettingsChanged()));
+	connect(Preferences::inst(), SIGNAL(syntaxHighlightChanged(const QString&)), 
+					editor, SLOT(setHighlightScheme(const QString&)));
 	Preferences::inst()->apply();
+
+	connect(this->findTypeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(selectFindType(int)));
+	connect(this->findInputField, SIGNAL(returnPressed()), this->nextButton, SLOT(animateClick()));
+	find_panel->installEventFilter(this);
+
+	connect(this->prevButton, SIGNAL(clicked()), this, SLOT(findPrev()));
+	connect(this->nextButton, SIGNAL(clicked()), this, SLOT(findNext()));
+	connect(this->hideFindButton, SIGNAL(clicked()), find_panel, SLOT(hide()));
+	connect(this->replaceButton, SIGNAL(clicked()), this, SLOT(replace()));
+	connect(this->replaceAllButton, SIGNAL(clicked()), this, SLOT(replaceAll()));
+	connect(this->replaceInputField, SIGNAL(returnPressed()), this->replaceButton, SLOT(animateClick()));
 
 	// make sure it looks nice..
 	QSettings settings;
@@ -454,6 +482,7 @@ MainWindow::~MainWindow()
 #ifdef ENABLE_OPENCSG
 	delete this->opencsgRenderer;
 #endif
+	MainWindow::windows->remove(this);
 }
 
 void MainWindow::showProgress()
@@ -506,6 +535,8 @@ MainWindow::openFile(const QString &new_filename)
 	}
 #endif
 	setFileName(actual_filename);
+	editor->setPlainText("");
+	this->last_compiled_doc = "";
 
 	fileChangedOnDisk(); // force cached autoReloadId to update
 	refreshDocument();
@@ -647,6 +678,7 @@ void MainWindow::compile(bool reload, bool forcedone)
 
 	if (shouldcompiletoplevel) {
 		console->clear();
+		if (editor->isContentModified()) saveBackup();
 		compileTopLevelDocument();
 		didcompile = true;
 	}
@@ -667,6 +699,16 @@ void MainWindow::compile(bool reload, bool forcedone)
 			return;
 		}
 	}
+
+	if (!reload && didcompile) {
+		if (!animate_panel->isVisible()) {
+			emit unhighlightLastError();
+			if (!this->root_module) {
+				emit highlightError( parser_error_pos );
+			}
+		}
+	}
+
 	compileDone(didcompile | forcedone);
 }
 
@@ -985,8 +1027,47 @@ void MainWindow::actionOpenExample()
 {
 	QAction *action = qobject_cast<QAction *>(sender());
 	if (action) {
-		openFile(examplesdir + QDir::separator() + action->text());
+		openFile(qexamplesdir + QDir::separator() + action->text());
 	}
+}
+
+void MainWindow::writeBackup(QFile *file)
+{
+	// see MainWindow::saveBackup()
+	file->resize(0);
+	QTextStream writer(file);
+	writer.setCodec("UTF-8");
+	writer << this->editor->toPlainText();
+	
+	PRINTB("Saved backup file: %s", file->fileName().toLocal8Bit().constData());
+}
+
+void MainWindow::saveBackup()
+{
+	std::string path = PlatformUtils::backupPath();
+	if ((!fs::exists(path)) && (!PlatformUtils::createBackupPath())) {
+		PRINTB("WARNING: Cannot create backup path: %s", path);
+		return;
+	}
+
+	QString backupPath = QString::fromStdString(path);
+	if (!backupPath.endsWith("/")) backupPath.append("/");
+
+	QString basename = "unsaved";
+	if (!this->fileName.isEmpty()) {
+		QFileInfo fileInfo = QFileInfo(this->fileName);
+		basename = fileInfo.baseName();
+	}
+
+	if (!this->tempFile) {
+		this->tempFile = new QTemporaryFile(backupPath.append(basename + "-backup-XXXXXXXX.scad"));
+	}
+
+	if ((!this->tempFile->isOpen()) && (! this->tempFile->open())) {
+		PRINT("WARNING: Failed to create backup file");
+		return;
+	}
+	return writeBackup(this->tempFile);
 }
 
 void MainWindow::actionSave()
@@ -1065,10 +1146,10 @@ void MainWindow::hideEditor()
 {
 	QSettings settings;
 	if (editActionHide->isChecked()) {
-		editor->hide();
+		editorPane->hide();
 		settings.setValue("view/hideEditor",true);
 	} else {
-		editor->show();
+		editorPane->show();
 		settings.setValue("view/hideEditor",false);
 	}
 }
@@ -1090,6 +1171,102 @@ void MainWindow::pasteViewportRotation()
 	cursor.insertText(txt);
 }
 
+void MainWindow::find()
+{
+	findTypeComboBox->setCurrentIndex(0);
+	replaceInputField->hide();
+	replaceButton->hide();
+	replaceAllButton->hide();
+	find_panel->show();
+	findInputField->setFocus();
+	findInputField->selectAll();
+}
+
+void MainWindow::findAndReplace()
+{
+	findTypeComboBox->setCurrentIndex(1);
+	replaceInputField->show();
+	replaceButton->show();
+	replaceAllButton->show();
+	find_panel->show();
+	findInputField->setFocus();
+	findInputField->selectAll();
+}
+
+void MainWindow::selectFindType(int type) {
+	if (type == 0) find();
+	if (type == 1) findAndReplace();
+}
+
+bool MainWindow::findOperation(QTextDocument::FindFlags options) {
+	bool success = editor->find(findInputField->text(), options);
+	if (!success) { // Implement wrap-around search behavior
+		QTextCursor old_cursor = editor->textCursor();
+		QTextCursor tmp_cursor = old_cursor;
+		tmp_cursor.movePosition((options & QTextDocument::FindBackward) ? QTextCursor::End : QTextCursor::Start);
+		editor->setTextCursor(tmp_cursor);
+		bool success = editor->find(findInputField->text(), options);
+		if (!success) {
+			editor->setTextCursor(old_cursor);
+		}
+		return success;
+	}
+	return true;
+}
+
+void MainWindow::replace() {
+	QTextCursor cursor = editor->textCursor();
+	QString selectedText = cursor.selectedText();
+	if (selectedText == findInputField->text()) {
+		cursor.insertText(replaceInputField->text());
+	}
+	findNext();
+}
+
+void MainWindow::replaceAll() {
+	QTextCursor old_cursor = editor->textCursor();
+	QTextCursor tmp_cursor = old_cursor;
+	tmp_cursor.movePosition(QTextCursor::Start);
+	editor->setTextCursor(tmp_cursor);
+	while (editor->find(findInputField->text())) {
+		editor->textCursor().insertText(replaceInputField->text());
+	}
+	editor->setTextCursor(old_cursor);
+}
+
+void MainWindow::findNext()
+{
+	findOperation();
+}
+
+void MainWindow::findPrev()
+{
+	findOperation(QTextDocument::FindBackward);
+}
+
+void MainWindow::useSelectionForFind()
+{
+	findInputField->setText(editor->textCursor().selectedText());
+}
+
+bool MainWindow::eventFilter(QObject* obj, QEvent *event)
+{
+    if (obj == find_panel)
+    {
+        if (event->type() == QEvent::KeyPress)
+        {
+            QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+            if (keyEvent->key() == Qt::Key_Escape)
+            {
+				find_panel->hide();
+				return true;
+            }
+        }
+        return false;
+    }
+    return QMainWindow::eventFilter(obj, event);
+}
+
 void MainWindow::updateTemporalVariables()
 {
 	this->top_ctx.set_variable("$t", Value(this->e_tval->text().toDouble()));
@@ -1107,6 +1284,10 @@ void MainWindow::updateTemporalVariables()
 	top_ctx.set_variable("$vpr", Value(vpr));
 }
 
+/*!
+	Returns true if the current document is a file on disk and that file has new content.
+	Returns false if a file on disk has disappeared or if we haven't yet saved.
+*/
 bool MainWindow::fileChangedOnDisk()
 {
 	if (!this->fileName.isEmpty()) {
@@ -1132,6 +1313,7 @@ bool MainWindow::fileChangedOnDisk()
 void MainWindow::compileTopLevelDocument()
 {
 	updateTemporalVariables();
+	resetPrintedDeprecations();
 	
 	this->last_compiled_doc = editor->toPlainText();
 	std::string fulltext = 
@@ -1147,15 +1329,6 @@ void MainWindow::compileTopLevelDocument()
 														QFileInfo(this->fileName).absolutePath().toLocal8Bit(), 
 														false);
 	
-	if (!animate_panel->isVisible()) {
-		highlighter->unhighlightLastError();
-		if (!this->root_module) {
-			QTextCursor cursor = editor->textCursor();
-			cursor.setPosition(parser_error_pos);
-			editor->setTextCursor(cursor);
-			highlighter->highlightError( parser_error_pos );
-		}
-	}
 }
 
 void MainWindow::checkAutoReload()
@@ -1285,6 +1458,7 @@ void MainWindow::actionRenderCGAL()
 void MainWindow::cgalRender()
 {
 	if (!this->root_module || !this->root_node) {
+        compileEnded();
 		return;
 	}
 
@@ -1331,7 +1505,6 @@ void MainWindow::actionRenderCGALDone(CGAL_Nef_polyhedron *root_N)
 			if (root_N->dim == 3) {
 				PRINT("   Top level object is a 3D object:");
 				PRINTB("   Simple:     %6s", (root_N->p3->is_simple() ? "yes" : "no"));
-				PRINTB("   Valid:      %6s", (root_N->p3->is_valid() ? "yes" : "no"));
 				PRINTB("   Vertices:   %6d", root_N->p3->number_of_vertices());
 				PRINTB("   Halfedges:  %6d", root_N->p3->number_of_halfedges());
 				PRINTB("   Edges:      %6d", root_N->p3->number_of_edges());
@@ -1423,6 +1596,30 @@ void MainWindow::actionDisplayCSGProducts()
 	e->show();
 	e->resize(600, 400);
 	clearCurrentOutput();
+}
+
+void MainWindow::actionCheckValidity() {
+	if (GuiLocker::isLocked()) return;
+	GuiLocker lock;
+#ifdef ENABLE_CGAL
+	setCurrentOutput();
+
+	if (!this->root_N) {
+		PRINT("Nothing to validate! Try building first (press F6).");
+		clearCurrentOutput();
+		return;
+	}
+
+	if (this->root_N->dim != 3) {
+		PRINT("Current top level object is not a 3D object.");
+		clearCurrentOutput();
+		return;
+	}
+
+	bool valid = this->root_N->p3->is_valid();
+	PRINTB("   Valid:      %6s", (valid ? "yes" : "no"));
+	clearCurrentOutput();
+#endif /* ENABLE_CGAL */
 }
 
 #ifdef ENABLE_CGAL
@@ -1775,6 +1972,12 @@ void MainWindow::viewOrthogonal()
 	this->qglview->updateGL();
 }
 
+void MainWindow::viewResetView()
+{
+	this->qglview->resetView();
+	this->qglview->updateGL();
+}
+
 void MainWindow::hideConsole()
 {
 	QSettings settings;
@@ -1870,6 +2073,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
 		settings.setValue("window/position", pos());
 		settings_setValueList("window/splitter1sizes",splitter1->sizes());
 		settings_setValueList("window/splitter2sizes",splitter2->sizes());
+		if (this->tempFile) {
+			delete this->tempFile;
+			this->tempFile = NULL;
+		}
 		event->accept();
 	} else {
 		event->ignore();

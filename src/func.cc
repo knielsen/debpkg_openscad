@@ -36,6 +36,10 @@
 #include "printutils.h"
 #include <boost/foreach.hpp>
 
+#include <boost/math/special_functions/fpclassify.hpp>
+using boost::math::isnan;
+using boost::math::isinf;
+
 /*
  Random numbers
 
@@ -45,6 +49,8 @@
 
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_real.hpp>
+/*Unicode support for string lengths and array accesses*/
+#include <glib.h>
 
 #ifdef __WIN32__
 #include <process.h>
@@ -306,7 +312,11 @@ Value builtin_length(const Context *, const EvalContext *evalctx)
 {
 	if (evalctx->numArgs() == 1) {
 		if (evalctx->getArgValue(0).type() == Value::VECTOR) return Value(int(evalctx->getArgValue(0).toVector().size()));
-		if (evalctx->getArgValue(0).type() == Value::STRING) return Value(int(evalctx->getArgValue(0).toString().size()));
+		if (evalctx->getArgValue(0).type() == Value::STRING) {
+			//Unicode glyph count for the length -- rather than the string (num. of bytes) length.
+			std::string text = evalctx->getArgValue(0).toString();
+			return Value(int( g_utf8_strlen( text.c_str(), text.size() ) ));
+		}
 	}
 	return Value();
 }
@@ -335,6 +345,24 @@ Value builtin_str(const Context *, const EvalContext *evalctx)
 		stream << evalctx->getArgValue(i).toString();
 	}
 	return Value(stream.str());
+}
+
+Value builtin_concat(const Context *, const EvalContext *evalctx)
+{
+	Value::VectorType result;
+
+	for (size_t i = 0; i < evalctx->numArgs(); i++) {
+		const Value v = evalctx->getArgValue(i);
+		if (v.type() == Value::VECTOR) {
+			Value::VectorType vec = v.toVector();
+			for (Value::VectorType::const_iterator it = vec.begin(); it != vec.end(); it++) {
+				result.push_back(*it);
+			}
+		} else {
+			result.push_back(v);
+		}
+	}
+	return Value(result);
 }
 
 Value builtin_lookup(const Context *, const EvalContext *evalctx)
@@ -380,10 +408,17 @@ Value builtin_lookup(const Context *, const EvalContext *evalctx)
   num_returns_per_match : int;
   index_col_num : int;
 
+ The search string and searched strings can be unicode strings.
  Examples:
   Index values return as list:
     search("a","abcdabcd");
-        - returns [0,4]
+        - returns [0]
+    search("Л","Л");  //A unicode string
+        - returns [0]
+    search("🂡aЛ","a🂡Л🂡a🂡Л🂡a",0);
+        - returns [[1,3,5,7],[0,4,8],[2,6]]
+    search("a","abcdabcd",0); //Search up to all matches
+        - returns [[0,4]]
     search("a","abcdabcd",1);
         - returns [0]
     search("e","abcdabcd",1);
@@ -433,16 +468,25 @@ Value builtin_search(const Context *, const EvalContext *evalctx)
 		}
 	} else if (findThis.type() == Value::STRING) {
 		unsigned int searchTableSize;
-		if (searchTable.type() == Value::STRING) searchTableSize = searchTable.toString().size();
-		else searchTableSize = searchTable.toVector().size();
-		for (size_t i = 0; i < findThis.toString().size(); i++) {
+		//Unicode glyph count for the length
+		unsigned int findThisSize =  g_utf8_strlen( findThis.toString().c_str(), findThis.toString().size() );
+		if (searchTable.type() == Value::STRING) {
+			searchTableSize = g_utf8_strlen( searchTable.toString().c_str(), searchTable.toString().size() );
+		} else {
+		    searchTableSize = searchTable.toVector().size();
+		}
+		for (size_t i = 0; i < findThisSize; i++) {
 		  unsigned int matchCount = 0;
 			Value::VectorType resultvec;
 		  for (size_t j = 0; j < searchTableSize; j++) {
-		    if ((searchTable.type() == Value::VECTOR && 
-						 findThis.toString()[i] == searchTable.toVector()[j].toVector()[index_col_num].toString()[0]) ||
-						(searchTable.type() == Value::STRING && 
-						 findThis.toString()[i] == searchTable.toString()[j])) {
+		    gchar* ptr_ft = g_utf8_offset_to_pointer(findThis.toString().c_str(), i);
+		    gchar* ptr_st = NULL;
+		    if(searchTable.type() == Value::VECTOR) {
+		        ptr_st = g_utf8_offset_to_pointer(searchTable.toVector()[j].toVector()[index_col_num].toString().c_str(), 0);
+		    } else if(searchTable.type() == Value::STRING){
+		    	ptr_st = g_utf8_offset_to_pointer(searchTable.toString().c_str(), j);
+		    }
+		    if( (ptr_ft) && (ptr_st) && (g_utf8_get_char(ptr_ft) == g_utf8_get_char(ptr_st)) ) {
 		      Value resultValue((double(j)));
 		      matchCount++;
 		      if (num_returns_per_match == 1) {
@@ -454,7 +498,14 @@ Value builtin_search(const Context *, const EvalContext *evalctx)
 		      if (num_returns_per_match > 1 && matchCount >= num_returns_per_match) break;
 		    }
 		  }
-		  if (matchCount == 0) PRINTB("  WARNING: search term not found: \"%s\"", findThis.toString()[i]);
+		  if (matchCount == 0) {
+			  gchar* ptr_ft = g_utf8_offset_to_pointer(findThis.toString().c_str(), i);
+			  gchar utf8_of_cp[6] = ""; //A buffer for a single unicode character to be copied into
+			  if(ptr_ft) {
+			      g_utf8_strncpy( utf8_of_cp, ptr_ft, 1 );
+		      }
+			  PRINTB("  WARNING: search term not found: \"%s\"", utf8_of_cp );
+		  }
 		  if (num_returns_per_match == 0 || num_returns_per_match > 1) {
 				returnvec.push_back(Value(resultvec));
 			}
@@ -528,6 +579,94 @@ Value builtin_version_num(const Context *ctx, const EvalContext *evalctx)
 	return Value(y * 10000 + m * 100 + d);
 }
 
+Value builtin_parent_module(const Context *, const EvalContext *evalctx)
+{
+	int n;
+	double d;
+	int s = Module::stack_size();
+	if (evalctx->numArgs() == 0)
+		d=1; // parent module
+	else if (evalctx->numArgs() == 1 && evalctx->getArgValue(0).type() == Value::NUMBER)
+		evalctx->getArgValue(0).getDouble(d);
+	else
+			return Value();
+	n=trunc(d);
+	if (n < 0) {
+		PRINTB("WARNING: Negative parent module index (%d) not allowed", n);
+		return Value();
+	}
+	if (n >= s) {
+		PRINTB("WARNING: Parent module index (%d) greater than the number of modules on the stack", n);
+		return Value();
+	}
+	return Value(Module::stack_element(s - 1 - n));
+}
+
+Value builtin_norm(const Context *, const EvalContext *evalctx)
+{
+	if (evalctx->numArgs() == 1 && evalctx->getArgValue(0).type() == Value::VECTOR) {
+		double sum = 0;
+		Value::VectorType v = evalctx->getArgValue(0).toVector();
+		for (size_t i = 0; i < v.size(); i++)
+			if (v[i].type() == Value::NUMBER)
+				sum += pow(v[i].toDouble(),2);
+			else {
+				PRINT("  WARNING: Incorrect arguments to norm()");
+				return Value();
+			}
+		return Value(sqrt(sum));
+	}
+	return Value();
+}
+
+Value builtin_cross(const Context *, const EvalContext *evalctx)
+{
+	if (evalctx->numArgs() != 2) {
+		PRINT("WARNING: Invalid number of parameters for cross()");
+		return Value();
+	}
+	
+	Value arg0 = evalctx->getArgValue(0);
+	Value arg1 = evalctx->getArgValue(1);
+	if ((arg0.type() != Value::VECTOR) || (arg1.type() != Value::VECTOR)) {
+		PRINT("WARNING: Invalid type of parameters for cross()");
+		return Value();
+	}
+	
+	Value::VectorType v0 = arg0.toVector();
+	Value::VectorType v1 = arg1.toVector();
+	if ((v0.size() != 3) || (v1.size() != 3)) {
+		PRINT("WARNING: Invalid vector size of parameter for cross()");
+		return Value();
+	}
+	for (unsigned int a = 0;a < 3;a++) {
+		if ((v0[a].type() != Value::NUMBER) || (v1[a].type() != Value::NUMBER)) {
+			PRINT("WARNING: Invalid value in parameter vector for cross()");
+			return Value();
+		}
+		double d0 = v0[a].toDouble();
+		double d1 = v1[a].toDouble();
+		if (boost::math::isnan(d0) || boost::math::isnan(d1)) {
+			PRINT("WARNING: Invalid value (NaN) in parameter vector for cross()");
+			return Value();
+		}
+		if (boost::math::isinf(d0) || boost::math::isinf(d1)) {
+			PRINT("WARNING: Invalid value (INF) in parameter vector for cross()");
+			return Value();
+		}
+	}
+	
+	double x = v0[1].toDouble() * v1[2].toDouble() - v0[2].toDouble() * v1[1].toDouble();
+	double y = v0[2].toDouble() * v1[0].toDouble() - v0[0].toDouble() * v1[2].toDouble();
+	double z = v0[0].toDouble() * v1[1].toDouble() - v0[1].toDouble() * v1[0].toDouble();
+	
+	Value::VectorType result;
+	result.push_back(Value(x));
+	result.push_back(Value(y));
+	result.push_back(Value(z));
+	return Value(result);
+}
+
 void register_builtin_functions()
 {
 	Builtins::init("abs", new BuiltinFunction(&builtin_abs));
@@ -552,8 +691,12 @@ void register_builtin_functions()
 	Builtins::init("log", new BuiltinFunction(&builtin_log));
 	Builtins::init("ln", new BuiltinFunction(&builtin_ln));
 	Builtins::init("str", new BuiltinFunction(&builtin_str));
+	Builtins::init("concat", new BuiltinFunction(&builtin_concat, Feature::ExperimentalConcatFunction));
 	Builtins::init("lookup", new BuiltinFunction(&builtin_lookup));
 	Builtins::init("search", new BuiltinFunction(&builtin_search));
 	Builtins::init("version", new BuiltinFunction(&builtin_version));
 	Builtins::init("version_num", new BuiltinFunction(&builtin_version_num));
+	Builtins::init("norm", new BuiltinFunction(&builtin_norm));
+	Builtins::init("cross", new BuiltinFunction(&builtin_cross));
+	Builtins::init("parent_module", new BuiltinFunction(&builtin_parent_module));
 }

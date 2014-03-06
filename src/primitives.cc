@@ -34,10 +34,15 @@
 #include "printutils.h"
 #include "visitor.h"
 #include "context.h"
+#include "calc.h"
+#include "mathc99.h"
 #include <sstream>
 #include <assert.h>
 #include <boost/assign/std/vector.hpp>
 using namespace boost::assign; // bring 'operator+=()' into scope
+
+#include <boost/math/special_functions/fpclassify.hpp>
+#define isinf boost::math::isinf
 
 #define F_MINIMUM 0.01
 
@@ -57,6 +62,8 @@ public:
 	primitive_type_e type;
 	PrimitiveModule(primitive_type_e type) : type(type) { }
 	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx) const;
+private:
+	Value lookup_radius(const Context &ctx, const std::string &radius_var, const std::string &diameter_var) const;
 };
 
 class PrimitiveNode : public AbstractPolyNode
@@ -101,9 +108,38 @@ public:
 	double fn, fs, fa;
 	primitive_type_e type;
 	int convexity;
-	Value points, paths, triangles;
+	Value points, paths, faces;
 	virtual PolySet *evaluate_polyset(class PolySetEvaluator *) const;
 };
+
+/**
+ * Return a radius value by looking up both a diameter and radius variable.
+ * The diameter has higher priority, so if found an additionally set radius
+ * value is ignored.
+ * 
+ * @param ctx data context with variable values.
+ * @param radius_var name of the variable to lookup for the radius value.
+ * @param diameter_var name of the variable to lookup for the diameter value.
+ * @return radius value of type Value::NUMBER or Value::UNDEFINED if both
+ *         variables are invalid or not set.
+ */
+Value PrimitiveModule::lookup_radius(const Context &ctx, const std::string &diameter_var, const std::string &radius_var) const
+{
+	const Value d = ctx.lookup_variable(diameter_var, true);
+	const Value r = ctx.lookup_variable(radius_var, true);
+	const bool r_defined = (r.type() == Value::NUMBER);
+	
+	if (d.type() == Value::NUMBER) {
+		if (r_defined) {
+			PRINTB("WARNING: Ignoring radius variable '%s' as diameter '%s' is defined too.", radius_var % diameter_var);
+		}
+		return Value(d.toDouble() / 2.0);
+	} else if (r_defined) {
+		return r;
+	} else {
+		return Value();
+	}
+}
 
 AbstractNode *PrimitiveModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx) const
 {
@@ -125,7 +161,7 @@ AbstractNode *PrimitiveModule::instantiate(const Context *ctx, const ModuleInsta
 		args += Assignment("h", NULL), Assignment("r1", NULL), Assignment("r2", NULL), Assignment("center", NULL);
 		break;
 	case POLYHEDRON:
-		args += Assignment("points", NULL), Assignment("triangles", NULL), Assignment("convexity", NULL);
+		args += Assignment("points", NULL), Assignment("faces", NULL), Assignment("convexity", NULL);
 		break;
 	case SQUARE:
 		args += Assignment("size", NULL), Assignment("center", NULL);
@@ -170,22 +206,21 @@ AbstractNode *PrimitiveModule::instantiate(const Context *ctx, const ModuleInsta
 	}
 
 	if (type == SPHERE) {
-		Value r = c.lookup_variable("r");
+		const Value r = lookup_radius(c, "d", "r");
 		if (r.type() == Value::NUMBER) {
 			node->r1 = r.toDouble();
 		}
 	}
 
 	if (type == CYLINDER) {
-		Value h = c.lookup_variable("h");
-		Value r, r1, r2;
-		r1 = c.lookup_variable("r1");
-		r2 = c.lookup_variable("r2");
-		r = c.lookup_variable("r", true); // silence warning since r has no default value
-		Value center = c.lookup_variable("center");
+		const Value h = c.lookup_variable("h");
 		if (h.type() == Value::NUMBER) {
 			node->h = h.toDouble();
 		}
+
+		const Value r = lookup_radius(c, "d", "r");
+		const Value r1 = lookup_radius(c, "d1", "r1");
+		const Value r2 = lookup_radius(c, "d2", "r2");
 		if (r.type() == Value::NUMBER) {
 			node->r1 = r.toDouble();
 			node->r2 = r.toDouble();
@@ -196,6 +231,8 @@ AbstractNode *PrimitiveModule::instantiate(const Context *ctx, const ModuleInsta
 		if (r2.type() == Value::NUMBER) {
 			node->r2 = r2.toDouble();
 		}
+		
+		const Value center = c.lookup_variable("center");
 		if (center.type() == Value::BOOL) {
 			node->center = center.toBool();
 		}
@@ -203,7 +240,14 @@ AbstractNode *PrimitiveModule::instantiate(const Context *ctx, const ModuleInsta
 
 	if (type == POLYHEDRON) {
 		node->points = c.lookup_variable("points");
-		node->triangles = c.lookup_variable("triangles");
+		node->faces = c.lookup_variable("faces");
+		if (node->faces.type() == Value::UNDEFINED) {
+			// backwards compatable
+			node->faces = c.lookup_variable("triangles");
+			if (node->faces.type() != Value::UNDEFINED) {
+				printDeprecation("DEPRECATED: polyhedron(triangles=[]) will be removed in future releases. Use polyhedron(faces=[]) instead.");
+			}
+		}
 	}
 
 	if (type == SQUARE) {
@@ -218,7 +262,7 @@ AbstractNode *PrimitiveModule::instantiate(const Context *ctx, const ModuleInsta
 	}
 
 	if (type == CIRCLE) {
-		Value r = c.lookup_variable("r");
+		const Value r = lookup_radius(c, "d", "r");
 		if (r.type() == Value::NUMBER) {
 			node->r1 = r.toDouble();
 		}
@@ -234,17 +278,6 @@ AbstractNode *PrimitiveModule::instantiate(const Context *ctx, const ModuleInsta
 		node->convexity = 1;
 
 	return node;
-}
-
-/*!
-	Returns the number of subdivision of a whole circle, given radius and
-	the three special variables $fn, $fs and $fa
-*/
-int get_fragments_from_r(double r, double fn, double fs, double fa)
-{
-	if (r < GRID_FINE) return 3;
-	if (fn > 0.0) return (int)(fn >= 3 ? fn : 3);
-	return (int)ceil(fmax(fmin(360.0 / fa, r*2*M_PI / fs), 5));
 }
 
 struct point2d {
@@ -264,8 +297,9 @@ PolySet *PrimitiveNode::evaluate_polyset(class PolySetEvaluator *) const
 {
 	PolySet *p = new PolySet();
 
-	if (this->type == CUBE && this->x > 0 && this->y > 0 && this->z > 0)
-	{
+	if (this->type == CUBE && 
+			this->x > 0 && this->y > 0 && this->z > 0 &&
+			!isinf(this->x) > 0 && !isinf(this->y) > 0 && !isinf(this->z) > 0) {
 		double x1, x2, y1, y2, z1, z2;
 		if (this->center) {
 			x1 = -this->x/2;
@@ -318,14 +352,14 @@ PolySet *PrimitiveNode::evaluate_polyset(class PolySetEvaluator *) const
 		p->append_vertex(x1, y2, z2);
 	}
 
-	if (this->type == SPHERE && this->r1 > 0)
+	if (this->type == SPHERE && this->r1 > 0 && !isinf(this->r1))
 	{
 		struct ring_s {
 			point2d *points;
 			double z;
 		};
 
-		int fragments = get_fragments_from_r(r1, fn, fs, fa);
+		int fragments = Calc::get_fragments_from_r(r1, fn, fs, fa);
 		int rings = (fragments+1)/2;
 // Uncomment the following three lines to enable experimental sphere tesselation
 //		if (rings % 2 == 0) rings++; // To ensure that the middle ring is at phi == 0 degrees
@@ -386,9 +420,10 @@ sphere_next_r2:
 	}
 
 	if (this->type == CYLINDER && 
-			this->h > 0 && this->r1 >=0 && this->r2 >= 0 && (this->r1 > 0 || this->r2 > 0))
-	{
-		int fragments = get_fragments_from_r(fmax(this->r1, this->r2), this->fn, this->fs, this->fa);
+			this->h > 0 && !isinf(this->h) &&
+			this->r1 >=0 && this->r2 >= 0 && (this->r1 + this->r2) > 0 &&
+			!isinf(this->r1) && !isinf(this->r2)) {
+		int fragments = Calc::get_fragments_from_r(fmax(this->r1, this->r2), this->fn, this->fs, this->fa);
 
 		double z1, z2;
 		if (this->center) {
@@ -448,15 +483,21 @@ sphere_next_r2:
 	if (this->type == POLYHEDRON)
 	{
 		p->convexity = this->convexity;
-		for (size_t i=0; i<this->triangles.toVector().size(); i++)
+		for (size_t i=0; i<this->faces.toVector().size(); i++)
 		{
 			p->append_poly();
-			for (size_t j=0; j<this->triangles.toVector()[i].toVector().size(); j++) {
-				size_t pt = this->triangles.toVector()[i].toVector()[j].toDouble();
+			const Value::VectorType &vec = this->faces.toVector()[i].toVector();
+			for (size_t j=0; j<vec.size(); j++) {
+				size_t pt = vec[j].toDouble();
 				if (pt < this->points.toVector().size()) {
 					double px, py, pz;
-					if (this->points.toVector()[pt].getVec3(px, py, pz))
-						p->insert_vertex(px, py, pz);
+					if (!this->points.toVector()[pt].getVec3(px, py, pz) ||
+							isinf(px) || isinf(py) || isinf(pz)) {
+						PRINTB("ERROR: Unable to convert point at index %d to a vec3 of numbers", j);
+						delete p;
+						return NULL;
+					}
+					p->insert_vertex(px, py, pz);
 				}
 			}
 		}
@@ -486,7 +527,7 @@ sphere_next_r2:
 
 	if (this->type == CIRCLE)
 	{
-		int fragments = get_fragments_from_r(this->r1, this->fn, this->fs, this->fa);
+		int fragments = Calc::get_fragments_from_r(this->r1, this->fn, this->fs, this->fa);
 
 		p->is2d = true;
 		p->append_poly();
@@ -503,7 +544,8 @@ sphere_next_r2:
 
 		for (size_t i=0; i<this->points.toVector().size(); i++) {
 			double x,y;
-			if (!this->points.toVector()[i].getVec2(x, y)) {
+			if (!this->points.toVector()[i].getVec2(x, y) ||
+					isinf(x) || isinf(y)) {
 				PRINTB("ERROR: Unable to convert point at index %d to a vec2 of numbers", i);
 				delete p;
 				return NULL;
@@ -513,8 +555,12 @@ sphere_next_r2:
 
 		if (this->paths.toVector().size() == 0)
 		{
+			if (dd.points.size() <= 2) { // Ignore malformed polygons
+				delete p;
+				return NULL;
+			}
 			dd.paths.push_back(DxfData::Path());
-			for (size_t i=0; i<this->points.toVector().size(); i++) {
+			for (size_t i=0; i<dd.points.size(); i++) {
 				assert(i < dd.points.size()); // FIXME: Not needed, but this used to be an 'if'
 				dd.paths.back().indices.push_back(i);
 			}
@@ -574,7 +620,7 @@ std::string PrimitiveNode::toString() const
 			break;
 	case POLYHEDRON:
 		stream << "(points = " << this->points
-					 << ", triangles = " << this->triangles
+					 << ", faces = " << this->faces
 					 << ", convexity = " << this->convexity << ")";
 			break;
 	case SQUARE:

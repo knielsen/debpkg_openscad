@@ -21,9 +21,11 @@ public:
 
 public slots:
 	void actionTriggered(class QAction *);
+	void featuresCheckBoxToggled(bool);
 	void on_colorSchemeChooser_itemSelectionChanged();
 	void on_fontChooser_activated(const QString &);
 	void on_fontSize_editTextChanged(const QString &);
+	void on_syntaxHighlight_currentIndexChanged(const QString &);
 	void on_openCSGWarningBox_toggled(bool);
 	void on_enableOpenCSGBox_toggled(bool);
 	void on_cgalCacheSizeEdit_textChanged(const QString &);
@@ -38,17 +40,22 @@ signals:
 	void requestRedraw() const;
 	void fontChanged(const QString &family, uint size) const;
 	void openCSGSettingsChanged() const;
+	void syntaxHighlightChanged(const QString &s);
 
 private:
 	Preferences(QWidget *parent = NULL);
 	void keyPressEvent(QKeyEvent *e);
 	void updateGUI();
 	void removeDefaultSettings();
+	void setupFeaturesPage();
+	void addPrefPage(QActionGroup *group, QAction *action, QWidget *widget);
 
 	QSettings::SettingsMap defaultmap;
 	QHash<QString, std::map<RenderSettings::RenderColor, Color4f> > colorschemes;
+	QHash<const QAction *, QWidget *> prefPages;
 
 	static Preferences *instance;
+	static const char *featurePropertyName;
 };
 
 #endif

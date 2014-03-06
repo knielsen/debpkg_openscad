@@ -90,17 +90,15 @@ fs::path find_valid_path(const fs::path &sourcepath,
 
 void parser_init(const std::string &applicationpath)
 {
-  // Add paths from OPENSCADPATH before adding built-in paths
+	// Add paths from OPENSCADPATH before adding built-in paths
 	const char *openscadpaths = getenv("OPENSCADPATH");
 	if (openscadpaths) {
 		std::string paths(openscadpaths);
-    typedef boost::split_iterator<std::string::iterator> string_split_iterator;
-    for (string_split_iterator it =
-					 make_split_iterator(paths, first_finder(":", boost::is_iequal()));
-				 it != string_split_iterator();
-				 ++it) {
-		add_librarydir(boosty::absolute(fs::path(boost::copy_range<std::string>(*it))).string());
-    }
+		std::string sep = PlatformUtils::pathSeparatorChar();
+		typedef boost::split_iterator<std::string::iterator> string_split_iterator;
+		for (string_split_iterator it = boost::make_split_iterator(paths, boost::first_finder(sep, boost::is_iequal())); it != string_split_iterator(); ++it) {
+			add_librarydir(boosty::absolute(fs::path(boost::copy_range<std::string>(*it))).string());
+		}
 	}
 
 	// This is the built-in user-writable library path
@@ -116,8 +114,12 @@ void parser_init(const std::string &applicationpath)
 	fs::path libdir(applicationpath);
 	fs::path tmpdir;
 #ifdef __APPLE__
-	libdir /= "../Resources"; // Libraries can be bundled
-	if (!is_directory(libdir / "libraries")) libdir /= "../../..";
+	// Libraries can be bundled on Mac. If not, fall back to development layout
+	bool isbundle = is_directory(libdir / ".." / "Resources");
+	if (isbundle) {
+		libdir /= "../Resources";
+		if (!is_directory(libdir / "libraries")) libdir /= "../../..";
+	}
 #elif !defined(WIN32)
 	if (is_directory(tmpdir = libdir / "../share/openscad/libraries")) {
 		librarydir = boosty::stringy(tmpdir);
@@ -130,5 +132,6 @@ void parser_init(const std::string &applicationpath)
 		if (is_directory(tmpdir = libdir / "libraries")) {
 			librarydir = boosty::stringy(tmpdir);
 		}
+
 	if (!librarydir.empty()) add_librarydir(librarydir);
 }

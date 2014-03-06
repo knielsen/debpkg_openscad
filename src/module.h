@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <list>
+#include <deque>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include <time.h>
@@ -12,6 +13,7 @@
 #include "value.h"
 #include "typedefs.h"
 #include "localscope.h"
+#include "feature.h"
 
 class ModuleInstantiation
 {
@@ -59,8 +61,14 @@ public:
 
 class AbstractModule
 {
+private:
+        const Feature *feature;
 public:
+        AbstractModule() : feature(NULL) {}
+        AbstractModule(const Feature& feature) : feature(&feature) {}
 	virtual ~AbstractModule();
+        virtual bool is_experimental() const { return feature != NULL; }
+        virtual bool is_enabled() const { return (feature == NULL) || feature->is_enabled(); }
 	virtual class AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, const class EvalContext *evalctx = NULL) const;
 	virtual std::string dump(const std::string &indent, const std::string &name) const;
 };
@@ -69,14 +77,20 @@ class Module : public AbstractModule
 {
 public:
 	Module() { }
+	Module(const Feature& feature) : AbstractModule(feature) { }
 	virtual ~Module();
 
 	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx = NULL) const;
 	virtual std::string dump(const std::string &indent, const std::string &name) const;
+	static const std::string& stack_element(int n) { return module_stack[n]; };
+	static int stack_size() { return module_stack.size(); };
 
 	AssignmentList definition_arguments;
 
 	LocalScope scope;
+
+private:
+	static std::deque<std::string> module_stack;
 };
 
 // FIXME: A FileModule doesn't have definition arguments, so we shouldn't really
