@@ -190,7 +190,7 @@ def load_makefiles(builddir):
     files = [file for file in files if 'esting' not in file and 'emporary' not in file]
     result = {}
     for fname in files:
-        result[fname.replace(builddir, '')] = tryread(fname)
+        result[fname] = tryread(fname)
     return result
 
 
