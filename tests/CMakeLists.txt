@@ -480,7 +480,7 @@ endif()
 add_definitions(-DOPENSCAD_TESTING -DENABLE_EXPERIMENTAL)
 
 # Search for MCAD in correct place
-set(CTEST_ENVIRONMENT "${CTEST_ENVIRONMENT};OPENSCADPATH=${CMAKE_CURRENT_SOURCE_DIR}/../libraries")
+#set(CTEST_ENVIRONMENT "${CTEST_ENVIRONMENT};OPENSCADPATH=${CMAKE_CURRENT_SOURCE_DIR}/../libraries")
 
 # Platform specific settings
 
