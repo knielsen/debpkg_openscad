@@ -1,4 +1,4 @@
-openscad (2014.03~rc2+dfsg-1) UNRELEASED; urgency=low
+openscad (2014.03+dfsg-1) unstable; urgency=low
 
   * New upstream version
     - resize module
@@ -38,7 +38,7 @@ openscad (2014.03~rc2+dfsg-1) UNRELEASED; urgency=low
     - Patch out check for MCAD subtree
   * Change Standards-Version to 3.9.5 (no further changes)
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 06 Aug 2013 23:48:00 +0200
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 10 Mar 2014 20:08:15 +0100
 
 openscad (2013.01+dfsg-2.2) unstable; urgency=medium
 
