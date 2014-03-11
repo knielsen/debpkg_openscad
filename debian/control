@@ -6,8 +6,6 @@ Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
 # for a build server gets the idea of installing xserver-xorg-core; also, this
 # is why the sequence of xserver-xorg-core and xvfb is flipped here relative to
 # openscad-testing, where they come from.
-#
-# for the time being, this is difficult to fullfill due to #718992
 Build-Depends:
     debhelper (>= 9),
     qt4-qmake (>=4.4),
@@ -90,7 +88,8 @@ Package: openscad-testing-data
 Architecture: all
 Depends:
     ${shlibs:Depends},
-    ${misc:Depends}
+    ${misc:Depends},
+    openscad-mcad
 # the examples, which are shipped in openscad, are part of the test suite
 Recommends: openscad
 Suggests: openscad-testing
