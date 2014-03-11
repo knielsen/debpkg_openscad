@@ -1,5 +1,5 @@
 version=3
 
 opts=dversionmangle=s/\+dfsg$// \
-    http://code.google.com/p/openscad/downloads/list?can=1 .*/openscad-([0-9.]*).src.tar.gz \
+    http://files.openscad.org/openscad-([0-9.]*).src.tar.gz \
     debian sh debian/repack.stub
