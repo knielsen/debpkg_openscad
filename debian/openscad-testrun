@@ -49,6 +49,12 @@ def main():
     for f in os.listdir(TESTPROGRAMS):
         os.symlink(join(TESTPROGRAMS, f), join(builddir, f))
 
+    # it's a lie, that's the gui version -- but we won't let anybody know...
+    #
+    # actually, the _nogui should be in another binary package, and
+    # alternatives should decide what is openscad in $PATH.
+    os.symlink('/usr/bin/openscad', join(builddir, 'openscad_nogui'))
+
     # this is a workaround while the throwntogethertest handles includes subtly
     # different from openscad's includes. in the build time tests, this does
     # not surface as OPENSCADPATH has to be set anyway due to the default
