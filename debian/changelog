@@ -1,3 +1,64 @@
+openscad (2015.03+dfsg-0.1) experimental; urgency=low
+
+  * Non-maintainer upload
+  * New upstream version
+    + Language Features
+      - Added text() module for 2D text
+      - Added offset() module for 2D offsets
+      - Added list comprehensions and let()
+      - Added concat() function
+      - Added chr() function
+      - surface() can now take PNG images as input
+      - min() and max() can now take a vector argument
+      - 2D minkowski can now handle polygons with holes
+      - Variables can now be assigned in local blocks without using assign()
+    + Program Features
+      - Added Toolbar icons
+      - New code editor based on QScintilla
+      - Added Splash screen
+      - Added SVG export
+      - Added AMF export
+      - Added --viewall and --autocenter cmd-line parameters
+      - GUI is now translated into German, Czech, Spanish, French and Russian
+      - MDI (Multiple Document Interface) is now available on all platforms
+      - Color schemes for viewer and editor can be user-edited using JSON files
+      - GUI components are now dockable
+      - Added Tickmarks on axes
+    + Bugfixes/improvements
+      - Performance improvement: 2D (clipper), preview, hull, minkowski, surface
+      - Performance improvement: Reduce duplicate evaluation of identical
+        expressions
+      - Better recursion behavior
+      - STL export and import is now more robust
+      - Internal cavities are better supported
+      - New examples
+      - Windows cmd-line behaves better
+      - Better mirror() and scale() behavior when using negative factors
+    + Deprecations
+      - polyhedron() now takes a faces= argument rather than triangles=
+      - assign() is no longer needed. Local variables can be created in any
+        scope
+  * Update build-deps
+  * Remove duplicate zlib paragraph from debian/copyright
+  * Don't bundle fonts
+  * Document font copyright
+  * Build-dep on libgl1-mesa-dri for tests
+  * Fix E: Unknown filetype application/gzip in repack.sh
+  * Bump Standards-Version to 3.9.6
+  * Let uscan do the repacking.
+    Document the removed files in debian/copyright's Files-Excluded and let
+    uscan do the repacking instead of the local repack.sh
+  * Reintroduce scripts folder.
+    We need some files for compilation.
+  * Document copyright for scripts/git-archive-all.py
+  * Document copyright for chrpath
+  * Remove test fonts too
+  * Don't run arguments through abspath in test_cmdline_tool.
+    OpenSCAD should handle relative paths just fine as long as the cwd is right.
+  * Add hashbang to test_cmdline_tool.py
+
+ -- Chow Loong Jin <hyperair@debian.org>  Tue, 10 Mar 2015 18:32:10 +0800
+
 openscad (2014.03+dfsg-1) unstable; urgency=low
 
   * New upstream version
