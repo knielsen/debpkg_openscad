@@ -28,10 +28,10 @@
 
 #include "module.h"
 #include "polyset.h"
+#include "Polygon2d.h"
 #include "evalcontext.h"
 #include "builtin.h"
 #include "dxfdata.h"
-#include "dxftess.h"
 #include "printutils.h"
 #include "fileutils.h"
 #include "handle_dep.h" // handle_dep()
@@ -61,14 +61,14 @@ class ImportModule : public AbstractModule
 public:
 	import_type_e type;
 	ImportModule(import_type_e type = TYPE_UNKNOWN) : type(type) { }
-	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx) const;
+	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const;
 };
 
-AbstractNode *ImportModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx) const
+AbstractNode *ImportModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const
 {
 	AssignmentList args;
-	args += Assignment("file", NULL), Assignment("layer", NULL), Assignment("convexity", NULL), Assignment("origin", NULL), Assignment("scale", NULL);
-	args += Assignment("filename",NULL), Assignment("layername", NULL);
+	args += Assignment("file"), Assignment("layer"), Assignment("convexity"), Assignment("origin"), Assignment("scale");
+	args += Assignment("filename"), Assignment("layername");
 
   // FIXME: This is broken. Tag as deprecated and fix
 	// Map old argnames to new argnames for compatibility
@@ -91,18 +91,18 @@ AbstractNode *ImportModule::instantiate(const Context *ctx, const ModuleInstanti
 	c.dump(this, inst);
 #endif
 
-	Value v = c.lookup_variable("file");
-	if (v.isUndefined()) {
+	ValuePtr v = c.lookup_variable("file");
+	if (v->isUndefined()) {
 		v = c.lookup_variable("filename");
-		if (!v.isUndefined()) {
-			printDeprecation("DEPRECATED: filename= is deprecated. Please use file=");
+		if (!v->isUndefined()) {
+			printDeprecation("filename= is deprecated. Please use file=");
 		}
 	}
-	std::string filename = lookup_file(v.isUndefined() ? "" : v.toString(), inst->path(), ctx->documentPath());
+	std::string filename = lookup_file(v->isUndefined() ? "" : v->toString(), inst->path(), ctx->documentPath());
 	import_type_e actualtype = this->type;
 	if (actualtype == TYPE_UNKNOWN) {
-		std::string extraw = boosty::extension_str( fs::path(filename) );
-		std::string ext = boost::algorithm::to_lower_copy( extraw );
+		std::string extraw = boosty::extension_str(fs::path(filename));
+		std::string ext = boost::algorithm::to_lower_copy(extraw);
 		if (ext == ".stl") actualtype = TYPE_STL;
 		else if (ext == ".off") actualtype = TYPE_OFF;
 		else if (ext == ".dxf") actualtype = TYPE_DXF;
@@ -110,31 +110,30 @@ AbstractNode *ImportModule::instantiate(const Context *ctx, const ModuleInstanti
 
 	ImportNode *node = new ImportNode(inst, actualtype);
 
-	node->fn = c.lookup_variable("$fn").toDouble();
-	node->fs = c.lookup_variable("$fs").toDouble();
-	node->fa = c.lookup_variable("$fa").toDouble();
+	node->fn = c.lookup_variable("$fn")->toDouble();
+	node->fs = c.lookup_variable("$fs")->toDouble();
+	node->fa = c.lookup_variable("$fa")->toDouble();
 
 	node->filename = filename;
-	Value layerval = c.lookup_variable("layer", true);
+	Value layerval = *c.lookup_variable("layer", true);
 	if (layerval.isUndefined()) {
-		layerval = c.lookup_variable("layername");
+		layerval = *c.lookup_variable("layername");
 		if (!layerval.isUndefined()) {
-			printDeprecation("DEPRECATED: layername= is deprecated. Please use layer=");
+			printDeprecation("layername= is deprecated. Please use layer=");
 		}
 	}
 	node->layername = layerval.isUndefined() ? ""  : layerval.toString();
-	node->convexity = c.lookup_variable("convexity", true).toDouble();
+	node->convexity = c.lookup_variable("convexity", true)->toDouble();
 
 	if (node->convexity <= 0) node->convexity = 1;
 
-	Value origin = c.lookup_variable("origin", true);
+	ValuePtr origin = c.lookup_variable("origin", true);
 	node->origin_x = node->origin_y = 0;
-	origin.getVec2(node->origin_x, node->origin_y);
+	origin->getVec2(node->origin_x, node->origin_y);
 
-	node->scale = c.lookup_variable("scale", true).toDouble();
+	node->scale = c.lookup_variable("scale", true)->toDouble();
 
-	if (node->scale <= 0)
-		node->scale = 1;
+	if (node->scale <= 0) node->scale = 1;
 
 	return node;
 }
@@ -182,21 +181,25 @@ void read_stl_facet( std::ifstream &f, stl_facet &facet )
 #endif
 }
 
-PolySet *ImportNode::evaluate_polyset(class PolySetEvaluator *) const
+/*!
+	Will return an empty geometry if the import failed, but not NULL
+*/
+Geometry *ImportNode::createGeometry() const
 {
-	PolySet *p = NULL;
+	Geometry *g = NULL;
 
-	if (this->type == TYPE_STL)
-	{
+	switch (this->type) {
+	case TYPE_STL: {
+		PolySet *p = new PolySet(3);
+		g = p;
+
 		handle_dep((std::string)this->filename);
 		// Open file and position at the end
 		std::ifstream f(this->filename.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
 		if (!f.good()) {
 			PRINTB("WARNING: Can't open import file '%s'.", this->filename);
-			return p;
+			return g;
 		}
-
-		p = new PolySet();
 
 		boost::regex ex_sfe("solid|facet|endloop");
 		boost::regex ex_outer("outer loop");
@@ -270,9 +273,10 @@ PolySet *ImportNode::evaluate_polyset(class PolySetEvaluator *) const
 			}
 		}
 	}
-
-	else if (this->type == TYPE_OFF)
-	{
+		break;
+	case TYPE_OFF: {
+		PolySet *p = new PolySet(3);
+		g = p;
 #ifdef ENABLE_CGAL
 		CGAL_Polyhedron poly;
 		std::ifstream file(this->filename.c_str(), std::ios::in | std::ios::binary);
@@ -282,33 +286,25 @@ PolySet *ImportNode::evaluate_polyset(class PolySetEvaluator *) const
 		else {
 			file >> poly;
 			file.close();
-			p = new PolySet();
-			bool err = createPolySetFromPolyhedron(poly, *p);
-			if (err) {
-				delete p;
-				p = NULL;
-			}
+			bool err = CGALUtils::createPolySetFromPolyhedron(poly, *p);
 		}
 #else
   PRINT("WARNING: OFF import requires CGAL.");
 #endif
 	}
-
-	else if (this->type == TYPE_DXF)
-	{
-		p = new PolySet();
+		break;
+	case TYPE_DXF: {
 		DxfData dd(this->fn, this->fs, this->fa, this->filename, this->layername, this->origin_x, this->origin_y, this->scale);
-		p->is2d = true;
-		dxf_tesselate(p, dd, 0, Vector2d(1,1), true, false, 0);
-		dxf_border_to_ps(p, dd);
+		g = dd.toPolygon2d();
 	}
-	else
-	{
+		break;
+	default:
 		PRINTB("ERROR: Unsupported file format while trying to import file '%s'", this->filename);
+		g = new PolySet(0);
 	}
 
-	if (p) p->convexity = this->convexity;
-	return p;
+	if (g) g->setConvexity(this->convexity);
+	return g;
 }
 
 std::string ImportNode::toString() const

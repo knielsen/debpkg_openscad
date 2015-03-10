@@ -24,8 +24,8 @@ void ModuleContext::evaluateAssignments(const AssignmentList &assignments)
 	// First, assign all simple variables
 	std::list<std::string> undefined_vars;
  	BOOST_FOREACH(const Assignment &ass, assignments) {
-		Value tmpval = ass.second->evaluate(this);
-		if (tmpval.isUndefined()) undefined_vars.push_back(ass.first);
+		ValuePtr tmpval = ass.second->evaluate(this);
+		if (tmpval->isUndefined()) undefined_vars.push_back(ass.first);
  		else this->set_variable(ass.first, tmpval);
  	}
 
@@ -46,12 +46,12 @@ void ModuleContext::evaluateAssignments(const AssignmentList &assignments)
 			boost::unordered_map<std::string, Expression *>::iterator found = tmpass.find(*curr);
 			if (found != tmpass.end()) {
 				const Expression *expr = found->second;
-				Value tmpval = expr->evaluate(this);
+				ValuePtr tmpval = expr->evaluate(this);
 				// FIXME: it's not enough to check for undefined;
 				// we need to check for any undefined variable in the subexpression
 				// For now, ignore this and revisit the validity and order of variable
 				// assignments later
-				if (!tmpval.isUndefined()) {
+				if (!tmpval->isUndefined()) {
 					changed = true;
 					this->set_variable(*curr, tmpval);
 					undefined_vars.erase(curr);
@@ -71,6 +71,7 @@ void ModuleContext::initializeModule(const class Module &module)
 	BOOST_FOREACH(const Assignment &ass, module.scope.assignments) {
 		this->set_variable(ass.first, ass.second->evaluate(this));
 	}
+
 // Experimental code. See issue #399
 //	evaluateAssignments(module.scope.assignments);
 }
@@ -89,7 +90,7 @@ void ModuleContext::registerBuiltin()
 		this->set_variable(ass.first, ass.second->evaluate(this));
 	}
 
-	this->set_constant("PI",Value(M_PI));
+	this->set_constant("PI", ValuePtr(M_PI));
 }
 
 const AbstractFunction *ModuleContext::findLocalFunction(const std::string &name) const
@@ -115,14 +116,15 @@ const AbstractModule *ModuleContext::findLocalModule(const std::string &name) co
 		}
 		std::string replacement = Builtins::instance()->isDeprecated(name);
 		if (!replacement.empty()) {
-			PRINT_DEPRECATION("DEPRECATED: The %s() module will be removed in future releases. Use %s() instead.", name % replacement);
+			PRINT_DEPRECATION("The %s() module will be removed in future releases. Use %s instead.", name % replacement);
 		}
 		return m;
 	}
 	return NULL;
 }
 
-Value ModuleContext::evaluate_function(const std::string &name, const EvalContext *evalctx) const
+ValuePtr ModuleContext::evaluate_function(const std::string &name, 
+																												 const EvalContext *evalctx) const
 {
 	const AbstractFunction *foundf = findLocalFunction(name);
 	if (foundf) return foundf->evaluate(this, evalctx);
@@ -130,7 +132,7 @@ Value ModuleContext::evaluate_function(const std::string &name, const EvalContex
 	return Context::evaluate_function(name, evalctx);
 }
 
-AbstractNode *ModuleContext::instantiate_module(const ModuleInstantiation &inst, const EvalContext *evalctx) const
+AbstractNode *ModuleContext::instantiate_module(const ModuleInstantiation &inst, EvalContext *evalctx) const
 {
 	const AbstractModule *foundm = this->findLocalModule(inst.name());
 	if (foundm) return foundm->instantiate(this, &inst, evalctx);
@@ -139,34 +141,35 @@ AbstractNode *ModuleContext::instantiate_module(const ModuleInstantiation &inst,
 }
 
 #ifdef DEBUG
-void ModuleContext::dump(const AbstractModule *mod, const ModuleInstantiation *inst)
+std::string ModuleContext::dump(const AbstractModule *mod, const ModuleInstantiation *inst)
 {
-	if (inst) 
-		PRINTB("ModuleContext %p (%p) for %s inst (%p) ", this % this->parent % inst->name() % inst);
-	else 
-		PRINTB("ModuleContext: %p (%p)", this % this->parent);
-	PRINTB("  document path: %s", this->document_path);
+	std::stringstream s;
+	if (inst)
+		s << boost::format("ModuleContext %p (%p) for %s inst (%p) ") % this % this->parent % inst->name() % inst;
+	else
+		s << boost::format("ModuleContext: %p (%p)") % this % this->parent;
+	s << boost::format("  document path: %s") % this->document_path;
 	if (mod) {
 		const Module *m = dynamic_cast<const Module*>(mod);
 		if (m) {
-			PRINT("  module args:");
+			s << "  module args:";
 			BOOST_FOREACH(const Assignment &arg, m->definition_arguments) {
-				PRINTB("    %s = %s", arg.first % variables[arg.first]);
+				s << boost::format("    %s = %s") % arg.first % variables[arg.first];
 			}
 		}
 	}
-	typedef std::pair<std::string, Value> ValueMapType;
-	PRINT("  vars:");
-  BOOST_FOREACH(const ValueMapType &v, constants) {
-	  PRINTB("    %s = %s", v.first % v.second);
-	}		
-  BOOST_FOREACH(const ValueMapType &v, variables) {
-	  PRINTB("    %s = %s", v.first % v.second);
-	}		
-  BOOST_FOREACH(const ValueMapType &v, config_variables) {
-	  PRINTB("    %s = %s", v.first % v.second);
-	}		
-
+	typedef std::pair<std::string, ValuePtr> ValueMapType;
+	s << "  vars:";
+	BOOST_FOREACH(const ValueMapType &v, constants) {
+		s << boost::format("    %s = %s") % v.first % v.second;
+	}
+	BOOST_FOREACH(const ValueMapType &v, variables) {
+		s << boost::format("    %s = %s") % v.first % v.second;
+	}
+	BOOST_FOREACH(const ValueMapType &v, config_variables) {
+		s << boost::format("    %s = %s") % v.first % v.second;
+	}
+	return s.str();
 }
 #endif
 
@@ -176,31 +179,38 @@ FileContext::FileContext(const class FileModule &module, const Context *parent)
 	if (!module.modulePath().empty()) this->document_path = module.modulePath();
 }
 
-Value FileContext::evaluate_function(const std::string &name, const EvalContext *evalctx) const
+ValuePtr FileContext::sub_evaluate_function(const std::string &name, 
+																													 const EvalContext *evalctx,
+																													 FileModule *usedmod) const
+
+{
+	FileContext ctx(*usedmod, this->parent);
+	ctx.initializeModule(*usedmod);
+	// FIXME: Set document path
+#ifdef DEBUG
+	PRINTDB("New lib Context for %s func:", name);
+	PRINTDB("%s",ctx.dump(NULL, NULL));
+#endif
+	return usedmod->scope.functions[name]->evaluate(&ctx, evalctx);
+}
+
+ValuePtr FileContext::evaluate_function(const std::string &name, 
+																											 const EvalContext *evalctx) const
 {
 	const AbstractFunction *foundf = findLocalFunction(name);
 	if (foundf) return foundf->evaluate(this, evalctx);
-	
+
 	BOOST_FOREACH(const FileModule::ModuleContainer::value_type &m, this->usedlibs) {
 		// usedmod is NULL if the library wasn't be compiled (error or file-not-found)
 		FileModule *usedmod = ModuleCache::instance()->lookup(m);
-		if (usedmod && 
-				usedmod->scope.functions.find(name) != usedmod->scope.functions.end()) {
-			FileContext ctx(*usedmod, this->parent);
-			ctx.initializeModule(*usedmod);
-			// FIXME: Set document path
-#if 0 && DEBUG
-			PRINTB("New lib Context for %s func:", name);
-			ctx.dump(NULL, NULL);
-#endif
-			return usedmod->scope.functions[name]->evaluate(&ctx, evalctx);
-		}
+		if (usedmod && usedmod->scope.functions.find(name) != usedmod->scope.functions.end())
+			return sub_evaluate_function(name, evalctx, usedmod);
 	}
 
 	return ModuleContext::evaluate_function(name, evalctx);
 }
 
-AbstractNode *FileContext::instantiate_module(const ModuleInstantiation &inst, const EvalContext *evalctx) const
+AbstractNode *FileContext::instantiate_module(const ModuleInstantiation &inst, EvalContext *evalctx) const
 {
 	const AbstractModule *foundm = this->findLocalModule(inst.name());
 	if (foundm) return foundm->instantiate(this, &inst, evalctx);
@@ -208,14 +218,14 @@ AbstractNode *FileContext::instantiate_module(const ModuleInstantiation &inst, c
 	BOOST_FOREACH(const FileModule::ModuleContainer::value_type &m, this->usedlibs) {
 		FileModule *usedmod = ModuleCache::instance()->lookup(m);
 		// usedmod is NULL if the library wasn't be compiled (error or file-not-found)
-		if (usedmod && 
+		if (usedmod &&
 				usedmod->scope.modules.find(inst.name()) != usedmod->scope.modules.end()) {
 			FileContext ctx(*usedmod, this->parent);
 			ctx.initializeModule(*usedmod);
 			// FIXME: Set document path
-#if 0 && DEBUG
-			PRINT("New file Context:");
-			ctx.dump(NULL, &inst);
+#ifdef DEBUG
+			PRINTD("New file Context:");
+			PRINTDB("%s",ctx.dump(NULL, &inst));
 #endif
 			return usedmod->scope.modules[inst.name()]->instantiate(&ctx, &inst, evalctx);
 		}

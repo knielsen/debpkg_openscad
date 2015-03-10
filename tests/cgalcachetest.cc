@@ -36,9 +36,9 @@
 #include "builtin.h"
 #include "Tree.h"
 #include "CGAL_Nef_polyhedron.h"
-#include "CGALEvaluator.h"
-#include "PolySetCGALEvaluator.h"
+#include "GeometryEvaluator.h"
 #include "CGALCache.h"
+#include "stackcheck.h"
 
 #ifndef _MSC_VER
 #include <getopt.h>
@@ -53,20 +53,12 @@ namespace fs = boost::filesystem;
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 #include "boosty.h"
+#include "PlatformUtils.h"
 
 std::string commandline_commands;
 std::string currentdir;
 
 using std::string;
-
-void cgalTree(Tree &tree)
-{
-	assert(tree.root());
-
-	CGALEvaluator evaluator(tree);
-	Traverser evaluate(evaluator, *tree.root(), Traverser::PRE_AND_POSTFIX);
-	evaluate.execute();
-}
 
 po::variables_map parse_options(int argc, char *argv[])
 {
@@ -97,6 +89,8 @@ int main(int argc, char **argv)
 {
 	const char *filename, *outfilename = NULL;
 	size_t cgalcachesize = 1*1024*1024;
+	StackCheck::inst()->init();
+
 	po::variables_map vm;
 	try {
 		vm = parse_options(argc, argv);
@@ -126,8 +120,8 @@ int main(int argc, char **argv)
 
 	currentdir = boosty::stringy(fs::current_path());
 
-	parser_init(boosty::stringy(fs::path(argv[0]).branch_path()));
-	add_librarydir(boosty::stringy(fs::path(argv[0]).branch_path() / "../libraries"));
+	PlatformUtils::registerApplicationPath(boosty::stringy(fs::path(argv[0]).branch_path()));
+	parser_init();
 
 	ModuleContext top_ctx;
 	top_ctx.registerBuiltin();
@@ -152,15 +146,14 @@ int main(int argc, char **argv)
 
 	Tree tree(root_node);
 
-	CGALEvaluator cgalevaluator(tree);
- 	PolySetCGALEvaluator psevaluator(cgalevaluator);
+	GeometryEvaluator geomevaluator(tree);
 
 	print_messages_push();
 
 	std::cout << "First evaluation:\n";
-	CGAL_Nef_polyhedron N = cgalevaluator.evaluateCGALMesh(*root_node);
+	shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*root_node, true);
 	std::cout << "Second evaluation:\n";
-	CGAL_Nef_polyhedron N2 = cgalevaluator.evaluateCGALMesh(*root_node);
+	shared_ptr<const Geometry> geom2 = geomevaluator.evaluateGeometry(*root_node, true);
 	// FIXME:
 	// Evaluate again to make cache kick in
 	// Record printed output and compare it

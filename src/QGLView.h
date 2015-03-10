@@ -1,5 +1,4 @@
-#ifndef QGLVIEW_H_
-#define QGLVIEW_H_
+#pragma once
 
 #include "system-gl.h"
 #include <QGLWidget>
@@ -18,6 +17,7 @@ class QGLView : public QGLWidget, public GLView
 	Q_PROPERTY(bool showAxes READ showAxes WRITE setShowAxes);
 	Q_PROPERTY(bool showCrosshairs READ showCrosshairs WRITE setShowCrosshairs);
 	Q_PROPERTY(bool orthoMode READ orthoMode WRITE setOrthoMode);
+	Q_PROPERTY(double showScaleProportional READ showScaleProportional WRITE setShowScaleProportional);
 
 public:
 	QGLView(QWidget *parent = NULL);
@@ -35,16 +35,20 @@ public:
 	bool showCrosshairs() const { return this->showcrosshairs; }
 	void setShowCrosshairs(bool enabled) { this->showcrosshairs = enabled; }
 	bool orthoMode() const { return (this->cam.projection == Camera::ORTHOGONAL); }
-	void setOrthoMode(bool enabled) {
-		if (enabled) this->cam.projection = Camera::ORTHOGONAL;
-		else this->cam.projection = Camera::PERSPECTIVE;
-	}
+	void setOrthoMode(bool enabled);
+	bool showScaleProportional() const { return this->showscale; }
+	void setShowScaleProportional(bool enabled) { this->showscale = enabled; }
 	std::string getRendererInfo() const;
-#if QT_VERSION >= 0x050001
+#if QT_VERSION >= 0x050100
 	float getDPI() { return this->devicePixelRatio(); }
 #endif
 	bool save(const char *filename);
-        void resetView();
+	void resetView();
+	void viewAll();
+
+public slots:
+	void ZoomIn(void);
+	void ZoomOut(void);
 
 public:
 	QLabel *statusLabel;
@@ -55,11 +59,11 @@ private:
 	bool mouse_drag_active;
 	QPoint last_mouse;
 
-	void keyPressEvent(QKeyEvent *event);
 	void wheelEvent(QWheelEvent *event);
 	void mousePressEvent(QMouseEvent *event);
 	void mouseMoveEvent(QMouseEvent *event);
 	void mouseReleaseEvent(QMouseEvent *event);
+	void mouseDoubleClickEvent(QMouseEvent *event);
 
 	void initializeGL();
 	void resizeGL(int w, int h);
@@ -76,5 +80,3 @@ private slots:
 signals:
 	void doAnimateUpdate();
 };
-
-#endif

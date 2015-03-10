@@ -33,10 +33,13 @@
 #include "function.h"
 #include "printutils.h"
 #include "parsersettings.h"
+#include "exceptions.h"
+#include "stackcheck.h"
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
 #include "boosty.h"
+#include "FontCache.h"
 #include <boost/foreach.hpp>
 #include <sstream>
 #include <sys/stat.h>
@@ -45,7 +48,7 @@ AbstractModule::~AbstractModule()
 {
 }
 
-AbstractNode *AbstractModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx) const
+AbstractNode *AbstractModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const
 {
 	(void)ctx; // avoid unusued parameter warning
 
@@ -54,6 +57,18 @@ AbstractNode *AbstractModule::instantiate(const Context *ctx, const ModuleInstan
 	node->children = inst->instantiateChildren(evalctx);
 
 	return node;
+}
+
+double AbstractModule::lookup_double_variable_with_default(Context &c, std::string variable, double def) const
+{
+	ValuePtr v = c.lookup_variable(variable, true);
+	return (v->type() == Value::NUMBER) ? v->toDouble() : def;
+}
+
+std::string AbstractModule::lookup_string_variable_with_default(Context &c, std::string variable, std::string def) const
+{
+	ValuePtr v = c.lookup_variable(variable, true);
+	return (v->type() == Value::STRING) ? v->toString() : def;
 }
 
 std::string AbstractModule::dump(const std::string &indent, const std::string &name) const
@@ -65,7 +80,6 @@ std::string AbstractModule::dump(const std::string &indent, const std::string &n
 
 ModuleInstantiation::~ModuleInstantiation()
 {
-	BOOST_FOREACH(const Assignment &arg, this->arguments) delete arg.second;
 }
 
 IfElseModuleInstantiation::~IfElseModuleInstantiation()
@@ -139,8 +153,13 @@ AbstractNode *ModuleInstantiation::evaluate(const Context *ctx) const
 	PRINT("New eval ctx:");
 	c.dump(NULL, this);
 #endif
-	AbstractNode *node = ctx->instantiate_module(*this, &c); // Passes c as evalctx
-	return node;
+	try {
+		AbstractNode *node = ctx->instantiate_module(*this, &c); // Passes c as evalctx
+		return node;
+	} catch (const RecursionException &e) {
+		PRINT(e.what());
+		return NULL;
+	}
 }
 
 std::vector<AbstractNode*> ModuleInstantiation::instantiateChildren(const Context *evalctx) const
@@ -159,33 +178,22 @@ Module::~Module()
 {
 }
 
-class ModRecursionGuard
+AbstractNode *Module::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const
 {
-public:
-	ModRecursionGuard(const ModuleInstantiation &inst) : inst(inst) { 
-		inst.recursioncount++; 
-	}
-	~ModRecursionGuard() { 
-		inst.recursioncount--; 
-	}
-	bool recursion_detected() const { return (inst.recursioncount > 1000); }
-private:
-	const ModuleInstantiation &inst;
-};
-
-AbstractNode *Module::instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx) const
-{
-	ModRecursionGuard g(*inst);
-	if (g.recursion_detected()) { 
-		PRINTB("ERROR: Recursion detected calling module '%s'", inst->name());
+	if (StackCheck::inst()->check()) {
+		throw RecursionException::create("module", inst->name());
 		return NULL;
 	}
 
+	// At this point we know that nobody will modify the dependencies of the local scope
+	// passed to this instance, so we can populate the context
+	inst->scope.apply(*evalctx);
+    
 	ModuleContext c(ctx, evalctx);
 	// set $children first since we might have variables depending on it
-	c.set_variable("$children", Value(double(inst->scope.children.size())));
+	c.set_variable("$children", ValuePtr(double(inst->scope.children.size())));
 	module_stack.push_back(inst->name());
-	c.set_variable("$parent_modules", Value(double(module_stack.size())));
+	c.set_variable("$parent_modules", ValuePtr(double(module_stack.size())));
 	c.initializeModule(*this);
 	// FIXME: Set document path to the path of the module
 #if 0 && DEBUG
@@ -220,6 +228,26 @@ std::string Module::dump(const std::string &indent, const std::string &name) con
 		dump << indent << "}\n";
 	}
 	return dump.str();
+}
+
+FileModule::~FileModule()
+{
+	delete context;
+}
+
+void FileModule::registerUse(const std::string path) {
+	std::string extraw = boosty::extension_str(fs::path(path));
+	std::string ext = boost::algorithm::to_lower_copy(extraw);
+	
+	if ((ext == ".otf") || (ext == ".ttf")) {
+		if (fs::is_regular(path)) {
+			FontCache::instance()->register_font_file(path);
+		} else {
+			PRINTB("ERROR: Can't read font with path '%s'", path);
+		}
+	} else {
+		usedlibs.insert(path);
+	}
 }
 
 void FileModule::registerInclude(const std::string &localpath,
@@ -295,9 +323,7 @@ bool FileModule::handleDependencies()
 			// Detect appearance but not removal of files, and keep old module
 			// on compile errors (FIXME: Is this correct behavior?)
 			if (changed) {
-#ifdef DEBUG
-				PRINTB_NOCACHE("  %s: %p -> %p", filename % oldmodule % newmodule);
-#endif
+				PRINTDB("  %s: %p -> %p", filename % oldmodule % newmodule);
 			}
 			somethingchanged |= changed;
 			// Only print warning if we're not part of an automatic reload
@@ -317,19 +343,37 @@ bool FileModule::handleDependencies()
 	return somethingchanged;
 }
 
-AbstractNode *FileModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, const EvalContext *evalctx) const
+AbstractNode *FileModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx)
 {
 	assert(evalctx == NULL);
-	FileContext c(*this, ctx);
-	c.initializeModule(*this);
+	
+	delete context;
+	context = new FileContext(*this, ctx);
+	AbstractNode *node = new AbstractNode(inst);
+
+	try {
+		context->initializeModule(*this);
+
 	// FIXME: Set document path to the path of the module
 #if 0 && DEBUG
-	c.dump(this, inst);
+		c.dump(this, inst);
 #endif
 
-	AbstractNode *node = new AbstractNode(inst);
-	std::vector<AbstractNode *> instantiatednodes = this->scope.instantiateChildren(ctx, &c);
-	node->children.insert(node->children.end(), instantiatednodes.begin(), instantiatednodes.end());
+		std::vector<AbstractNode *> instantiatednodes = this->scope.instantiateChildren(context);
+		node->children.insert(node->children.end(), instantiatednodes.begin(), instantiatednodes.end());
+	}
+	catch (RecursionException &e) {
+		PRINT(e.what());
+	}
 
 	return node;
+}
+
+ValuePtr FileModule::lookup_variable(const std::string &name) const
+{
+	if (!context) {
+		return ValuePtr::undefined;
+	}
+	
+	return context->lookup_variable(name, true);
 }

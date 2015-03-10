@@ -1,5 +1,4 @@
-#ifndef RENDERNODE_H_
-#define RENDERNODE_H_
+#pragma once
 
 #include "node.h"
 #include "visitor.h"
@@ -14,9 +13,6 @@ public:
 	}
 	virtual std::string toString() const;
 	virtual std::string name() const { return "render"; }
-	PolySet *evaluate_polyset(class PolySetEvaluator *ps) const;
 
 	int convexity;
 };
-
-#endif

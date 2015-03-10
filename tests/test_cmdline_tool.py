@@ -1,4 +1,3 @@
-
 #
 # Regression test driver for cmd-line tools
 #
@@ -9,6 +8,11 @@
 # 
 # Any generated output is written to the file `basename <argument`-actual.<suffix>
 # Any warning or errors are written to stderr.
+#
+# The test is run with OPENSCAD_FONT_PATH set to the testdata/ttf directory. This
+# should ensure we fetch the fonts from there even if they are also installed
+# on the system. (E.g. the C glyph is actually different from Debian/Jessie
+# installation and what we ship as Liberation-2.00.1).
 #
 # Returns 0 on passed test
 #         1 on error
@@ -26,13 +30,24 @@ import getopt
 import shutil
 import platform
 import string
+import difflib
+
+#_debug_tcct = True
+_debug_tcct = False
+
+def debug(*args):
+    global _debug_tcct
+    if _debug_tcct:
+	print 'test_cmdline_tool:',
+	for a in args: print a,
+	print
 
 def initialize_environment():
     if not options.generate: options.generate = bool(os.getenv("TEST_GENERATE"))
     return True
 
 def init_expected_filename():
-    global expecteddir, expectedfilename
+    global expecteddir, expectedfilename # fixme - globals are hard to use
 
     expected_testname = options.testname
 
@@ -46,7 +61,7 @@ def init_expected_filename():
     expectedfilename = os.path.normpath(expectedfilename)
 
 def init_actual_filename():
-    global actualdir, actualfilename
+    global actualdir, actualfilename # fixme - globals are hard to use
 
     cmdname = os.path.split(options.cmd)[1]
     actualdir = os.path.join(os.getcwd(), options.testname + "-output")
@@ -54,10 +69,13 @@ def init_actual_filename():
     actualfilename = os.path.normpath(actualfilename)
 
 def verify_test(testname, cmd):
-    global expectedfilename
+    global expectedfilename, actualfilename
     if not options.generate:
         if not os.path.isfile(expectedfilename):
             print >> sys.stderr, "Error: test '%s' is missing expected output in %s" % (testname, expectedfilename)
+            # next 2 imgs parsed by test_pretty_print.py
+            print >> sys.stderr, ' actual image: ' + actualfilename + '\n'
+            print >> sys.stderr, ' expected image: ' + expectedfilename + '\n'
             return False
     return True
 
@@ -87,12 +105,15 @@ def compare_text(expected, actual):
     return get_normalized_text(expected) == get_normalized_text(actual)
 
 def compare_default(resultfilename):
-    print >> sys.stderr, 'diff text compare: '
+    print >> sys.stderr, 'text comparison: '
     print >> sys.stderr, ' expected textfile: ', expectedfilename
     print >> sys.stderr, ' actual textfile: ', resultfilename
-    if not compare_text(expectedfilename, resultfilename):
+    expected_text = get_normalized_text(expectedfilename)
+    actual_text = get_normalized_text(resultfilename)
+    if not expected_text == actual_text:
 	if resultfilename: 
-            execute_and_redirect("diff", [expectedfilename, resultfilename], sys.stderr)
+            differences = difflib.unified_diff(expected_text.splitlines(1), actual_text.splitlines(1))
+            for line in differences: sys.stderr.write(line)
         return False
     return True
 
@@ -109,19 +130,31 @@ def compare_png(resultfilename):
     if options.comparator == 'ncc':
       # for systems where imagemagick crashes when using the above comparators
       args = [expectedfilename, resultfilename, "-alpha", "Off", "-compose", "difference", "-metric", "NCC", "tmp.png"]
-      options.convert_exec = 'compare'
+      options.comparison_exec = 'compare'
       compare_method = 'NCC'
 
-    msg = 'ImageMagick image comparison: '  + options.convert_exec + ' '+ ' '.join(args[2:])
-    msg += '\n expected image: ' + expectedfilename + '\n'
-    print >> sys.stderr, msg
+    if options.comparator == 'diffpng':
+      # alternative to imagemagick based on Yee's algorithm
+
+      # Writing the 'difference image' with --output is very useful for debugging but takes a long time
+      # args = [expectedfilename, resultfilename, "--output", resultfilename+'.diff.png']
+
+      args = [expectedfilename, resultfilename]
+      compare_method = 'diffpng'
+
+    print >> sys.stderr, 'Image comparison cmdline: '
+    print >> sys.stderr, '["'+str(options.comparison_exec) + '"],' + str(args)
+
+    # these two lines are parsed by the test_pretty_print.py
+    print >> sys.stderr, ' actual image: ' + resultfilename + '\n'
+    print >> sys.stderr, ' expected image: ' + expectedfilename + '\n'
+
     if not resultfilename:
         print >> sys.stderr, "Error: Error during test image generation"
         return False
-    print >> sys.stderr, ' actual image: ', resultfilename
 
-    (retval, output) = execute_and_redirect(options.convert_exec, args, subprocess.PIPE)
-    print "Imagemagick return", retval, "output:", output
+    (retval, output) = execute_and_redirect(options.comparison_exec, args, subprocess.PIPE)
+    print "Image comparison return:", retval, "output:", output
     if retval == 0:
 	if compare_method=='pixel':
             pixelerr = int(float(output.strip()))
@@ -132,6 +165,9 @@ def compare_png(resultfilename):
             ncc_err = float(output.strip())
             if ncc_err > thresh or ncc_err==0.0: return True
             else: print >> sys.stderr, ncc_err, ' Images differ: NCC comparison < ', thresh
+        elif compare_method=='diffpng':
+            if 'MATCHES:' in output: return True
+            if 'DIFFERS:' in output: return False
     return False
 
 def compare_with_expected(resultfilename):
@@ -144,31 +180,41 @@ def run_test(testname, cmd, args):
     cmdname = os.path.split(options.cmd)[1]
 
     if options.generate: 
-        if not os.path.exists(expecteddir): os.makedirs(expecteddir)
+        if not os.path.exists(expecteddir):
+            try:
+                os.makedirs(expecteddir)
+            except OSError as e:
+                if e.errno != 17: raise e # catch File Exists to allow parallel runs
         outputname = expectedfilename
     else:
-        if not os.path.exists(actualdir): os.makedirs(actualdir)
+        if not os.path.exists(actualdir):
+            try:
+                os.makedirs(actualdir)
+            except OSError as e:
+                if e.errno != 17: raise e  # catch File Exists to allow parallel runs
         outputname = actualfilename
     outputname = os.path.normpath(outputname)
 
     outfile = open(outputname, "wb")
 
     try:
-        if os.path.isfile(cmd+'.exe') and options.mingw_cross_env:
-            cmdline = ['wine']+[cmd+'.exe'] + args + [outputname]
-        elif cmd[-4:].lower() == '.exe' and options.mingw_cross_env:
-            cmdline = ['wine']+[cmd] + args + [outputname]
-        else:
-            cmdline = [cmd] + args + [outputname]
-        print cmdline
-        proc = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        errtext = proc.communicate()[1]
+        cmdline = [cmd] + args + [outputname]
+        print 'run_test() cmdline:',cmdline
+        fontdir =  os.path.join(os.path.dirname(cmd), "..", "testdata")
+        fontenv = os.environ.copy()
+        fontenv["OPENSCAD_FONT_PATH"] = fontdir
+        print 'using font directory:', fontdir
+        sys.stdout.flush()
+        proc = subprocess.Popen(cmdline, env = fontenv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	comresult = proc.communicate()
+        stdouttext, errtext = comresult[0],comresult[1]
         if errtext != None and len(errtext) > 0:
-            print >> sys.stderr, "Error output: " + errtext
+            print >> sys.stderr, "stderr output: " + errtext
+        if stdouttext != None and len(stdouttext) > 0:
+            print >> sys.stderr, "stdout output: " + stdouttext
         outfile.close()
         if proc.returncode != 0:
             print >> sys.stderr, "Error: %s failed with return code %d" % (cmdname, proc.returncode)
-            return None
 
         return outputname
     except OSError, err:
@@ -192,12 +238,13 @@ def usage():
     print >> sys.stderr, "  -t, --test=<name>        Specify test name instead of deducting it from the argument (defaults to basename <exe>)"
     print >> sys.stderr, "  -f, --file=<name>        Specify test file instead of deducting it from the argument (default to basename <first arg>)"
     print >> sys.stderr, "  -c, --convexec=<name>    Path to ImageMagick 'convert' executable"
-    print >> sys.stderr, "  -x, --mingw-cross-env    Mingw-cross-env cross compilation"
 
 if __name__ == '__main__':
     # Handle command-line arguments
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "gs:e:c:t:f:m:x", ["generate", "convexec=", "suffix=", "expected_dir=", "test=", "file=", "comparator=", "mingw-cross-env"])
+        debug('args:'+str(sys.argv))
+        opts, args = getopt.getopt(sys.argv[1:], "gs:e:c:t:f:m", ["generate", "convexec=", "suffix=", "expected_dir=", "test=", "file=", "comparator="])
+        debug('getopt args:'+str(sys.argv))
     except getopt.GetoptError, err:
         usage()
         sys.exit(2)
@@ -220,12 +267,10 @@ if __name__ == '__main__':
             options.testname = a
         elif o in ("-f", "--file"):
             options.filename = a
-        elif o in ("-c", "--convexec"): 
-            options.convert_exec = os.path.normpath( a )
+        elif o in ("-c", "--compare-exec"): 
+            options.comparison_exec = os.path.normpath( a )
         elif o in ("-m", "--comparator"):
             options.comparator = a
-        elif o in ("-x", "--mingw-cross-env"):
-            options.mingw_cross_env = True
 
     # <cmdline-tool> and <argument>
     if len(args) < 2:
@@ -237,7 +282,10 @@ if __name__ == '__main__':
     if len(args) == 2:
         basename = os.path.splitext(args[1])[0]
         path, options.filename = os.path.split(basename)
+        print >> sys.stderr, basename
+        print >> sys.stderr, path, options.filename
 
+    print >> sys.stderr, options.filename
     if not hasattr(options, "filename"):
         print >> sys.stderr, "Filename cannot be deducted from arguments. Specify test filename using the -f option"
         sys.exit(2)
@@ -256,5 +304,4 @@ if __name__ == '__main__':
 
     resultfile = run_test(options.testname, options.cmd, args[1:])
     if not resultfile: exit(1)
-    
     if not verification or not compare_with_expected(resultfile): exit(1)

@@ -1,19 +1,22 @@
-#ifndef CGALRENDERER_H_
-#define CGALRENDERER_H_
+#pragma once
 
 #include "renderer.h"
+#include "CGAL_Nef_polyhedron.h"
 
 class CGALRenderer : public Renderer
 {
 public:
-	CGALRenderer(const class CGAL_Nef_polyhedron &root);
+	CGALRenderer(shared_ptr<const class Geometry> geom);
 	~CGALRenderer();
-	void draw(bool showfaces, bool showedges) const;
+	virtual void draw(bool showfaces, bool showedges) const;
+	virtual void setColorScheme(const ColorScheme &cs);
+	virtual BoundingBox getBoundingBox() const;
 
-public:
-	const CGAL_Nef_polyhedron &root;
-	class Polyhedron *polyhedron;
-	class PolySet *polyset;
+private:
+	shared_ptr<class CGAL_OGL_Polyhedron> getPolyhedron() const;
+	void buildPolyhedron() const;
+
+	mutable shared_ptr<class CGAL_OGL_Polyhedron> polyhedron;
+	shared_ptr<const CGAL_Nef_polyhedron> N;
+	shared_ptr<const class PolySet> polyset;
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef ROTATEEXTRUDENODE_H_
-#define ROTATEEXTRUDENODE_H_
+#pragma once
 
 #include "node.h"
 #include "visitor.h"
@@ -24,7 +23,4 @@ public:
 	double origin_x, origin_y, scale;
 	Filename filename;
 	std::string layername;
-	virtual PolySet *evaluate_polyset(class PolySetEvaluator *) const;
 };
-
-#endif

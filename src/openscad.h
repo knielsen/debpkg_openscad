@@ -24,8 +24,7 @@
  *
  */
 
-#ifndef OPENSCAD_H
-#define OPENSCAD_H
+#pragma once
 
 extern class FileModule *parse(const char *text, const char *path, int debug);
 
@@ -36,5 +35,11 @@ extern std::string commandline_commands;
 // doing this, use currentdir to get the original CWD.
 extern std::string currentdir;
 
-#endif
+// Version number without the git suffix.
+extern std::string versionnumber;
 
+// Just the number (might have the git commit as suffix), e.g. 2014.12.23.
+extern std::string openscad_versionnumber;
+
+// The string "OpenSCAD " and the version number.
+extern std::string openscad_version;

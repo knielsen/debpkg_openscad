@@ -1,5 +1,4 @@
-#ifndef CSGTERMEVALUATOR_H_
-#define CSGTERMEVALUATOR_H_
+#pragma once
 
 #include <map>
 #include <list>
@@ -11,8 +10,8 @@
 class CSGTermEvaluator : public Visitor
 {
 public:
-	CSGTermEvaluator(const class Tree &tree, class PolySetEvaluator *psevaluator = NULL)
-		: tree(tree), psevaluator(psevaluator) {
+	CSGTermEvaluator(const class Tree &tree, class GeometryEvaluator *geomevaluator = NULL)
+		: tree(tree), geomevaluator(geomevaluator) {
 	}
   virtual ~CSGTermEvaluator() {}
 
@@ -44,7 +43,5 @@ public:
 	std::vector<shared_ptr<CSGTerm> > highlights;
 	std::vector<shared_ptr<CSGTerm> > background;
 	const Tree &tree;
-	class PolySetEvaluator *psevaluator;
+	class GeometryEvaluator *geomevaluator;
 };
-
-#endif
