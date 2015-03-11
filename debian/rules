@@ -61,6 +61,12 @@ override_dh_auto_install:
 	rm -rf debian/openscad/usr/share/openscad/libraries/MCAD/
 	-rmdir debian/openscad/usr/share/openscad/libraries
 
+	# remove fonts
+	rm -rf debian/openscad/usr/share/openscad/fonts/Liberation-2.00.1 \
+		debian/openscad/usr/share/openscad/fonts/05-osx-fonts.conf \
+		debian/openscad/usr/share/openscad/fonts/10-liberation.conf
+	-rmdir debian/openscad/usr/share/openscad/fonts/
+
 	# solve the http://wiki.debian.org/RpathIssue the brutal way; it's only
 	# the testing scripts and not the regular build process for openscad,
 	# so i'll accept not getting the extra score for finding out what's

@@ -51,7 +51,8 @@ Package: openscad
 Architecture: any
 Depends:
     ${shlibs:Depends},
-    ${misc:Depends}
+    ${misc:Depends},
+    fonts-liberation
 Recommends:
     openscad-mcad
 Suggests:
@@ -93,7 +94,10 @@ Architecture: all
 Depends:
     ${shlibs:Depends},
     ${misc:Depends},
-    openscad-mcad
+    openscad-mcad,
+    fonts-liberation,
+    ttf-marvosym,
+    fonts-hosny-amiri
 # the examples, which are shipped in openscad, are part of the test suite
 Recommends: openscad
 Suggests: openscad-testing
