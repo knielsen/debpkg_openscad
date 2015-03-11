@@ -17,6 +17,17 @@ Copyright: 2010, Ilya Kulakov <kulakov.ilya@gmail.com>
 License: MIT
 Comment: From https://github.com/Kentzo/git-archive-all
 
+Files: scripts/chrpath_linux.c
+Copyright: Geoffrey Keating <geoffk@ozemail.com.au>
+           Peeter Joot <peeterj@ca.ibm.com>
+           Petter Reinholdtsen <pere@hungry.com>
+           Darren Salt <linux@youmustbejoking.demon.co.uk>
+           David Hull <hull@paracel.com>
+           Bradford W. Johnson <bradford@math.umn.edu>
+           Thomas Anders <anders@hmi.de>
+           Tollef Fog Heen <tollef@add.no>
+License: GPL-2+
+
 Files: fonts/Liberation-2.00.1/*
 Copyright: 2010, Google Corporation
            2012, Red Hat, Inc.
