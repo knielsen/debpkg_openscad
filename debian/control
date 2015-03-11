@@ -33,6 +33,7 @@ Build-Depends:
     pkg-config,
     imagemagick,
     libgl1-mesa-swx11-dev | libgl-dev,
+    libgl1-mesa-dri,
     xvfb | xserver-xorg-core,
     libgl1-mesa-swx11 | xserver-xorg-core,
     openscad-mcad
