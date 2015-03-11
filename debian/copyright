@@ -2,16 +2,11 @@ Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: openscad
 Source: http://www.openscad.org/
 Files-Excluded: icons/flattr.png
-                scripts
                 src/SparkleAutoUpdater.*
 Comment: For the +dfsg version, icons/flattr.png was removed. It seems that the
  company holding the flattr trademark is ok with applications integratin this,
  but there is no explicit confirmation thereof, and if there was, it can be
  expected that the terms of use violate DFSG.
- .
- Also, the complet scripts/ directory was removed, as it contains files of
- uncertain origin. This decision has been made 2013-07-02 and not been reviwed
- since.
 
 Files: *
 Copyright: © 2009-2014 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
