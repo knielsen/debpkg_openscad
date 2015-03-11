@@ -138,7 +138,7 @@ real_mv "$UP_BASE" "$DIR/$REPACK_DIR"
 # .gz or .bz2?
 FILETYPE=$(file --brief --mime-type --dereference "$FILE")
 case "$FILETYPE" in
-    application/x-gzip|application/zip)
+    application/x-gzip|application/zip|application/gzip)
         C_PROGRAM="gzip"
         C_SUFFIX="gz"
         ;;
