@@ -55,8 +55,7 @@ distributed, this file may become obsolete and can be deleted from OpenSCAD
 */
 
 
-#ifndef _CGAL_NEF3_WORKAROUND_H
-#define _CGAL_NEF3_WORKAROUND_H
+#pragma once
 
 #include <CGAL/Polyhedron_incremental_builder_3.h>
 #include <CGAL/Polyhedron_3.h>
@@ -69,9 +68,10 @@ distributed, this file may become obsolete and can be deleted from OpenSCAD
 #include <CGAL/Projection_traits_xz_3.h>
 #include <CGAL/Constrained_triangulation_face_base_2.h>
 
-#include "printutils.h"
+#include <CGAL/exceptions.h> // added for OpenSCAD
+#include "printutils.h"      // added for OpenSCAD
 
-namespace nefworkaround {
+namespace nefworkaround {    // added for OpenSCAD
 
 template<typename Kernel, typename Nef>
 class Triangulation_handler2 {
@@ -228,7 +228,7 @@ public:
 	typename Nef::SHalfedge_const_handle se;
 	typename Nef::Halffacet_cycle_const_iterator fc;
      	
-	typename Nef::Halffacet_const_handle f = opposite_facet->twin();
+	typename Nef::Halffacet_const_handle f = !opposite_facet->incident_volume()->mark() ? opposite_facet : opposite_facet->twin();
 
 	typename Nef::SHalfedge_around_facet_const_circulator 
 	  sfc1(f->facet_cycles_begin()), sfc2(sfc1);
@@ -251,8 +251,8 @@ public:
 	    th.handle_triangles(B, VI);
 	  } else
 	    CGAL_error_msg( "wrong value");
-	 } catch(...) { // added for OpenSCAD
-	  PRINT("ERROR: CGAL NefPolyhedron Triangulation failed"); // added for OpenSCAD
+	 } catch (const CGAL::Failure_exception &e) { // added for OpenSCAD
+	  PRINTB("WARNING: CGAL NefPolyhedron Triangulation failed: %s", e.what()); // added for OpenSCAD
 	  this->error=true; //added for OpenSCAD
 	 } // added for OpenSCAD
 	} else {
@@ -344,9 +344,3 @@ bool convert_to_Polyhedron( const CGAL::Nef_polyhedron_3<Kernel> &N, CGAL::Polyh
 
 
 } //namespace nefworkaround
-
-
-
-
-#endif
-

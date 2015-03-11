@@ -25,7 +25,7 @@
  */
 
 #include "csgterm.h"
-#include "polyset.h"
+#include "Geometry.h"
 #include "linalg.h"
 #include <sstream>
 #include <boost/foreach.hpp>
@@ -34,10 +34,15 @@
 	\class CSGTerm
 
 	A CSGTerm is either a "primitive" or a CSG operation with two
-	children terms. A primitive in this context is any PolySet, which
+	children terms. A primitive in this context is any Geometry, which
 	may or may not have a subtree which is already evaluated (e.g. using
 	the render() module).
 
+	Note: To distinguish between geometry evaluated to an empty volume
+	and non-geometric nodes (e.g. echo), a NULL CSGTerm is considered a
+	non-geometric node, while a CSGTerm with a NULL geometry is
+	considered empty geometry. This is important when e.g. establishing
+	positive vs. negative volumes using the difference operator.
  */
 
 /*!
@@ -69,26 +74,16 @@ shared_ptr<CSGTerm> CSGTerm::createCSGTerm(type_e type, shared_ptr<CSGTerm> left
 	const BoundingBox &rightbox = right->getBoundingBox();
 	Vector3d newmin, newmax;
 	if (type == TYPE_INTERSECTION) {
-#if EIGEN_WORLD_VERSION == 2
-		newmin = leftbox.min().cwise().max( rightbox.min() );
-		newmax = leftbox.max().cwise().min( rightbox.max() );
-#else
 		newmin = leftbox.min().array().cwiseMax( rightbox.min().array() );
 		newmax = leftbox.max().array().cwiseMin( rightbox.max().array() );
-#endif
 		BoundingBox newbox( newmin, newmax );
 		if (newbox.isNull()) {
 			return shared_ptr<CSGTerm>(); // Prune entire product
 		}
 	}
 	else if (type == TYPE_DIFFERENCE) {
-#if EIGEN_WORLD_VERSION == 2
-		newmin = leftbox.min().cwise().max( rightbox.min() );
-		newmax = leftbox.max().cwise().min( rightbox.max() );
-#else
 		newmin = leftbox.min().array().cwiseMax( rightbox.min().array() );
 		newmax = leftbox.max().array().cwiseMin( rightbox.max().array() );
-#endif
 		BoundingBox newbox( newmin, newmax );
 		if (newbox.isNull()) {
 			return left; // Prune the negative component
@@ -103,9 +98,10 @@ shared_ptr<CSGTerm> CSGTerm::createCSGTerm(type_e type, CSGTerm *left, CSGTerm *
 	return createCSGTerm(type, shared_ptr<CSGTerm>(left), shared_ptr<CSGTerm>(right));
 }
 
-CSGTerm::CSGTerm(const shared_ptr<PolySet> &polyset, const Transform3d &matrix, const Color4f &color, const std::string &label)
-	: type(TYPE_PRIMITIVE), polyset(polyset), label(label), flag(CSGTerm::FLAG_NONE), m(matrix), color(color)
+CSGTerm::CSGTerm(const shared_ptr<const Geometry> &geom, const Transform3d &matrix, const Color4f &color, const std::string &label)
+	: type(TYPE_PRIMITIVE), label(label), flag(CSGTerm::FLAG_NONE), m(matrix), color(color)
 {
+	if (geom && !geom->isEmpty()) this->geom = geom;
 	initBoundingBox();
 }
 
@@ -128,7 +124,8 @@ CSGTerm::~CSGTerm()
 void CSGTerm::initBoundingBox()
 {
 	if (this->type == TYPE_PRIMITIVE) {
-		this->bbox = this->m * this->polyset->getBoundingBox();
+    if (!this->geom) return;
+		this->bbox = this->m * this->geom->getBoundingBox();
 	}
 	else {
 		const BoundingBox &leftbox = this->left->getBoundingBox();
@@ -136,23 +133,13 @@ void CSGTerm::initBoundingBox()
 		Vector3d newmin, newmax;
 		switch (this->type) {
 		case TYPE_UNION:
-#if EIGEN_WORLD_VERSION == 2
-			newmin = leftbox.min().cwise().min( rightbox.min() );
-			newmax = leftbox.max().cwise().max( rightbox.max() );
-#else
 			newmin = leftbox.min().array().cwiseMin( rightbox.min().array() );
 			newmax = leftbox.max().array().cwiseMax( rightbox.max().array() );
-#endif
 			this->bbox = this->m * BoundingBox( newmin, newmax );
 			break;
 		case TYPE_INTERSECTION:
-#if EIGEN_WORLD_VERSION == 2
-			newmin = leftbox.min().cwise().max( rightbox.min() );
-			newmax = leftbox.max().cwise().min( rightbox.max() );
-#else
 			newmin = leftbox.min().array().cwiseMax( rightbox.min().array() );
 			newmax = leftbox.max().array().cwiseMin( rightbox.max().array() );
-#endif
 			this->bbox = this->m * BoundingBox( newmin, newmax );
 			break;
 		case TYPE_DIFFERENCE:
@@ -186,7 +173,7 @@ void CSGChain::import(shared_ptr<CSGTerm> term, CSGTerm::type_e type, CSGTerm::F
 {
 	CSGTerm::Flag newflag = (CSGTerm::Flag)(term->flag | flag);
 	if (term->type == CSGTerm::TYPE_PRIMITIVE) {
-		this->objects.push_back(CSGChainObject(term->polyset, term->m, term->color, type, term->label, newflag));
+		this->objects.push_back(CSGChainObject(term->geom, term->m, term->color, type, term->label, newflag));
 	} else {
 		assert(term->left && term->right);
 		import(term->left, type, newflag);
@@ -209,7 +196,7 @@ std::string CSGChain::dump(bool full)
 			dump << " *";
 		dump << obj.label;
 		if (full) {
-			dump << " polyset: \n" << obj.polyset->dump() << "\n";
+			dump << " polyset: \n" << obj.geom->dump() << "\n";
 			dump << " matrix: \n" << obj.matrix.matrix() << "\n";
 			dump << " color: \n" << obj.color << "\n";
 		}
@@ -223,9 +210,11 @@ BoundingBox CSGChain::getBoundingBox() const
 	BoundingBox bbox;
 	BOOST_FOREACH(const CSGChainObject &obj, this->objects) {
 		if (obj.type != CSGTerm::TYPE_DIFFERENCE) {
-			BoundingBox psbox = obj.polyset->getBoundingBox();
-			if (!psbox.isNull()) {
-				bbox.extend(obj.matrix * psbox);
+			if (obj.geom) {
+				BoundingBox psbox = obj.geom->getBoundingBox();
+				if (!psbox.isNull()) {
+					bbox.extend(obj.matrix * psbox);
+				}
 			}
 		}
 	}

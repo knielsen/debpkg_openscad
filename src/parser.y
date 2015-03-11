@@ -49,6 +49,8 @@ namespace fs = boost::filesystem;
 
 #include "boosty.h"
 
+#define YYMAXDEPTH 20000
+
 int parser_error_pos = -1;
 
 int parserlex(void);
@@ -80,10 +82,14 @@ std::string parser_source_path;
   AssignmentList *args;
 }
 
+%token TOK_ERROR
+
 %token TOK_MODULE
 %token TOK_FUNCTION
 %token TOK_IF
 %token TOK_ELSE
+%token TOK_FOR
+%token TOK_LET
 
 %token <text> TOK_ID
 %token <text> TOK_STRING
@@ -95,6 +101,8 @@ std::string parser_source_path;
 %token TOK_UNDEF
 
 %token LE GE EQ NE AND OR
+
+%right LET
 
 %right '?' ':'
 
@@ -111,6 +119,8 @@ std::string parser_source_path;
 
 %type <expr> expr
 %type <expr> vector_expr
+%type <expr> list_comprehension_elements
+%type <expr> list_comprehension_elements_or_expr
 
 %type <inst> module_instantiation
 %type <ifelse> if_statement
@@ -122,6 +132,7 @@ std::string parser_source_path;
 
 %type <arg> argument_call
 %type <arg> argument_decl
+%type <text> module_id
 
 %debug
 
@@ -129,7 +140,7 @@ std::string parser_source_path;
 
 input:    /* empty */
         | TOK_USE
-            { rootmodule->usedlibs.insert($1); }
+            { rootmodule->registerUse(std::string($1)); }
           input
         | statement input
         ;
@@ -157,9 +168,7 @@ statement:
             }
         | TOK_FUNCTION TOK_ID '(' arguments_decl optional_commas ')' '=' expr
             {
-                Function *func = new Function();
-                func->definition_arguments = *$4;
-                func->expr = $8;
+                Function *func = Function::create($2, *$4, $8);
                 scope_stack.top()->functions[$2] = func;
                 free($2);
                 delete $4;
@@ -178,14 +187,15 @@ assignment:
                 bool found = false;
                 foreach (Assignment& iter, scope_stack.top()->assignments) {
                     if (iter.first == $1) {
-                        iter.second = $3;
+                        iter.second = boost::shared_ptr<Expression>($3);
                         found = true;
                         break;
                     }
                 }
                 if (!found) {
-                    scope_stack.top()->assignments.push_back(Assignment($1, $3));
+                    scope_stack.top()->assignments.push_back(Assignment($1, boost::shared_ptr<Expression>($3)));
                 }
+                free($1);
             }
         ;
 
@@ -246,7 +256,7 @@ if_statement:
           TOK_IF '(' expr ')'
             {
                 $<ifelse>$ = new IfElseModuleInstantiation();
-                $<ifelse>$->arguments.push_back(Assignment("", $3));
+                $<ifelse>$->arguments.push_back(Assignment("", boost::shared_ptr<Expression>($3)));
                 $<ifelse>$->setPath(parser_source_path);
                 scope_stack.push(&$<ifelse>$->scope);
             }
@@ -260,6 +270,7 @@ if_statement:
 child_statements:
           /* empty */
         | child_statements child_statement
+        | child_statements assignment
         ;
 
 child_statement:
@@ -271,14 +282,14 @@ child_statement:
             }
         ;
 
-/*
- FIXME: This allows for variable declaration in child blocks, not activated yet
- |
-assignment ;
-*/
+// "for" is a valid module identifier
+module_id:
+          TOK_ID  { $$ = $1; }
+        | TOK_FOR { $$ = strdup("for"); }
+        ;
 
 single_module_instantiation:
-          TOK_ID '(' arguments_call ')'
+          module_id '(' arguments_call ')'
             {
                 $$ = new ModuleInstantiation($1);
                 $$->arguments = *$3;
@@ -291,56 +302,55 @@ single_module_instantiation:
 expr:
           TOK_TRUE
             {
-                $$ = new Expression(Value(true));
+                $$ = new ExpressionConst(ValuePtr(true));
             }
         | TOK_FALSE
             {
-                $$ = new Expression(Value(false));
+                $$ = new ExpressionConst(ValuePtr(false));
             }
         | TOK_UNDEF
             {
-                $$ = new Expression(Value::undefined);
+                $$ = new ExpressionConst(ValuePtr::undefined);
             }
         | TOK_ID
             {
-                $$ = new Expression();
-                $$->type = "L";
-                $$->var_name = $1;
+                $$ = new ExpressionLookup($1);
                 free($1);
             }
         | expr '.' TOK_ID
             {
-                $$ = new Expression("N", $1);
-                $$->var_name = $3;
+              $$ = new ExpressionMember($1, $3);
                 free($3);
             }
         | TOK_STRING
             {
-                $$ = new Expression(Value(std::string($1)));
+                $$ = new ExpressionConst(ValuePtr(std::string($1)));
                 free($1);
             }
         | TOK_NUMBER
             {
-                $$ = new Expression(Value($1));
+                $$ = new ExpressionConst(ValuePtr($1));
+            }
+        | TOK_LET '(' arguments_call ')' expr %prec LET
+            {
+              $$ = new ExpressionLet(*$3, $5);
+                delete $3;
             }
         | '[' expr ':' expr ']'
             {
-                $$ = new Expression();
-                $$->type = "R";
-                $$->children.push_back($2);
-                $$->children.push_back($4);
+                $$ = new ExpressionRange($2, $4);
             }
         | '[' expr ':' expr ':' expr ']'
             {
-                $$ = new Expression();
-                $$->type = "R";
-                $$->children.push_back($2);
-                $$->children.push_back($4);
-                $$->children.push_back($6);
+                $$ = new ExpressionRange($2, $4, $6);
+            }
+        | '[' list_comprehension_elements ']'
+            {
+                $$ = new ExpressionLcExpression($2);
             }
         | '[' optional_commas ']'
             {
-                $$ = new Expression(Value(Value::VectorType()));
+                $$ = new ExpressionConst(ValuePtr(Value::VectorType()));
             }
         | '[' vector_expr optional_commas ']'
             {
@@ -348,55 +358,55 @@ expr:
             }
         | expr '*' expr
             {
-                $$ = new Expression("*", $1, $3);
+                $$ = new ExpressionMultiply($1, $3);
             }
         | expr '/' expr
             {
-                $$ = new Expression("/", $1, $3);
+                $$ = new ExpressionDivision($1, $3);
             }
         | expr '%' expr
             {
-                $$ = new Expression("%", $1, $3);
+                $$ = new ExpressionModulo($1, $3);
             }
         | expr '+' expr
             {
-                $$ = new Expression("+", $1, $3);
+                $$ = new ExpressionPlus($1, $3);
             }
         | expr '-' expr
             {
-                $$ = new Expression("-", $1, $3);
+                $$ = new ExpressionMinus($1, $3);
             }
         | expr '<' expr
             {
-                $$ = new Expression("<", $1, $3);
+                $$ = new ExpressionLess($1, $3);
             }
         | expr LE expr
             {
-                $$ = new Expression("<=", $1, $3);
+                $$ = new ExpressionLessOrEqual($1, $3);
             }
         | expr EQ expr
             {
-                $$ = new Expression("==", $1, $3);
+                $$ = new ExpressionEqual($1, $3);
             }
         | expr NE expr
             {
-                $$ = new Expression("!=", $1, $3);
+                $$ = new ExpressionNotEqual($1, $3);
             }
         | expr GE expr
             {
-                $$ = new Expression(">=", $1, $3);
+                $$ = new ExpressionGreaterOrEqual($1, $3);
             }
         | expr '>' expr
             {
-                $$ = new Expression(">", $1, $3);
+                $$ = new ExpressionGreater($1, $3);
             }
         | expr AND expr
             {
-                $$ = new Expression("&&", $1, $3);
+                $$ = new ExpressionLogicalAnd($1, $3);
             }
         | expr OR expr
             {
-                $$ = new Expression("||", $1, $3);
+                $$ = new ExpressionLogicalOr($1, $3);
             }
         | '+' expr
             {
@@ -404,11 +414,11 @@ expr:
             }
         | '-' expr
             {
-                $$ = new Expression("I", $2);
+                $$ = new ExpressionInvert($2);
             }
         | '!' expr
             {
-                $$ = new Expression("!", $2);
+                $$ = new ExpressionNot($2);
             }
         | '(' expr ')'
             {
@@ -416,25 +426,50 @@ expr:
             }
         | expr '?' expr ':' expr
             {
-                $$ = new Expression();
-                $$->type = "?:";
-                $$->children.push_back($1);
-                $$->children.push_back($3);
-                $$->children.push_back($5);
+                $$ = new ExpressionTernary($1, $3, $5);
             }
         | expr '[' expr ']'
             {
-                $$ = new Expression("[]", $1, $3);
+                $$ = new ExpressionArrayLookup($1, $3);
             }
         | TOK_ID '(' arguments_call ')'
             {
-                $$ = new Expression();
-                $$->type = "F";
-                $$->call_funcname = $1;
-                $$->call_arguments = *$3;
+              $$ = new ExpressionFunctionCall($1, *$3);
                 free($1);
                 delete $3;
             }
+        ;
+
+list_comprehension_elements:
+          /* The last set element may not be a "let" (as that would instead
+             be parsed as an expression) */
+          TOK_LET '(' arguments_call ')' list_comprehension_elements
+            {
+              $$ = new ExpressionLc("let", *$3, $5);
+                delete $3;
+            }
+        | TOK_FOR '(' arguments_call ')' list_comprehension_elements_or_expr
+            {
+                $$ = $5;
+
+                /* transform for(i=...,j=...) -> for(i=...) for(j=...) */
+                for (int i = $3->size()-1; i >= 0; i--) {
+                  AssignmentList arglist;
+                  arglist.push_back((*$3)[i]);
+                  Expression *e = new ExpressionLc("for", arglist, $$);
+                    $$ = e;
+                }
+                delete $3;
+            }
+        | TOK_IF '(' expr ')' list_comprehension_elements_or_expr
+            {
+              $$ = new ExpressionLc("if", $3, $5);
+            }
+        ;
+
+list_comprehension_elements_or_expr:
+          list_comprehension_elements
+        | expr
         ;
 
 optional_commas:
@@ -445,7 +480,7 @@ optional_commas:
 vector_expr:
           expr
             {
-                $$ = new Expression("V", $1);
+                $$ = new ExpressionVector($1);
             }
         | vector_expr ',' optional_commas expr
             {
@@ -476,12 +511,12 @@ arguments_decl:
 argument_decl:
           TOK_ID
             {
-                $$ = new Assignment($1, NULL);
+                $$ = new Assignment($1);
                 free($1);
             }
         | TOK_ID '=' expr
             {
-                $$ = new Assignment($1, $3);
+                $$ = new Assignment($1, boost::shared_ptr<Expression>($3));
                 free($1);
             }
         ;
@@ -508,11 +543,11 @@ arguments_call:
 argument_call:
           expr
             {
-                $$ = new Assignment("", $1);
+                $$ = new Assignment("", boost::shared_ptr<Expression>($1));
             }
         | TOK_ID '=' expr
             {
-                $$ = new Assignment($1, $3);
+                $$ = new Assignment($1, boost::shared_ptr<Expression>($3));
                 free($1);
             }
         ;
@@ -527,7 +562,7 @@ int parserlex(void)
 void yyerror (char const *s)
 {
   // FIXME: We leak memory on parser errors...
-  PRINTB("Parser error in line %d: %s\n", lexerget_lineno() % s);
+  PRINTB("ERROR: Parser error in line %d: %s\n", lexerget_lineno() % s);
 }
 
 FileModule *parse(const char *text, const char *path, int debug)

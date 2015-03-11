@@ -1,5 +1,4 @@
-#ifndef DXFDATA_H_
-#define DXFDATA_H_
+#pragma once
 
 #include "linalg.h"
 #include <vector>
@@ -41,6 +40,5 @@ public:
 
 	void fixup_path_direction();
 	std::string dump() const;
+	class Polygon2d *toPolygon2d() const;
 };
-
-#endif

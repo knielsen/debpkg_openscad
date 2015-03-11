@@ -1,5 +1,4 @@
-#ifndef LINEAREXTRUDENODE_H_
-#define LINEAREXTRUDENODE_H_
+#pragma once
 
 #include "node.h"
 #include "visitor.h"
@@ -27,7 +26,4 @@ public:
 	bool center, has_twist;
 	Filename filename;
 	std::string layername;
-	virtual PolySet *evaluate_polyset(class PolySetEvaluator *) const;
 };
-
-#endif

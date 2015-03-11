@@ -1,5 +1,4 @@
-#ifndef CGALADVNODE_H_
-#define CGALADVNODE_H_
+#pragma once
 
 #include "node.h"
 #include "visitor.h"
@@ -21,19 +20,16 @@ public:
 		convexity = 1;
 	}
 	virtual ~CgaladvNode() { }
-  virtual Response accept(class State &state, Visitor &visitor) const {
+        virtual Response accept(class State &state, Visitor &visitor) const {
 		return visitor.visit(state, *this);
 	}
 	virtual std::string toString() const;
 	virtual std::string name() const;
-	PolySet *evaluate_polyset(class PolySetEvaluator *ps) const;
 
-	Value path;
+	ValuePtr path;
 	std::string subdiv_type;
 	int convexity, level;
 	Vector3d newsize;
 	Eigen::Matrix<bool,3,1> autosize;
 	cgaladv_type_e type;
 };
-
-#endif

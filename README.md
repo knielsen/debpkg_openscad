@@ -1,4 +1,6 @@
 [![Travis CI](https://api.travis-ci.org/openscad/openscad.png)](https://travis-ci.org/openscad/openscad)
+[![Coverity Status](https://scan.coverity.com/projects/2510/badge.svg)](https://scan.coverity.com/projects/2510)
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/openscad/openscad/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
 # What is OpenSCAD?
 [![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=openscad&url=http://openscad.org&title=OpenSCAD&language=&tags=github&category=software)
@@ -86,20 +88,23 @@ libraries from aptitude. If you're using Mac, or an older Linux/BSD, there
 are build scripts that download and compile the libraries from source. 
 Follow the instructions for the platform you're compiling on below.
 
-* [Qt4 (4.4 - 4.8)](http://www.qt.nokia.com/)
-* [CGAL (3.6 - 4.1)](http://www.cgal.org/)
+* [Qt4 (4.4 - 5.4)](http://www.qt.nokia.com/)
+* [QScintilla2 (2.7 - 2.8)](http://www.riverbankcomputing.co.uk/software/qscintilla/)
+* [CGAL (3.6 - 4.5)](http://www.cgal.org/)
  * [GMP (5.x)](http://www.gmplib.org/)
  * [MPFR (3.x)](http://www.mpfr.org/)
-* [cmake (2.8, required by CGAL and the test framework)](http://www.cmake.org/)
-* [boost (1.35 - 1.55)](http://www.boost.org/)
-* [OpenCSG (1.3.2)](http://www.opencsg.org/)
+* [cmake (2.8 - 3.0, required by CGAL and the test framework)](http://www.cmake.org/)
+* [boost (1.35 - 1.57)](http://www.boost.org/)
+* [OpenCSG (1.3.2 ->)](http://www.opencsg.org/)
 * [GLEW (1.5.4 ->)](http://glew.sourceforge.net/)
-* [Eigen (3.0 - 3.2)](http://eigen.tuxfamily.org/)
-* [glib2 (2.2.0)](https://developer.gnome.org/glib/)
-* [GCC C++ Compiler (4.2 ->)](http://gcc.gnu.org/)
-* [Bison (2.4)](http://www.gnu.org/software/bison/)
-* [Flex (2.5.35)](http://flex.sourceforge.net/)
-* [pkg-config (0.26)](http://www.freedesktop.org/wiki/Software/pkg-config/)
+* [Eigen (3.x)](http://eigen.tuxfamily.org/)
+* [glib2 (2.x)](https://developer.gnome.org/glib/)
+* [fontconfig (2.10 -> )](http://fontconfig.org/)
+* [freetype2 (2.4 -> )](http://freetype.org/)
+* [harfbuzz (0.9.19 -> )](http://harfbuzz.org/)
+* [Bison (2.4 -> )](http://www.gnu.org/software/bison/)
+* [Flex (2.5.35 -> )](http://flex.sourceforge.net/)
+* [pkg-config (0.26 -> )](http://www.freedesktop.org/wiki/Software/pkg-config/)
 
 ### Getting the source code
 
@@ -117,26 +122,41 @@ To pull the MCAD library (http://reprap.org/wiki/MCAD), do the following:
 ### Building for Mac OS X
 
 Prerequisites:
-* XCode, including XCode command-line tools (install from XCode Preferences).
-* [CMake](http://cmake.org) and [pkg-config](http://www.freedesktop.org/wiki/Software/pkg-config/),
-   both can be installed manually or through MacPorts/homebrew.
 
-Then after you've cloned this git repository, run the script that sets up the
-environment variables.
+* XCode, including XCode command-line tools.
 
-    source setenv_mac-gcc.sh
+Install Dependencies:
 
-(or setenv_mac-clang.sh if you want to use the clang compiler instead of gcc).
-Then run the script to compile all the prerequisite libraries above:
+Run the script that sets up the environment variables:
+    ```source setenv_mac-qt5.sh```
 
-    ./scripts/macosx-build-dependencies.sh
+Then run the script to compile all the dependencies:
+    ```./scripts/macosx-build-dependencies.sh```
 
-You can also install the prerequisites using
-[MacPorts](http://www.macports.org).  Unfortunately,
-[brew](http://mxcl.github.com/homebrew/) doesn't yet support CGAL and
-OpenCSG.
 
-After that, follow the Compilation instructions below.
+After building dependencies, follow the instructions in the *Compilation* section.
+
+For the adventurous, it might be possible to build OpenSCAD using _MacPorts_ or _Homebrew_. The main challenge is that both these systems have partially broken libraries, but that tends to change from time to time.
+
+1. **MacPorts** (assumes [MacPorts](http://macports.org) is already installed)
+
+    NB! MacPorts currently doesn't support Qt5 very well, so using Qt4
+    is the only working option at the moment. However, MacPorts' Qt4
+    has a broken ```moc``` command, causing OpenSCAD compilation to
+    break. This may be fixed in MacPorts by the time you read this.
+
+    ```sudo port install opencsg qscintilla boost cgal pkgconfig eigen3 harfbuzz fontconfig```
+
+1. **Homebrew** (assumes [Homebrew](http://brew.sh)) is already installed)
+
+    NB! Homebrew's ```qscintilla2``` component doesn't support Qt5, so using Qt4 is currently necessary.
+    However, Homebrew's Qt4 has a broken ```moc``` command, causing OpenSCAD compilation to
+    break. This may be fixed in Homebrew by the time you read this.
+    NB! Homebrew's ```harfbuzz``` package requires X11, so you may have to install an X11 server.
+    NB! Homebrew doesnt have an OpenCSG package
+
+    ```brew install cgal qscintilla2 eigen harfbuzz```
+
 
 ### Building for Linux/BSD
 
@@ -170,17 +190,9 @@ Then run the script to compile all the prerequisite libraries above:
 
     ./scripts/uni-build-dependencies.sh
 
-This may take an hour or more, depending on your network and system. It 
-is recommended to have at least 1 gigabyte of free disk space. As a 
-special timesaver if you are only missing CGAL and OpenCSG, you can do 
-this instead:
-
-    ./scripts/uni-build-dependencies.sh opencsg
-    ./scripts/uni-build-dependencies.sh cgal
-
-Note that huge dependencies like gcc or qt are not included here, only 
-the smaller ones (boost, CGAL, opencsg, etc). After the build, again 
-check dependencies.
+Note that huge dependencies like gcc, qt, or glib2 are not included 
+here, only the smaller ones (boost, CGAL, opencsg, etc). After the 
+build, again check dependencies.
 
     ./scripts/check-dependencies.sh
 
@@ -212,15 +224,16 @@ complete, build OpenSCAD and package it to an installer:
 If you wish you can only build the openscad.exe binary:
 
     cd mingw32
-    qmake .. CONFIG+=mingw-cross-env
+    qmake ../openscad.pro CONFIG+=mingw-cross-env
     make
 
 For a 64-bit Windows cross-build, replace 32 with 64 in the above instructions. 
 
 ### Compilation
 
-First, run 'qmake' from Qt4 to generate a Makefile. On some systems you need to
-run 'qmake4', 'qmake-qt4' or something alike to run the qt4 version of the tool.
+First, run 'qmake openscad.pro' from Qt4 to generate a Makefile.
+
+On some systems, depending on which version(s) of Qt you have installed, you may need to specify which version you want to use, e.g. by running 'qmake4', 'qmake-qt4' or something alike.
 
 Then run make. Finally you might run 'make install' as root or simply copy the
 'openscad' binary (OpenSCAD.app on Mac OS X) to the bin directory of your choice.

@@ -1,6 +1,6 @@
-#ifndef PROGRESSWIDGET_H_
-#define PROGRESSWIDGET_H_
+#pragma once
 
+#include "qtgettext.h"
 #include "ui_ProgressWidget.h"
 #include <QTime>
 
@@ -27,5 +27,3 @@ private:
 	bool wascanceled;
 	QTime starttime;
 };
-
-#endif

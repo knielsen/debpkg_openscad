@@ -1,5 +1,4 @@
-#ifndef OPENCSGRENDERER_H_
-#define OPENCSGRENDERER_H_
+#pragma once
 
 #include "renderer.h"
 #include "system-gl.h"
@@ -9,7 +8,8 @@ class OpenCSGRenderer : public Renderer
 public:
 	OpenCSGRenderer(class CSGChain *root_chain, CSGChain *highlights_chain, 
 									CSGChain *background_chain, GLint *shaderinfo);
-	void draw(bool showfaces, bool showedges) const;
+	virtual void draw(bool showfaces, bool showedges) const;
+	virtual BoundingBox getBoundingBox() const;
 private:
 	void renderCSGChain(class CSGChain *chain, GLint *shaderinfo, 
 											bool highlight, bool background) const;
@@ -19,5 +19,3 @@ private:
 	CSGChain *background_chain;
 	GLint *shaderinfo;
 };
-
-#endif

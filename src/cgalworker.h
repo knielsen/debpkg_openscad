@@ -1,7 +1,7 @@
-#ifndef CGALWORKER_H_
-#define CGALWORKER_H_
+#pragma once
 
 #include <QObject>
+#include "memory.h"
 
 class CGALWorker : public QObject
 {
@@ -17,12 +17,10 @@ protected slots:
 	void work();
 
 signals:
-	void done(class CGAL_Nef_polyhedron *);
+	void done(shared_ptr<const class Geometry>);
 
 protected:
 
 	class QThread *thread;
 	const class Tree *tree;
 };
-
-#endif

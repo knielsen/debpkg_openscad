@@ -1,4 +1,6 @@
-#include <Carbon/Carbon.h>
+#include <AppleEvents.h>
+#include <MacTypes.h>
+#include <CoreServices/CoreServices.h>
 #include <QApplication>
 #include "MainWindow.h"
 
@@ -15,7 +17,7 @@ OSErr eventHandler(const AppleEvent *, AppleEvent *, SRefCon )
 		if (mainwin) break;
 	}
 	if (mainwin) {
-		mainwin->actionReloadRenderCSG();
+		mainwin->actionReloadRenderPreview();
 	}
 	return noErr;
 }

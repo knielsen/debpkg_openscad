@@ -27,6 +27,7 @@
 #include "ThrownTogetherRenderer.h"
 #include "polyset.h"
 #include "csgterm.h"
+#include "printutils.h"
 
 #include "system-gl.h"
 
@@ -43,6 +44,7 @@ ThrownTogetherRenderer::ThrownTogetherRenderer(CSGChain *root_chain,
 
 void ThrownTogetherRenderer::draw(bool /*showfaces*/, bool showedges) const
 {
+	PRINTD("Thrown draw");
 	if (this->root_chain) {
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
@@ -62,21 +64,25 @@ void ThrownTogetherRenderer::renderCSGChain(CSGChain *chain, bool highlight,
 																						bool background, bool showedges, 
 																						bool fberror) const
 {
+	PRINTD("Thrown renderCSGChain");
 	glDepthFunc(GL_LEQUAL);
-	boost::unordered_map<std::pair<PolySet*,const Transform3d*>,int> polySetVisitMark;
+	boost::unordered_map<std::pair<const Geometry*,const Transform3d*>,int> geomVisitMark;
 	BOOST_FOREACH(const CSGChainObject &obj, chain->objects) {
-		if (polySetVisitMark[std::make_pair(obj.polyset.get(), &obj.matrix)]++ > 0)
+		if (geomVisitMark[std::make_pair(obj.geom.get(), &obj.matrix)]++ > 0)
 			continue;
 		const Transform3d &m = obj.matrix;
 		const Color4f &c = obj.color;
 		glPushMatrix();
 		glMultMatrixd(m.data());
-		PolySet::csgmode_e csgmode  = obj.type == CSGTerm::TYPE_DIFFERENCE ? PolySet::CSGMODE_DIFFERENCE : PolySet::CSGMODE_NORMAL;
+		csgmode_e csgmode = csgmode_e(
+			(highlight ? 
+			 CSGMODE_HIGHLIGHT :
+			 (background ? CSGMODE_BACKGROUND : CSGMODE_NORMAL)) |
+			(obj.type == CSGTerm::TYPE_DIFFERENCE ? CSGMODE_DIFFERENCE : 0));
 		ColorMode colormode = COLORMODE_NONE;
 		ColorMode edge_colormode = COLORMODE_NONE;
 
 		if (highlight) {
-			csgmode = PolySet::csgmode_e(csgmode + 20);
 			colormode = COLORMODE_HIGHLIGHT;
 			edge_colormode = COLORMODE_HIGHLIGHT_EDGES;
 		} else if (background) {
@@ -86,16 +92,11 @@ void ThrownTogetherRenderer::renderCSGChain(CSGChain *chain, bool highlight,
 			else {
 				colormode = COLORMODE_BACKGROUND;
 			}
-			csgmode = PolySet::csgmode_e(csgmode + 10);
 			edge_colormode = COLORMODE_BACKGROUND_EDGES;
 		} else if (fberror) {
-			if (highlight) csgmode = PolySet::csgmode_e(csgmode + 20);
-			else if (background) csgmode = PolySet::csgmode_e(csgmode + 10);
-			else csgmode = PolySet::csgmode_e(csgmode);
 		} else if (obj.type == CSGTerm::TYPE_DIFFERENCE) {
 			if (obj.flag & CSGTerm::FLAG_HIGHLIGHT) {
 				colormode = COLORMODE_HIGHLIGHT;
-				csgmode = PolySet::csgmode_e(csgmode + 20);
 			}
 			else {
 				colormode = COLORMODE_CUTOUT;
@@ -104,7 +105,6 @@ void ThrownTogetherRenderer::renderCSGChain(CSGChain *chain, bool highlight,
 		} else {
 			if (obj.flag & CSGTerm::FLAG_HIGHLIGHT) {
 				colormode = COLORMODE_HIGHLIGHT;
-				csgmode = PolySet::csgmode_e(csgmode + 20);
 			}
 			else {
 				colormode = COLORMODE_MATERIAL;
@@ -113,13 +113,20 @@ void ThrownTogetherRenderer::renderCSGChain(CSGChain *chain, bool highlight,
 		}
 		
 		setColor(colormode, c.data());
-		obj.polyset->render_surface(csgmode, m);
+		render_surface(obj.geom, csgmode, m);
 		if (showedges) {
 			// FIXME? glColor4f((c[0]+1)/2, (c[1]+1)/2, (c[2]+1)/2, 1.0);
 			setColor(edge_colormode);
-			obj.polyset->render_edges(csgmode);
+			render_edges(obj.geom, csgmode);
 		}
 
 		glPopMatrix();
 	}
+}
+
+BoundingBox ThrownTogetherRenderer::getBoundingBox() const
+{
+	BoundingBox bbox;
+	if (this->root_chain) bbox = this->root_chain->getBoundingBox();
+	return bbox;
 }

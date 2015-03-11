@@ -1,33 +1,38 @@
-#ifndef LINALG_H_
-#define LINALG_H_
+#pragma once
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <Eigen/Dense>
-#include<Eigen/StdVector>
+#include <Eigen/StdVector>
 
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Vector2d)
 using Eigen::Vector2d;
 EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Vector3d)
 using Eigen::Vector3d;
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Vector3f)
+using Eigen::Vector3f;
+EIGEN_DEFINE_STL_VECTOR_SPECIALIZATION(Eigen::Vector3i)
+using Eigen::Vector3i;
 
 typedef Eigen::AlignedBox<double, 3> BoundingBox;
 using Eigen::Matrix3f;
 using Eigen::Matrix3d;
 using Eigen::Matrix4d;
-#if EIGEN_WORLD_VERSION >= 3
 #define Transform3d Eigen::Affine3d
-#else
-using Eigen::Transform3d;
-#endif
+#define Transform2d Eigen::Affine2d
 
 bool matrix_contains_infinity( const Transform3d &m );
 bool matrix_contains_nan( const Transform3d &m );
 
-BoundingBox operator*(const Transform3d &m, const BoundingBox &box);
-Vector3d getBoundingCenter(BoundingBox bbox);
-double getBoundingRadius(BoundingBox bbox);
+template<typename Derived> bool is_finite(const Eigen::MatrixBase<Derived>& x) {
+   return ( (x - x).array() == (x - x).array()).all();
+}
 
+template<typename Derived> bool is_nan(const Eigen::MatrixBase<Derived>& x) {
+   return ((x.array() == x.array())).all();
+}
+
+BoundingBox operator*(const Transform3d &m, const BoundingBox &box);
 
 class Color4f : public Eigen::Vector4f
 {
@@ -42,5 +47,3 @@ public:
 
 	bool isValid() const { return this->minCoeff() >= 0.0f; }
 };
-
-#endif

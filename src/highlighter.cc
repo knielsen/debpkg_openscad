@@ -167,20 +167,20 @@ void format_colors_for_light_background(QMap<QString,QTextCharFormat> &formats)
 void format_colors_for_dark_background(QMap<QString,QTextCharFormat> &formats)
 {
 	//PRINT("format for dark");
-	formats["operator"].setForeground(Qt::blue);
+	formats["operator"].setForeground(QColor("SkyBlue"));
 	formats["math"].setForeground(Qt::green);
 	formats["keyword"].setForeground(QColor("LightGreen"));
 	formats["keyword"].setToolTip("Keyword");
-	formats["transform"].setForeground(QColor("Indigo"));
+	formats["transform"].setForeground(QColor("Thistle"));
 	formats["csgop"].setForeground(QColor("LightGreen"));
 	formats["prim3d"].setForeground(QColor("LightBlue"));
 	formats["prim2d"].setForeground(QColor("LightBlue"));
 	formats["import"].setForeground(QColor("LightYellow"));
 	formats["special"].setForeground(QColor("LightGreen"));
-	formats["extrude"].setForeground(QColor("LightGreen"));
-	formats["bracket"].setForeground(QColor("Green"));
-	formats["curlies"].setForeground(QColor(132,132,120));
-	formats["bool"].setForeground(QColor("LightRed"));
+	formats["extrude"].setForeground(QColor("PaleGreen"));
+	formats["bracket"].setForeground(QColor("LimeGreen"));
+	formats["curlies"].setForeground(QColor("Lavender"));
+	formats["bool"].setForeground(QColor("Red"));
 
 	formats["_$quote"].setForeground(Qt::magenta);
 	formats["_$comment"].setForeground(Qt::cyan);
@@ -219,13 +219,13 @@ Highlighter::Highlighter(QTextDocument *parent)
 {
 	tokentypes["operator"] << "=" << "!" << "&&" << "||" << "+" << "-" << "*" << "/" << "%" << "!" << "#" << ";";
 	tokentypes["math"] << "abs" << "sign" << "acos" << "asin" << "atan" << "atan2" << "sin" << "cos" << "floor" << "round" << "ceil" << "ln" << "log" << "lookup" << "min" << "max" << "pow" << "sqrt" << "exp" << "rands";
-	tokentypes["keyword"] << "module" << "function" << "for" << "intersection_for" << "if" << "assign" << "echo"<< "search" << "str";
+	tokentypes["keyword"] << "module" << "function" << "for" << "intersection_for" << "if" << "assign" << "echo"<< "search" << "str" << "let";
 	tokentypes["transform"] << "scale" << "translate" << "rotate" << "multmatrix" << "color" << "projection" << "hull" << "resize" << "mirror" << "minkowski";
 	tokentypes["csgop"]	<< "union" << "intersection" << "difference" << "render";
 	tokentypes["prim3d"] << "cube" << "cylinder" << "sphere" << "polyhedron";
 	tokentypes["prim2d"] << "square" << "polygon" << "circle";
 	tokentypes["import"] << "include" << "use" << "import_stl" << "import" << "import_dxf" << "dxf_dim" << "dxf_cross" << "surface";
-	tokentypes["special"] << "$children" << "child" << "children" << "$fn" << "$fa" << "$fs" << "$t" << "$vpt" << "$vpr";
+	tokentypes["special"] << "$children" << "child" << "children" << "$fn" << "$fa" << "$fs" << "$t" << "$vpt" << "$vpr" << "$vpd";
 	tokentypes["extrude"] << "linear_extrude" << "rotate_extrude";
 	tokentypes["bracket"] << "[" << "]" << "(" << ")";
 	tokentypes["curlies"] << "{" << "}";
@@ -234,9 +234,6 @@ Highlighter::Highlighter(QTextDocument *parent)
 	tokentypes["_$comment"] << "_$comment"; // bit of a kludge here
 	tokentypes["_$quote"] << "_$quote";
 	tokentypes["_$number"] << "_$number";
-
-	QString syntaxhighlight = Preferences::inst()->getValue("editor/syntaxhighlight").toString();
-	this->assignFormatsToTokens(syntaxhighlight);
 
 	errorFormat.setBackground(Qt::red);
 	errorState = false;
