@@ -179,8 +179,6 @@ def compare_with_expected(resultfilename):
 def run_test(testname, cmd, args):
     cmdname = os.path.split(options.cmd)[1]
 
-    args = [os.path.abspath(x) if '/' in x and not x.startswith('/') else x for x in args]
-
     if options.generate: 
         if not os.path.exists(expecteddir):
             try:
