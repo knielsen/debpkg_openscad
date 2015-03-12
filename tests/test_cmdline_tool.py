@@ -1,5 +1,6 @@
+#!/usr/bin/python
 #
-# Regression test driver for cmd-line tools
+# regression test driver for cmd-line tools
 #
 # Usage: test_cmdline_tool.py [<options>] <tool> <arguments>
 #
