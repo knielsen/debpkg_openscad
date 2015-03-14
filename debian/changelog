@@ -56,6 +56,8 @@ openscad (2015.03+dfsg-0.1) experimental; urgency=low
   * Don't run arguments through abspath in test_cmdline_tool.
     OpenSCAD should handle relative paths just fine as long as the cwd is right.
   * Add hashbang to test_cmdline_tool.py
+  * Remove rainbow.min.js as well
+  * Update Files-Excluded to drop rainbow.min.js
 
  -- Chow Loong Jin <hyperair@debian.org>  Tue, 10 Mar 2015 18:32:10 +0800
 
