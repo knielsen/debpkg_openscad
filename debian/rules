@@ -5,6 +5,8 @@
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 UPSTREAMVERS = $(shell dpkg-parsechangelog | sed -n 's/^Version: \([^+~]*\).*$$/\1/p')
 
+export QT_SELECT = qt5
+
 %:
 	dh $@ --parallel
 
