@@ -1,3 +1,10 @@
+openscad (2015.03+dfsg-0.2) experimental; urgency=medium
+
+  * Non-maintainer upload
+  * Use qt5
+
+ -- Chow Loong Jin <hyperair@debian.org>  Mon, 13 Apr 2015 10:43:22 +0800
+
 openscad (2015.03+dfsg-0.1) experimental; urgency=low
 
   * Non-maintainer upload
