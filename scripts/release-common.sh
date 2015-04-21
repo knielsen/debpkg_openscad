@@ -85,7 +85,7 @@ if [ "`echo $* | grep mingw64`" ]; then
 fi
 
 if [ "`echo $* | grep snapshot`" ]; then
-  CONFIG="$CONFIG experimental"
+  CONFIG="$CONFIG snapshot experimental"
   OPENSCAD_COMMIT=`git log -1 --pretty=format:"%h"`
 fi
 
@@ -110,10 +110,10 @@ do
 done
 
 if test -z "$VERSIONDATE"; then
-    VERSIONDATE=2015.03.06
+    VERSIONDATE=2015.04.21
 fi
 if test -z "$VERSION"; then
-    VERSION=2015.03
+    VERSION=2015.03-1
 fi
 
 export VERSIONDATE
