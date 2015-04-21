@@ -1,4 +1,4 @@
 version=3
 
-opts=dversionmangle=s/\+dfsg$// \
-    http://files.openscad.org/openscad-([0-9.]*).src.tar.gz
+opts=dversionmangle=s/\+dfsg$//,uversionmangle=s/-(\d+)$/+$1/ \
+    http://files.openscad.org/openscad-([0-9.-]*).src.tar.gz
