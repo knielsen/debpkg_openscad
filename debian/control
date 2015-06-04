@@ -31,7 +31,7 @@ Build-Depends:
     libboost-filesystem-dev,
     chrpath,
     pkg-config,
-    imagemagick,
+    imagemagick (>= 6.5.9.3),
     libgl1-mesa-swx11-dev | libgl-dev,
     libgl1-mesa-dri,
     xvfb | xserver-xorg-core,
@@ -73,6 +73,7 @@ Description: script file based graphical CAD environment
 
 Package: openscad-testing
 Architecture: any
+# the versioned imagemagick dependency stems from https://github.com/openscad/openscad/issues/1360
 Depends:
     ${shlibs:Depends},
     ${misc:Depends},
@@ -81,7 +82,7 @@ Depends:
     python,
     python-argparse,
     cmake,
-    imagemagick,
+    imagemagick (>= 6.5.9.3),
     xserver-xorg-core | xvfb,
     xserver-xorg-core | libgl1-mesa-swx11
 Description: script file based graphical CAD environment (test suite)
