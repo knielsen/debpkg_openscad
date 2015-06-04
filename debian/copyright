@@ -8,6 +8,13 @@ Comment: For the +dfsg version, icons/flattr.png was removed. It seems that the
  company holding the flattr trademark is ok with applications integratin this,
  but there is no explicit confirmation thereof, and if there was, it can be
  expected that the terms of use violate DFSG.
+ .
+ The SparkleAutoUpdater was just called "BSD licensed" by original author, is
+ thus licensed in an unclear fashion, and is only required on Mac anyway.
+ .
+ The rainbow.min.js is an obfuscated (minified) file shipped with upstream, but
+ not strictly required (FIXME: check this).
+
 
 Files: *
 Copyright: © 2009-2014 Clifford Wolf <clifford@clifford.at>, Marius Kintel <marius@kintel.net>
