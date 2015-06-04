@@ -16,6 +16,7 @@
 
 import argparse
 import os
+import subprocess
 import datetime
 from os.path import join
 
@@ -42,7 +43,8 @@ def main():
     os.mkdir(dirname)
     os.mkdir(builddir)
     os.symlink(EXAMPLES, join(dirname, "examples"))
-    os.symlink(TESTDATA, join(dirname, "testdata"))
+    # the csgpngtest family creates intermediate files like scad/3D/issues/issue1105c.scad.csg
+    subprocess.check_call(['cp', '-sa', TESTDATA, join(dirname, "testdata")])
     os.symlink(REGRESSION, join(builddir, "regression"))
     os.symlink(LIBRARIES, join(dirname, "libraries"))
 
