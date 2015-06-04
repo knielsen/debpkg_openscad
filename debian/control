@@ -36,7 +36,10 @@ Build-Depends:
     libgl1-mesa-dri,
     xvfb | xserver-xorg-core,
     libgl1-mesa-swx11 | xserver-xorg-core,
-    openscad-mcad
+    openscad-mcad,
+    fonts-liberation,
+    ttf-marvosym,
+    fonts-hosny-amiri
 # openscad is not gles compatible yet. this line makes builds abort before they
 # faile at compile time. libqt4-opengl-dev currently pulls libgles2-mesa-dev in
 # on ubuntu arm{el,hf}.
