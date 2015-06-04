@@ -9,6 +9,8 @@ tests/virtualfb.sh /usr/lib/openscad/testprograms/
 tests/test_pretty_print.py /usr/lib/openscad/testprograms/
 tests/test_cmdline_tool.py /usr/lib/openscad/testprograms/
 tests/export_import_pngtest.py /usr/lib/openscad/testprograms/
+tests/validatestl.py /usr/lib/openscad/testprograms/
+tests/shouldfail.py /usr/lib/openscad/testprograms/
 
 # these got stripped off absoltue paths at build time
 tests/CTestTestfile.cmake /usr/lib/openscad/testprograms/
