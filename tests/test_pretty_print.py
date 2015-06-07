@@ -81,7 +81,6 @@ def ezsearch(pattern, str):
     return ''
     
 def read_gitinfo():
-    return 'Installed OpenSCAD Debian packages:\n' + subprocess.check_output(['dpkg-query', '-l', 'openscad-*'])
     # won't work if run from outside of branch. 
     try:
         data = subprocess.Popen(['git', 'remote', '-v'], stdout=subprocess.PIPE).stdout.read()
@@ -199,7 +198,7 @@ def load_makefiles(builddir):
     files = [file for file in files if 'esting' not in file and 'emporary' not in file]
     result = {}
     for fname in files:
-        result[fname] = tryread(fname)
+        result[fname.replace(builddir, '')] = tryread(fname)
     return result
 
 
