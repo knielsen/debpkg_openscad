@@ -1,12 +1,16 @@
 openscad (2015.03-1+dfsg-0.1) unstable; urgency=medium
 
   * Non-maintainer upload
+  * New upstream bugfix release:
+    - Fixes a segfault bug (Closes: #787127)
+    - Removes __DATE__ reference (Closes: #781638)
   * Use qt5
   * Set uversionmangle in debian/watch for microreleases
+  * Fix linker error from missing -lX11 in unstable
 
  -- Chow Loong Jin <hyperair@debian.org>  Mon, 13 Apr 2015 10:43:22 +0800
 
-openscad (2015.03+dfsg-0.1) experimental; urgency=low
+openscad (2015.03+dfsg-0.1) UNRELEASED; urgency=low
 
   * Non-maintainer upload
   * New upstream version
