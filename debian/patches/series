@@ -5,3 +5,4 @@ don-t-override-OPENSCADPATH.patch
 Add-hashbang-to-test_cmdline_tool.py.patch
 Report-Debian-versions-in-test_pretty_print.patch
 test_pretty_print-remove-a-pathname-normalization-st.patch
+Add-missing-X11-libraries-when-using-GLX.patch
