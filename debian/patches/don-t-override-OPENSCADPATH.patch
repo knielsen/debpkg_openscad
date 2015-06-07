@@ -1,0 +1,28 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Fri, 7 Mar 2014 09:19:29 +0100
+Subject: don't override OPENSCADPATH
+
+the debian tests scripts already set an adaequate OPENSCADPATH; the
+overrides in the test scripts would set that wrongly again (beause
+openscad and mcad are not built in the same tree in debian)
+
+for a cleaner solution, the library path should be respected
+unconditionally, removing the necessity for debian to specify a path at
+all.
+---
+ tests/CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 156db11..7365674 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -603,7 +603,7 @@ endif()
+ add_definitions(-DOPENSCAD_TESTING -DENABLE_EXPERIMENTAL)
+ 
+ # Search for MCAD in correct place
+-set(CTEST_ENVIRONMENT "${CTEST_ENVIRONMENT};OPENSCADPATH=${CMAKE_CURRENT_SOURCE_DIR}/../libraries")
++#set(CTEST_ENVIRONMENT "${CTEST_ENVIRONMENT};OPENSCADPATH=${CMAKE_CURRENT_SOURCE_DIR}/../libraries")
+ 
+ # Platform specific settings
+ 

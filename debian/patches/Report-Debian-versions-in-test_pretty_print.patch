@@ -1,0 +1,23 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Sun, 7 Jun 2015 17:16:26 +0200
+Subject: Report Debian versions in test_pretty_print
+
+The git repository the test_pretty_print.py script tries to read is
+available neither at build time nor when run as openscad-testrun; this
+provides the relevant information for the latter case.
+---
+ tests/test_pretty_print.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tests/test_pretty_print.py b/tests/test_pretty_print.py
+index 798a726..27797a8 100644
+--- a/tests/test_pretty_print.py
++++ b/tests/test_pretty_print.py
+@@ -81,6 +81,7 @@ def ezsearch(pattern, str):
+     return ''
+     
+ def read_gitinfo():
++    return 'Installed OpenSCAD Debian packages:\n' + subprocess.check_output(['dpkg-query', '-l', 'openscad*'])
+     # won't work if run from outside of branch. 
+     try:
+         data = subprocess.Popen(['git', 'remote', '-v'], stdout=subprocess.PIPE).stdout.read()

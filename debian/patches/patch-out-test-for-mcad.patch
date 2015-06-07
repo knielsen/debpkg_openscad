@@ -1,0 +1,27 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Thu, 8 Aug 2013 00:43:29 +0200
+Subject: patch out test for mcad
+
+Conflicts:
+	debian/changelog
+---
+ tests/CMakeLists.txt | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index a7c27a0..156db11 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -82,9 +82,9 @@ else()
+ endif()
+ 
+ # MCAD
+-if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../libraries/MCAD/__init__.py)
+-  message(FATAL_ERROR "MCAD not found. You can install from the OpenSCAD root as follows: \n  git submodule update --init")
+-endif()
++#if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../libraries/MCAD/__init__.py)
++#  message(FATAL_ERROR "MCAD not found. You can install from the OpenSCAD root as follows: \n  git submodule update --init")
++#endif()
+ 
+ # NULLGL - Allow us to build without OpenGL(TM). run 'cmake .. -DNULLGL=1'
+ # Most tests will fail, but it can be used for testing/experiments

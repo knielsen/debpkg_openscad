@@ -1,0 +1,7 @@
+Patch-out-verbose-mode-in-openscad.pro.patch
+Allow-building-even-with-resource-absent-from-dfsg-p.patch
+patch-out-test-for-mcad.patch
+don-t-override-OPENSCADPATH.patch
+Add-hashbang-to-test_cmdline_tool.py.patch
+Report-Debian-versions-in-test_pretty_print.patch
+test_pretty_print-remove-a-pathname-normalization-st.patch

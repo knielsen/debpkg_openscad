@@ -1,0 +1,26 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Thu, 6 Mar 2014 23:12:06 +0100
+Subject: test_pretty_print: remove a pathname normalization step
+
+with absolute paths replaced by relative ones in debian (see
+debian/rules), what's done in test_pretty_print.py by replacing the
+build dir with nothing causes all '.' characters to be removed again.
+
+for a cleaner solution, absolute path removal should be upstremed.
+---
+ tests/test_pretty_print.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/test_pretty_print.py b/tests/test_pretty_print.py
+index 27797a8..fc7b408 100644
+--- a/tests/test_pretty_print.py
++++ b/tests/test_pretty_print.py
+@@ -199,7 +199,7 @@ def load_makefiles(builddir):
+     files = [file for file in files if 'esting' not in file and 'emporary' not in file]
+     result = {}
+     for fname in files:
+-        result[fname.replace(builddir, '')] = tryread(fname)
++        result[fname] = tryread(fname)
+     return result
+ 
+ 
