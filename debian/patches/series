@@ -13,3 +13,4 @@ remove-OPENSCAD_TESTING/fix-building-of-remaining-binaries.patch
 remove-OPENSCAD_TESTING/use-qmake-in-travis-to-build-gui-free-openscad-binar.patch
 remove-OPENSCAD_TESTING/pack-OPENSCAD_NOGUI-in-qmake-nogui-config.patch
 remove-OPENSCAD_TESTING/fix-font-directory-discovery-in-export_import_pngtes.patch
+test_pretty_print-drop-file-name-munging.patch
