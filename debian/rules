@@ -32,6 +32,9 @@ override_dh_auto_build:
 	perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s/\Q$$here\/tests\E/./g' obj-*/*.cmake
 
 override_dh_auto_test:
+	# workaround to have the test suite usable out-of-tree
+	cd obj-* && ln -s ../tests/* -t. || echo "Some files are expected to already be present."
+
 	# FIXME: ignoring the tests is not a nice thing to do, but it seems
 	# they are too much under construction atm
 	#
