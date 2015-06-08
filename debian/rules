@@ -16,13 +16,11 @@ override_dh_auto_configure:
 override_dh_auto_build:
 	dh_auto_build
 
-	# build test suite; FIXME: why is the GLEW path not discovered automatically?
-	cd tests && CFLAGS="$$CFLAGS $$CPPFLAGS" CXXFLAGS="$$CXXFLAGS $$CPPFLAGS" cmake \
-		-DGLEW_LIBRARY=`pkg-config --variable libdir glew`/libGLEW.so \
-		-DGLEW_INCLUDE_DIR=`pkg-config --variable includedir` \
-		-DEIGEN_INCLUDE_DIR=`pkg-config --cflags-only-I eigen3 | sed 's/^-I//'` \
-		.
-	cd tests && make csgtexttest
+	# not run in dh_auto_configure stage, as it requires the openscad binary to be already built
+	dh_auto_configure -Dtests
+
+	# is cgalcachetest only required in out-of-tree builds?
+	dh_auto_build -Dtests -Scmake -- csgtexttest cgalcachetest
 
 	# fix absolute paths in ctest scripts (relative paths will work during
 	# the build time tests, and are catered for by the openscad-testrun
@@ -34,18 +32,13 @@ override_dh_auto_build:
 	cd tests && perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s/\Q$$here\E/./g' *.cmake
 
 override_dh_auto_test:
-ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	# FIXME: ignoring the tests is not a nice thing to do, but it seems
 	# they are too much under construction atm
 	#
-	# PATH has to be set as the explicit ../openscad reference was removed above.
 	# OPENSCADPATH has to be set because the default library dir is
 	# determined based on the openscad binary's path (will be ok after
 	# installation).
-	cd tests && PATH=..:$$PATH OPENSCADPATH=/usr/share/openscad/libraries ctest || echo "Not failing just because some tests went wrong..."
-else
-	@echo "Skipping test suite as requested in DEB_BUILD_OPTIONS"
-endif
+	OPENSCADPATH=/usr/share/openscad/libraries dh_auto_test -Dtests -Scmake || echo "Not failing just because some tests went wrong..."
 
 	# fix absolute paths in generated scad files. this step logically
 	# belongs to the similar lines in the dh_auto_build override, but can
