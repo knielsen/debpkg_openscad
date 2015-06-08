@@ -29,7 +29,7 @@ override_dh_auto_build:
 	# note that often, a `../openscad` reference remains. this is left in
 	# place, as not all tools involved honor $PATH (eg. because they do an
 	# explicit `os.path.exists` on their openscad binary).
-	cd tests && perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s/\Q$$here\E/./g' *.cmake
+	perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s/\Q$$here\/tests\E/./g' obj-*/*.cmake
 
 override_dh_auto_test:
 	# FIXME: ignoring the tests is not a nice thing to do, but it seems
