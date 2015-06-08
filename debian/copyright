@@ -4,6 +4,7 @@ Source: http://www.openscad.org/
 Files-Excluded: icons/flattr.png
                 src/SparkleAutoUpdater.*
                 scripts/examples-html/assets/js/rainbow.min.js
+                libraries/MCAD
 Comment: For the +dfsg version, icons/flattr.png was removed. It seems that the
  company holding the flattr trademark is ok with applications integratin this,
  but there is no explicit confirmation thereof, and if there was, it can be
@@ -14,6 +15,9 @@ Comment: For the +dfsg version, icons/flattr.png was removed. It seems that the
  .
  The rainbow.min.js is an obfuscated (minified) file shipped with upstream, but
  not strictly required (FIXME: check this).
+ .
+ The MCAD library is free, included in upstream's tar ball, but not part of
+ upstream's git tree, and packaged independently.
 
 
 Files: *
