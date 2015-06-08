@@ -1,0 +1,30 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Sun, 7 Jun 2015 15:32:36 +0200
+Subject: fix building of remaining binaries
+
+the previous patch has removed the -DENABLE_EXPERIMENTAL flag, assuming
+that it is not required any more without openscad_nogui being built.
+while that is sufficient for the test suite, other binaries built in the
+tests/ directory would still use those flags.
+
+in order to make them buildable again, the -DOPENSCAD_NOGUI compile time
+option is added (as the resulting binaries are command-line-only tools,
+which was previously implicit by setting -DOPENSCAD_TESTING), and
+-DENABLE_EXPERIMENTAL is restored.
+---
+ tests/CMakeLists.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 0e0b46c..4f45fea 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -600,6 +600,8 @@ if (DEFINED OPENSCAD_DAY)
+   add_definitions(-DOPENSCAD_DAY=${OPENSCAD_DAY})
+ endif()
+ 
++add_definitions(-DENABLE_EXPERIMENTAL -DOPENSCAD_NOGUI)
++
+ # Search for MCAD in correct place
+ #set(CTEST_ENVIRONMENT "${CTEST_ENVIRONMENT};OPENSCADPATH=${CMAKE_CURRENT_SOURCE_DIR}/../libraries")
+ 

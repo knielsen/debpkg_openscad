@@ -1,0 +1,162 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Thu, 4 Jun 2015 21:24:07 +0200
+Subject: drop OPENSCAD_TESTING definition
+
+for cases when a binary without gui / qt should be built, OPENSCAD_NOGUI
+can now be defined. all the other uses for OPENSCAD_TESTING are now
+covered by the unit test framework.
+---
+ src/import.cc         |  3 ---
+ src/linearextrude.cc  |  3 ---
+ src/openscad.cc       |  6 ++----
+ src/parsersettings.cc |  2 --
+ src/rotateextrude.cc  |  3 ---
+ src/surface.cc        |  3 ---
+ src/value.cc          | 21 ---------------------
+ src/version_check.h   |  2 +-
+ 8 files changed, 3 insertions(+), 40 deletions(-)
+
+diff --git a/src/import.cc b/src/import.cc
+index 1f1686d..56b994a 100644
+--- a/src/import.cc
++++ b/src/import.cc
+@@ -319,10 +319,7 @@ std::string ImportNode::toString() const
+ 		"scale = " << this->scale << ", "
+ 		"convexity = " << this->convexity << ", "
+ 		"$fn = " << this->fn << ", $fa = " << this->fa << ", $fs = " << this->fs
+-#ifndef OPENSCAD_TESTING
+-  // timestamp is needed for caching, but disturbs the test framework
+ 				 << ", " "timestamp = " << (fs::exists(path) ? fs::last_write_time(path) : 0)
+-#endif
+ 				 << ")";
+ 
+ 
+diff --git a/src/linearextrude.cc b/src/linearextrude.cc
+index cddbc31..9d70da1 100644
+--- a/src/linearextrude.cc
++++ b/src/linearextrude.cc
+@@ -142,10 +142,7 @@ std::string LinearExtrudeNode::toString() const
+ 			"file = " << this->filename << ", "
+ 			"layer = " << QuotedString(this->layername) << ", "
+ 			"origin = [" << this->origin_x << ", " << this->origin_y << "], "
+-#ifndef OPENSCAD_TESTING
+-			// timestamp is needed for caching, but disturbs the test framework
+ 			<< "timestamp = " << (fs::exists(path) ? fs::last_write_time(path) : 0) << ", "
+-#endif
+ 			;
+ 	}
+ 	stream <<
+diff --git a/src/openscad.cc b/src/openscad.cc
+index e0ac953..73d6759 100644
+--- a/src/openscad.cc
++++ b/src/openscad.cc
+@@ -272,12 +272,10 @@ Camera get_camera(po::variables_map vm)
+ 	return camera;
+ }
+ 
+-#ifdef OPENSCAD_TESTING
+-#undef OPENSCAD_QTGUI
+-#else
+-#define OPENSCAD_QTGUI 1
++#ifndef OPENSCAD_NOGUI
+ #include <QApplication>
+ #include <QSettings>
++#define OPENSCAD_QTGUI 1
+ #endif
+ static bool checkAndExport(shared_ptr<const Geometry> root_geom, unsigned nd,
+ 	enum FileFormat format, const char *filename)
+diff --git a/src/parsersettings.cc b/src/parsersettings.cc
+index 6e3f06b..01d54da 100644
+--- a/src/parsersettings.cc
++++ b/src/parsersettings.cc
+@@ -102,9 +102,7 @@ void parser_init()
+ 		}
+ 	}
+ 
+-#ifndef OPENSCAD_TESTING
+ 	add_librarydir(PlatformUtils::userLibraryPath());
+-#endif
+ 
+ 	add_librarydir(boosty::absolute(PlatformUtils::resourcePath("libraries")).string());
+ }
+diff --git a/src/rotateextrude.cc b/src/rotateextrude.cc
+index bbe8490..fe355cd 100644
+--- a/src/rotateextrude.cc
++++ b/src/rotateextrude.cc
+@@ -104,10 +104,7 @@ std::string RotateExtrudeNode::toString() const
+ 			"layer = " << QuotedString(this->layername) << ", "
+ 			"origin = [" << std::dec << this->origin_x << ", " << this->origin_y << "], "
+ 			"scale = " << this->scale << ", "
+-#ifndef OPENSCAD_TESTING
+-			// timestamp is needed for caching, but disturbs the test framework
+ 			<< "timestamp = " << (fs::exists(path) ? fs::last_write_time(path) : 0) << ", "
+-#endif
+ 			;
+ 	}
+ 	stream <<
+diff --git a/src/surface.cc b/src/surface.cc
+index 5c2617c..9cdd958 100644
+--- a/src/surface.cc
++++ b/src/surface.cc
+@@ -311,10 +311,7 @@ std::string SurfaceNode::toString() const
+ 	stream << this->name() << "(file = " << this->filename
+ 		<< ", center = " << (this->center ? "true" : "false")
+ 		<< ", invert = " << (this->invert ? "true" : "false")
+-#ifndef OPENSCAD_TESTING
+-		// timestamp is needed for caching, but disturbs the test framework
+ 				 << ", " "timestamp = " << (fs::exists(path) ? fs::last_write_time(path) : 0)
+-#endif
+ 				 << ")";
+ 
+ 	return stream.str();
+diff --git a/src/value.cc b/src/value.cc
+index 897eed3..499d1e0 100644
+--- a/src/value.cc
++++ b/src/value.cc
+@@ -201,33 +201,12 @@ public:
+     if (op1 == 0) {
+       return "0"; // Don't return -0 (exactly -0 and 0 equal 0)
+     }
+-#ifdef OPENSCAD_TESTING
+-    // Quick and dirty hack to work around floating point rounding differences
+-    // across platforms for testing purposes.
+-    std::stringstream tmp;
+-    tmp.precision(12);
+-    tmp.setf(std::ios_base::fixed);
+-    tmp << op1;
+-    std::string tmpstr = tmp.str();
+-    size_t endpos = tmpstr.find_last_not_of('0');
+-    if (tmpstr[endpos] == '.') endpos--;
+-    tmpstr = tmpstr.substr(0, endpos+1);
+-    size_t dotpos = tmpstr.find('.');
+-    if (dotpos != std::string::npos) {
+-      if (tmpstr.size() - dotpos > 12) tmpstr.erase(dotpos + 12);
+-      while (tmpstr[tmpstr.size()-1] == '0') tmpstr.erase(tmpstr.size()-1);
+-    }
+-    if (tmpstr.compare("-0") == 0) tmpstr = "0";
+-    tmpstr = two_digit_exp_format(tmpstr);
+-    return tmpstr;
+-#else
+     // attempt to emulate Qt's QString.sprintf("%g"); from old OpenSCAD.
+     // see https://github.com/openscad/openscad/issues/158
+     std::stringstream tmp;
+     tmp.unsetf(std::ios::floatfield);
+     tmp << op1;
+     return tmp.str();
+-#endif
+   }
+ 
+   std::string operator()(const boost::blank &) const {
+diff --git a/src/version_check.h b/src/version_check.h
+index eb0d499..3099203 100644
+--- a/src/version_check.h
++++ b/src/version_check.h
+@@ -89,7 +89,7 @@ a time, to avoid confusion.
+ #else
+ #endif // ENABLE_OPENCSG
+ 
+-#ifndef OPENSCAD_TESTING
++#ifndef OPENSCAD_NOGUI
+ #include <QtCore/qglobal.h>
+ #if QT_VERSION < 0x040400
+ #error QT library missing or version too old. See README.md. To force compile, run qmake CONFIG+=skip-version-check

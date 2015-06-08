@@ -1,0 +1,23 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Mon, 8 Jun 2015 08:34:36 +0200
+Subject: use qmake in travis to build gui-free openscad binary
+
+with OPENSCAD_TESTING gone, the openscad binary (even in a non-gui
+version) is easiest made using qmake.
+---
+ scripts/travis-ci.sh | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/scripts/travis-ci.sh b/scripts/travis-ci.sh
+index 21e4725..a808a12 100755
+--- a/scripts/travis-ci.sh
++++ b/scripts/travis-ci.sh
+@@ -1,5 +1,8 @@
+ #!/bin/bash
+ 
++qmake CONFIG+=experimental DEFINES+=OPENSCAD_NOGUI
++make
++
+ cd tests
+ cmake . 
+ if [[ $? != 0 ]]; then

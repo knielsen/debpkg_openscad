@@ -6,4 +6,10 @@ Add-hashbang-to-test_cmdline_tool.py.patch
 Report-Debian-versions-in-test_pretty_print.patch
 test_pretty_print-remove-a-pathname-normalization-st.patch
 Add-missing-X11-libraries-when-using-GLX.patch
-remove-OPENSCAD_TESTING-build-flag.patch
+remove-OPENSCAD_TESTING/add-float-normalization-to-test_cmdline_tool.patch
+remove-OPENSCAD_TESTING/drop-OPENSCAD_TESTING-definition.patch
+remove-OPENSCAD_TESTING/don-t-build-openscad_nogui-any-more.patch
+remove-OPENSCAD_TESTING/fix-building-of-remaining-binaries.patch
+remove-OPENSCAD_TESTING/use-qmake-in-travis-to-build-gui-free-openscad-binar.patch
+remove-OPENSCAD_TESTING/pack-OPENSCAD_NOGUI-in-qmake-nogui-config.patch
+remove-OPENSCAD_TESTING/fix-font-directory-discovery-in-export_import_pngtes.patch

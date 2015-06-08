@@ -1,0 +1,24 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Mon, 8 Jun 2015 11:05:52 +0200
+Subject: fix font directory discovery in export_import_pngtest
+
+the old way of constructing the font path from the openscad binary
+has failed since the binary built outside testing has been used.
+building the path from the test script works with any openscad binary.
+---
+ tests/export_import_pngtest.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/export_import_pngtest.py b/tests/export_import_pngtest.py
+index 1764726..9d7bbf2 100644
+--- a/tests/export_import_pngtest.py
++++ b/tests/export_import_pngtest.py
+@@ -116,7 +116,7 @@ if args.format != 'csg':
+ create_png_cmd = [args.openscad, newscadfile, '-o', pngfile] + remaining_args
+ print >> sys.stderr, 'Running OpenSCAD #2:'
+ print >> sys.stderr, ' '.join(create_png_cmd)
+-fontdir =  os.path.join(os.path.dirname(args.openscad), "..", "testdata");
++fontdir =  os.path.join(os.path.dirname(__file__), "..", "testdata");
+ fontenv = os.environ.copy();
+ fontenv["OPENSCAD_FONT_PATH"] = fontdir;
+ result = subprocess.call(create_png_cmd, env = fontenv);
