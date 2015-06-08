@@ -22,7 +22,7 @@ override_dh_auto_build:
 		-DGLEW_INCLUDE_DIR=`pkg-config --variable includedir` \
 		-DEIGEN_INCLUDE_DIR=`pkg-config --cflags-only-I eigen3 | sed 's/^-I//'` \
 		.
-	cd tests && make
+	cd tests && make csgtexttest
 
 	# fix absolute paths in ctest scripts (relative paths will work during
 	# the build time tests, and are catered for by the openscad-testrun
