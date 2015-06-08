@@ -27,11 +27,11 @@ override_dh_auto_build:
 	# fix absolute paths in ctest scripts (relative paths will work during
 	# the build time tests, and are catered for by the openscad-testrun
 	# script).
+	#
+	# note that often, a `../openscad` reference remains. this is left in
+	# place, as not all tools involved honor $PATH (eg. because they do an
+	# explicit `os.path.exists` on their openscad binary).
 	cd tests && perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s/\Q$$here\E/./g' *.cmake
-	# fix relative paths to plain binary names (the $PATH will be
-	# explicitly set during build time tests, and with openscad-testrun, it
-	# will have been installed).
-	cd tests && sed 's@\./\.\./openscad@openscad@' -i *.cmake
 
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
