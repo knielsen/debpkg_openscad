@@ -1,5 +1,8 @@
+# when obj-* is placed as first component, this menas obj-x86_64-linux-gnu or
+# similar -- whatever `dh_auto_configure -Scmake -Dtests` chose.
+
 # compiled programs
-tests/csgtexttest /usr/lib/openscad/testprograms/
+obj-*/csgtexttest /usr/lib/openscad/testprograms/
 
 # helper scripts
 tests/cgalstlsanitytest /usr/lib/openscad/testprograms/
@@ -13,8 +16,8 @@ tests/validatestl.py /usr/lib/openscad/testprograms/
 tests/shouldfail.py /usr/lib/openscad/testprograms/
 
 # these got stripped off absoltue paths at build time
-tests/CTestTestfile.cmake /usr/lib/openscad/testprograms/
-tests/CTestCustom.cmake /usr/lib/openscad/testprograms/
+obj-*/CTestTestfile.cmake /usr/lib/openscad/testprograms/
+obj-*/CTestCustom.cmake /usr/lib/openscad/testprograms/
 tests/EnforceConfig.cmake /usr/lib/openscad/testprograms/
 
 
