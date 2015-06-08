@@ -40,6 +40,10 @@ Copyright: Geoffrey Keating <geoffk@ozemail.com.au>
            Tollef Fog Heen <tollef@add.no>
 License: GPL-2+
 
+Files: scripts/*.nsh
+Copyright: 1995-2009 Vytautas, intersol, chefkoch, dselkirk@hotmail.com, eccles@users.sf.net
+License: zlib
+
 Files: fonts/Liberation-2.00.1/*
 Copyright: 2010, Google Corporation
            2012, Red Hat, Inc.
