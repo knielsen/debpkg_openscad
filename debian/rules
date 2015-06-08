@@ -67,12 +67,6 @@ override_dh_auto_install:
 		debian/openscad/usr/share/openscad/testdata/ttf/amiri-0.106
 	-rmdir debian/openscad/usr/share/openscad/fonts/
 
-ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
-	# can't do that in debian/openscad-testing-data.install as it would fail when building with nocheck
-	mkdir -p debian/openscad-testing-data/usr/share/openscad/buildtestresults/
-	for x in tests/*-output; do dh_install --package openscad-testing-data -Xtestdata/ttf/ $$x /usr/share/openscad/buildtestresults/; done
-endif
-
 override_dh_install:
 	dh_install -Xtestdata/ttf/
 
