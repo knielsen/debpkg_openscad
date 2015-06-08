@@ -67,14 +67,6 @@ override_dh_auto_install:
 		debian/openscad/usr/share/openscad/testdata/ttf/amiri-0.106
 	-rmdir debian/openscad/usr/share/openscad/fonts/
 
-	# solve the http://wiki.debian.org/RpathIssue the brutal way; it's only
-	# the testing scripts and not the regular build process for openscad,
-	# so i'll accept not getting the extra score for finding out what's
-	# wrong exactly
-	for x in \
-		csgtexttest \
-		; do chrpath -d tests/$$x; done
-
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	# can't do that in debian/openscad-testing-data.install as it would fail when building with nocheck
 	mkdir -p debian/openscad-testing-data/usr/share/openscad/buildtestresults/

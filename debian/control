@@ -29,7 +29,6 @@ Build-Depends:
     libboost-regex-dev,
     libboost-system-dev,
     libboost-filesystem-dev,
-    chrpath,
     pkg-config,
     imagemagick (>= 6.5.9.3),
     libgl1-mesa-swx11-dev | libgl-dev,
