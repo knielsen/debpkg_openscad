@@ -47,7 +47,9 @@ override_dh_auto_test:
 	# done by the build environment (at least by gbp buildpackage), but it
 	# makes it clear that the intent is to always render the build-time
 	# tests in software.
-	DISPLAY= OPENSCADPATH=/usr/share/openscad/libraries dh_auto_test -Dtests -Scmake || echo "Not failing just because some tests went wrong..."
+	#
+	# as for the tests excluded with --exclude-regex, see README.testsuite.
+	DISPLAY= OPENSCADPATH=/usr/share/openscad/libraries dh_auto_test -Dtests -Scmake -- ARGS+="--exclude-regex issue1165\\|issue1215\\|throwntogethertest_issue1089\\|openscad-cameyeortho_camera-tests\\|openscad-cameyeortho-viewall_camera-tests"
 
 	# fix absolute paths in generated scad files. this step logically
 	# belongs to the similar lines in the dh_auto_build override, but can

@@ -10,3 +10,6 @@ parentheses indicates failure at build time).
 * issue1165, issue1215 (RB): There appears to be Z-fighting in the both the
   expected and the actual image, but that can't be expected to be reliable --
   check with upstream!
+* throwntogethertest_issue1089, openscad-cameyeortho_camera-tests,
+  openscad-cameyeortho-viewall_camera-tests: seem to just fail with the
+  software renderer
