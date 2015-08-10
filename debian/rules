@@ -37,7 +37,7 @@ override_dh_auto_test:
 	cd obj-* && ln -s ../tests/* -t. || echo "Some files are expected to already be present."
 
 	# FIXME: ignoring the tests is not a nice thing to do, but it seems
-	# they are too much under construction atm
+	# they are too much under construction atm. see debian/README.testsuite
 	#
 	# OPENSCADPATH has to be set because the default library dir is
 	# determined based on the openscad binary's path (will be ok after
