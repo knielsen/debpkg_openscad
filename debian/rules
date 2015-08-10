@@ -42,7 +42,12 @@ override_dh_auto_test:
 	# OPENSCADPATH has to be set because the default library dir is
 	# determined based on the openscad binary's path (will be ok after
 	# installation).
-	OPENSCADPATH=/usr/share/openscad/libraries dh_auto_test -Dtests -Scmake || echo "Not failing just because some tests went wrong..."
+	#
+	# clearing DISPLAY is not strictly necessary here as this is already
+	# done by the build environment (at least by gbp buildpackage), but it
+	# makes it clear that the intent is to always render the build-time
+	# tests in software.
+	DISPLAY= OPENSCADPATH=/usr/share/openscad/libraries dh_auto_test -Dtests -Scmake || echo "Not failing just because some tests went wrong..."
 
 	# fix absolute paths in generated scad files. this step logically
 	# belongs to the similar lines in the dh_auto_build override, but can

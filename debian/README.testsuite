@@ -10,13 +10,3 @@ parentheses indicates failure at build time).
 * issue1165, issue1215 (RB): There appears to be Z-fighting in the both the
   expected and the actual image, but that can't be expected to be reliable --
   check with upstream!
-* All graphics cards dependent tests (B): If the build dependencies are
-  satisfied using the hardware renderer mesa implementation, and if the DISPLAY
-  variable is filtered out at build time (which happens at least with gbp
-  buildpackage), then all those tests fail at build time.
-
-  If there is any way to influence the presence of the DISPLAY variable, we
-  should try to use the existing display if software rendering is unavailable
-  (on the build servers, that wouldn't be the case because they pick the first
-  choice being software rendering). Just hard-builddepening on the software
-  renderer may be the more sane option, though.
