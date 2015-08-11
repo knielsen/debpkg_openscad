@@ -131,35 +131,15 @@ Files: src/lodepng.*
 Copyright: 2005-2012 Lode Vandevenne
 License: zlib
 
-Files: examples/example024.scad
+Files: examples/Old/example024.scad
 Copyright: 2013 Nathan Hellweg, Emmett Lalish and Marius Kintel
 License: CC-BY-SA
  CC-BY-SA license
 FIXME: No further explanation of the license is given
 
-Files: tests/test_upload.py
-Copyright: 2013 Don Bright <hugh.m.bright@gmail.com>
-License: zlib
-
 Files: debian/*
 Copyright: © 2010-2013 Christian M. Amsüss <chrysn@fsfe.org>
 License: GPL-2+ with CGAL exception
-
-Files: debian/repack.sh debian/repack.stub
-Copyright: ryan52, gregor herrmann <gregoa@debian.org>
-License: perl
- All rights reserved. This document is free software; you may redistribute it
- and/or modify it under the same terms as Perl itself.
- .
- Perl is distributed under your choice of the GNU General Public License or the
- Artistic License. On Debian systems, the complete text of version 1 of the GNU
- General Public License can be found in /usr/share/common-licenses/GPL-1 and
- the Artistic License in /usr/share/common-licenses/Artistic.
-FIXME: Files sourced from
- <http://anonscm.debian.org/gitweb/?p=pkg-perl/scripts.git;a=summary>; they are
- expected to be updated to contain a copyright notice soon. For the time being,
- the license is inferred from the file history and
- <http://pkg-perl.alioth.debian.org/howto/repacking.html>.
 
 License: GPL-2+
  This program is free software; you can redistribute it and/or modify it
