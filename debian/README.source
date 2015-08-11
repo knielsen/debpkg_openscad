@@ -1,0 +1,11 @@
+Test suite coverage
+===================
+
+This package is configured to run the test suite to run at build time. As a
+graphical environment is not generally available at build time (and even if
+available often disabled by build tools), this build-depends explicitly on the
+software rendere. Unfortunately, due to the conflicts between libgl1-mesa-swx11
+and  libgl1-mesa-dri, this means that it can not be built on most desktop
+machines, and often needs to be built in a chroot.
+
+As for individual excluded tests, see README.testsuite.

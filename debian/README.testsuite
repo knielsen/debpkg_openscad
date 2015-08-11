@@ -11,5 +11,9 @@ parentheses indicates failure at build time).
   expected and the actual image, but that can't be expected to be reliable --
   check with upstream!
 * throwntogethertest_issue1089, openscad-cameyeortho_camera-tests,
-  openscad-cameyeortho-viewall_camera-tests: seem to just fail with the
+  openscad-cameyeortho-viewall_camera-tests (RB): seem to just fail with the
   software renderer
+
+The tests marked with B are explicitly excluded in debian/rules to make things
+build without a general "Some tests are expected to fail, continuing anyway"
+exception.

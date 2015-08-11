@@ -1,11 +1,6 @@
 Source: openscad
 Priority: optional
 Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
-# while it is common to have libgl1-mesa-dev as the default option for
-# libgl1-dev, libgl1-mesa-swx11-dev is chosen here to avoid that an installer
-# for a build server gets the idea of installing xserver-xorg-core; also, this
-# is why the sequence of xserver-xorg-core and xvfb is flipped here relative to
-# openscad-testing, where they come from.
 Build-Depends:
     debhelper (>= 9),
     qt5-qmake,
