@@ -68,5 +68,8 @@ override_dh_auto_install:
 	# remove fonts
 	rm -rf debian/openscad/usr/share/openscad/fonts
 
+override_dh_install:
+	dh_install -Xtestdata/ttf/liberation-2.00.1/LICENSE
+
 override_dh_strip:
 	dh_strip --dbg-package openscad-dbg
