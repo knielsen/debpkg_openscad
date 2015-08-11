@@ -1,0 +1,18 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Tue, 11 Aug 2015 09:22:56 +0200
+Subject: Add keywords to the desktop file
+
+Forwarded: no
+---
+ icons/openscad.desktop | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/icons/openscad.desktop b/icons/openscad.desktop
+index 1b397cf..b4eddb6 100644
+--- a/icons/openscad.desktop
++++ b/icons/openscad.desktop
+@@ -6,3 +6,4 @@ Icon=openscad
+ Exec=openscad %f
+ MimeType=application/x-openscad;
+ Categories=Graphics;3DGraphics;Engineering;
++Keywords=3d;solid;geometry;csg;model;stl;
