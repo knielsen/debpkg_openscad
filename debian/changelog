@@ -1,3 +1,61 @@
+openscad (2015.03-1+dfsg-1) UNRELEASED; urgency=medium
+
+  [ chrysn ]
+
+  * Patch build system: Work around missing -lX11
+  * Depend on versioned imagemagick
+  * remove src/SparkleAutoUpdater.* from dfsg branch
+  * explain why SparkleAutoUpdater is removed in dfsg
+  * include fonts in build dependencies
+  * adaptions to changes in test suite
+  * simplify patch against test_pretty_print.py
+  * more programs that need to be shipped with the test suite
+  * revert all direct changes to source as of switching to gbp-pq
+  * re-apply the debian changes as gbp-pq patches
+  * gbp-pq: use unnumbered patches
+  * dropping files that are not required any more due to the gbp-pq switch
+  * add the remove-OPENSCAD_TESTING branch as a debian patch
+  * explicitly drop libraries/MCAD from the tarball
+  * only build the single remaining relevant binary in tests/
+  * test suite preparation: relative paths instead of $PATH
+  * copyright notes on scripts
+  * renew drop-openscadtesting branch patch
+  * use debhelper's cmake / ctest targets
+  * introduce a new patch to fix out-of-tree cmake
+  * install openscad-testing files from the locations dh chooses
+  * apply absolute path stripping to cmake generated files
+  * drop chrpath tricks
+  * drop installation of build test results
+  * out-of-tree workaround for test suite
+  * testrun: create '../openscad' link for tests that explicitly look there
+  * Extend don-t-override-OPENSCADPATH.patch to catch more overrides
+  * Fix the absolute path replacements in testing cmake files
+  * add README for test suite
+  * Unconditionally render build time tests in virtual frame buffer
+  * Exclude the tests known to fail from building, require the rest to work
+  * Install EMACS mode (Closes: #789318)
+  * Add DEP-3 tags to patches
+  * Patches for upstream fixing lintian warnings
+  * Drop debian/dirs (not required any more)
+  * Remove dropped files from debian/copyright
+  * Add a grammar patch
+  * Tagging patches forwarded upstream
+  * Update build documentation
+  * Simplify debian/rules
+  * Fix builds where test runs are disabled
+  * Reference upstream bug reports in README.testsuite
+  * Keep the font files in the test data
+  * Override lintian warnings for shipped font files
+  * Don't install the additional license file
+  * Introduce patch for path discovery
+  * Don't depend on any fonts any more
+  * Drop build requirement on hardware accelerated rendering
+
+  [ Chow Loong Jin ]
+  * Fix up watch file options
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 11 Aug 2015 18:15:32 +0200
+
 openscad (2015.03-1+dfsg-0.1) unstable; urgency=medium
 
   * Non-maintainer upload
