@@ -63,19 +63,10 @@ override_dh_auto_install:
 	# a normal git source checkout) nor the full library (when this is
 	# built from a git checkout with submodules or from a tarball). mcad
 	# gets its own package.
-	rm -rf debian/openscad/usr/share/openscad/libraries/MCAD/
-	-rmdir debian/openscad/usr/share/openscad/libraries
+	rm -rf debian/openscad/usr/share/openscad/libraries
 
 	# remove fonts
-	rm -rf debian/openscad/usr/share/openscad/fonts/Liberation-2.00.1 \
-		debian/openscad/usr/share/openscad/fonts/05-osx-fonts.conf \
-		debian/openscad/usr/share/openscad/fonts/10-liberation.conf
-	-rmdir debian/openscad/usr/share/openscad/fonts/
-
-	rm -rf debian/openscad/usr/share/openscad/testdata/ttf/Liberation-2.00.1 \
-		debian/openscad/usr/share/openscad/testdata/ttf/marvosym-3.10 \
-		debian/openscad/usr/share/openscad/testdata/ttf/amiri-0.106
-	-rmdir debian/openscad/usr/share/openscad/fonts/
+	rm -rf debian/openscad/usr/share/openscad/fonts
 
 override_dh_install:
 	dh_install -Xtestdata/ttf/
