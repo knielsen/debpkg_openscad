@@ -31,7 +31,6 @@ Build-Depends:
     xvfb,
     libgl1-mesa-swx11,
     openscad-mcad,
-    fonts-liberation,
     ttf-marvosym,
     fonts-hosny-amiri
 # openscad is not gles compatible yet. this line makes builds abort before they
@@ -49,8 +48,7 @@ Package: openscad
 Architecture: any
 Depends:
     ${shlibs:Depends},
-    ${misc:Depends},
-    fonts-liberation
+    ${misc:Depends}
 Recommends:
     openscad-mcad
 Suggests:
@@ -94,7 +92,6 @@ Depends:
     ${shlibs:Depends},
     ${misc:Depends},
     openscad-mcad,
-    fonts-liberation,
     ttf-marvosym,
     fonts-hosny-amiri
 # the examples, which are shipped in openscad, are part of the test suite
