@@ -1,0 +1,28 @@
+From: chrysn <chrysn@fsfe.org>
+Date: Tue, 11 Aug 2015 16:01:19 +0200
+Subject: Fix path discovery for fonts
+
+When the path to the openscad binary changed in [1], the relative path
+was not changed and therefore led into the void, falling back to system
+paths.
+
+[1] https://github.com/openscad/openscad/issues/1362
+
+Forwarded: no
+---
+ tests/test_cmdline_tool.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/test_cmdline_tool.py b/tests/test_cmdline_tool.py
+index 1d6fe9a..3cedb70 100755
+--- a/tests/test_cmdline_tool.py
++++ b/tests/test_cmdline_tool.py
+@@ -231,7 +231,7 @@ def run_test(testname, cmd, args):
+     try:
+         cmdline = [cmd] + args + [outputname]
+         print 'run_test() cmdline:',cmdline
+-        fontdir =  os.path.join(os.path.dirname(cmd), "..", "testdata")
++        fontdir =  os.path.join(os.path.dirname(cmd), "testdata")
+         fontenv = os.environ.copy()
+         fontenv["OPENSCAD_FONT_PATH"] = fontdir
+         print 'using font directory:', fontdir
