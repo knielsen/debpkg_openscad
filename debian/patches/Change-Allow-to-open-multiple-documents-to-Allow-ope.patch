@@ -6,7 +6,7 @@ This is for grammatical reasons. It is being discussed in
 https://bugs.debian.org/795158, and "allowing" seems to be a correct
 (not necessarily ideal, but not intrusive) solution.
 
-Forwarded: no
+Forwarded: https://github.com/openscad/openscad/pull/1411
 ---
  locale/cs.po        | 2 +-
  locale/de.po        | 2 +-

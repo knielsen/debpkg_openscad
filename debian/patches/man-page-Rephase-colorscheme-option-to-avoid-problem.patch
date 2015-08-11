@@ -10,7 +10,7 @@ $ LC_ALL=en_US.UTF-8 MANROFFSEQ='' MANWIDTH=80 man --warnings -E UTF-8 -l -Tutf8
 This was discovered by lintian and reported as
 'manpage-has-errors-from-man'.
 
-Forwarded: no
+Forwarded: https://github.com/openscad/openscad/pull/1411
 ---
  doc/openscad.1 | 4 +++-
  1 file changed, 3 insertions(+), 1 deletion(-)
