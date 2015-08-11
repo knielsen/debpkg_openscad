@@ -9,3 +9,11 @@ and  libgl1-mesa-dri, this means that it can not be built on most desktop
 machines, and often needs to be built in a chroot.
 
 As for individual excluded tests, see README.testsuite.
+
+Shipped fonts
+=============
+
+OpenSCAD, in openscad-testing-data, does ship copies of fonts already present
+in Debian. They are included because they are relied on for regression tests --
+if we just swapped in the (newer) font files from other packages, the unit
+tests would fail.

@@ -1,0 +1,4 @@
+# See README.source -- they're needed for unit tests.
+duplicate-font-file usr/share/openscad/testdata/ttf/amiri-0.106/amiri-regular.ttf also in fonts-hosny-amiri
+duplicate-font-file usr/share/openscad/testdata/ttf/liberation-2.00.1/LiberationSans-Regular.ttf also in ttf-liberation
+duplicate-font-file usr/share/openscad/testdata/ttf/marvosym-3.10/marvosym.ttf also in ttf-marvosym
