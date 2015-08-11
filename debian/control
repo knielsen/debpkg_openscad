@@ -27,7 +27,6 @@ Build-Depends:
     pkg-config,
     imagemagick (>= 6.5.9.3),
     libgl1-mesa-swx11-dev,
-    libgl1-mesa-dri,
     xvfb,
     libgl1-mesa-swx11,
     openscad-mcad,
