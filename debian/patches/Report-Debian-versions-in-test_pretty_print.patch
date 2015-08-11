@@ -5,6 +5,8 @@ Subject: Report Debian versions in test_pretty_print
 The git repository the test_pretty_print.py script tries to read is
 available neither at build time nor when run as openscad-testrun; this
 provides the relevant information for the latter case.
+
+Forwarded: not-needed
 ---
  tests/test_pretty_print.py | 1 +
  1 file changed, 1 insertion(+)

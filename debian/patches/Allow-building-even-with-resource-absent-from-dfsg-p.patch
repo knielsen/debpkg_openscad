@@ -5,6 +5,8 @@ Subject: Allow building even with resource absent from +dfsg package
 This removes all references to the flattr.png icon which has been
 removed to create the DFSG tarball for reasons outlined in
 debian/copyright.
+
+Forwarded: not-needed
 ---
  openscad.qrc         | 1 -
  src/AboutDialog.h    | 2 --

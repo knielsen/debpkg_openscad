@@ -2,6 +2,7 @@ From: Chow Loong Jin <hyperair@debian.org>
 Date: Thu, 12 Mar 2015 12:00:57 +0800
 Subject: Add hashbang to test_cmdline_tool.py
 
+Forwarded: no
 ---
  tests/test_cmdline_tool.py | 1 +
  1 file changed, 1 insertion(+)

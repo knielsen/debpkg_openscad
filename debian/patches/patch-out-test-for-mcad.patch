@@ -2,8 +2,7 @@ From: chrysn <chrysn@fsfe.org>
 Date: Thu, 8 Aug 2013 00:43:29 +0200
 Subject: patch out test for mcad
 
-Conflicts:
-	debian/changelog
+Forwarded: not-needed
 ---
  tests/CMakeLists.txt | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
