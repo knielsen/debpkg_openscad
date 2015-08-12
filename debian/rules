@@ -48,7 +48,7 @@ override_dh_auto_test:
 	# tests in software.
 	#
 	# as for the tests excluded with --exclude-regex, see README.testsuite.
-	DISPLAY= OPENSCADPATH=/usr/share/openscad/libraries dh_auto_test -Dtests -Scmake -- ARGS+="--exclude-regex issue1165\\|issue1215\\|throwntogethertest_issue1089\\|openscad-cameyeortho_camera-tests\\|openscad-cameyeortho-viewall_camera-tests"
+	DISPLAY= OPENSCADPATH=/usr/share/openscad/libraries dh_auto_test -Dtests -Scmake -- ARGS+="--exclude-regex issue1165\\|issue1215\\|throwntogethertest_issue1089\\|openscad-cameyeortho_camera-tests\\|openscad-cameyeortho-viewall_camera-tests" || ( echo '---- content of ' obj-*/Testing/Temporary/*_report.html ' ----'; cat obj-*/Testing/Temporary/*_report.html; echo; echo '---- end content ----'; exit 1)
 
 override_dh_auto_install:
 	# fix absolute paths in generated scad files. this step logically
