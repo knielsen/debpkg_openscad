@@ -1,3 +1,10 @@
+openscad (2015.03-1+dfsg-2) unstable; urgency=medium
+
+  * Output the tests' HTML rendering to the build log on failure
+  * Go back to being lax about regression tests (See #795300)
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 14 Aug 2015 14:46:19 +0200
+
 openscad (2015.03-1+dfsg-1) unstable; urgency=medium
 
   [ Chow Loong Jin ]
