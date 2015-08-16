@@ -10,6 +10,21 @@ machines, and often needs to be built in a chroot.
 
 As for individual excluded tests, see README.testsuite.
 
+Test suite export in builds
+===========================
+
+If the test suite fails, the complete HTML test report is echoed to stdout and
+thus to the build log; that's somewhat abusing the build log, but is the only
+known way to get the file out to review why the regressions failed.
+
+The bookmarklet
+
+    javascript:var t = document.getElementsByTagName('pre')[0].childNodes[0].textContent; document.body.innerHTML = t.slice(t.indexOf('\n---- content of'), t.indexOf('\n---- end content ----\n'));
+
+can be used to make the HTML readable on the build logs available from
+https://buildd.debian.org/status/package.php?p=openscad behind the colored
+status messages.
+
 Shipped fonts
 =============
 
