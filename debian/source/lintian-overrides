@@ -1,0 +1,3 @@
+# due to https://bugs.debian.org/798900
+openscad source: source-is-missing scripts/examples-html/assets/js/language/generic.js
+openscad source: source-contains-prebuilt-javascript-object scripts/examples-html/assets/js/language/generic.js line length is 346 characters (>256)
