@@ -1,3 +1,14 @@
+openscad (2015.03-1+dfsg-3) unstable; urgency=medium
+
+  * Use libgl1-mesa-dri instead of the abandoned libgl1-mesa-swx11 (Closes:
+    #803248)
+  * Build-depend on libcgal-qt5-dev (see #804539)
+  * Add lintian override against source-is-missing (see #798900)
+  * Change repository URIs to collab-maint
+  * Add a note about the build logs to README.source
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Mon, 09 Nov 2015 14:00:17 +0100
+
 openscad (2015.03-1+dfsg-2) unstable; urgency=medium
 
   * Output the tests' HTML rendering to the build log on failure
