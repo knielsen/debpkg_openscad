@@ -28,9 +28,9 @@ Build-Depends:
     libboost-filesystem-dev,
     pkg-config,
     imagemagick (>= 6.5.9.3),
-    libgl1-mesa-swx11-dev,
+    libgl1-mesa-dri,
     xvfb,
-    libgl1-mesa-swx11,
+    libgl1-mesa-dev,
     openscad-mcad,
     ttf-marvosym,
     fonts-hosny-amiri
@@ -80,7 +80,7 @@ Depends:
     cmake,
     imagemagick (>= 6.5.9.3),
     xserver-xorg-core | xvfb,
-    xserver-xorg-core | libgl1-mesa-swx11
+    libgl1-mesa-dri
 Description: script file based graphical CAD environment (test suite)
  OpenSCAD is a software for creating solid 3D CAD objects. It focuses on CAD
  aspects rather than artistic ones.
