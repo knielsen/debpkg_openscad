@@ -35,10 +35,12 @@ Build-Depends:
     ttf-marvosym,
     fonts-hosny-amiri
 # openscad is not gles compatible yet. this line makes builds abort before they
-# faile at compile time. libqt4-opengl-dev currently pulls libgles2-mesa-dev in
-# on ubuntu arm{el,hf}.
+# faile at compile time. libqt5opengl5 uses gles on arm{el,hf}, making openscad
+# currently unbuildable there. tracked upstream as
+# https://github.com/openscad/openscad/issues/292 and in debian as
+# http://bugs.debian.org/797816
 Build-Conflicts:
-    libgles2-dev
+    libgles2-mesa-dev
 Standards-Version: 3.9.6
 Section: graphics
 Homepage: http://openscad.org/
