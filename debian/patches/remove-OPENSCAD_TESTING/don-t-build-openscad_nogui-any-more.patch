@@ -3,11 +3,11 @@ Date: Thu, 4 Jun 2015 21:28:17 +0200
 Subject: don't build openscad_nogui any more
 
 ---
- tests/CMakeLists.txt | 41 +++++++++++++----------------------------
- 1 file changed, 13 insertions(+), 28 deletions(-)
+ tests/CMakeLists.txt | 35 +++++++++++++----------------------
+ 1 file changed, 13 insertions(+), 22 deletions(-)
 
 diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index 2ae12c1..0e0b46c 100644
+index fb8ac63..d82d53f 100644
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
 @@ -600,8 +600,6 @@ if (DEFINED OPENSCAD_DAY)
@@ -19,7 +19,7 @@ index 2ae12c1..0e0b46c 100644
  # Search for MCAD in correct place
  #set(CTEST_ENVIRONMENT "${CTEST_ENVIRONMENT};OPENSCADPATH=${CMAKE_CURRENT_SOURCE_DIR}/../libraries")
  
-@@ -793,44 +791,31 @@ add_executable(cgalcachetest cgalcachetest.cc)
+@@ -793,32 +791,25 @@ add_executable(cgalcachetest cgalcachetest.cc)
  set_target_properties(cgalcachetest PROPERTIES COMPILE_FLAGS "-DENABLE_CGAL ${CGAL_CXX_FLAGS_INIT}")
  target_link_libraries(cgalcachetest tests-cgal ${GLEW_LIBRARY} ${OPENCSG_LIBRARY} ${APP_SERVICES_LIBRARY})
  
@@ -36,44 +36,32 @@ index 2ae12c1..0e0b46c 100644
  #
  # GUI binary tests
  #
--#if(APPLE)
+-#if(EXISTS "$ENV{OPENSCAD_BINARY}")
+-#  set(OPENSCAD_BINPATH "$ENV{OPENSCAD_BINARY}")
+-#elseif(APPLE)
 -#  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../OpenSCAD.app/Contents/MacOS/OpenSCAD")
 -#elseif (MINGW_CROSS_ENV_DIR) 
 -#  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../mingw32/release/openscad.exe")
 -#elseif(WIN32)
 -#  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../Release/openscad.exe")
--#else()
+-#elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR/../openscad}")
+-#  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../bin/openscad")
+-#elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR/../bin/openscad}")
 -#  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../openscad")
 -#endif()
-+if(APPLE)
++if(EXISTS "$ENV{OPENSCAD_BINARY}")
++  set(OPENSCAD_BINPATH "$ENV{OPENSCAD_BINARY}")
++elseif(APPLE)
 +  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../OpenSCAD.app/Contents/MacOS/OpenSCAD")
 +elseif (MINGW_CROSS_ENV_DIR) 
 +  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../mingw32/release/openscad.exe")
 +elseif(WIN32)
 +  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../Release/openscad.exe")
-+else()
++elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR/../openscad}")
++  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../bin/openscad")
++elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR/../bin/openscad}")
 +  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../openscad")
 +endif()
  
- #if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/openscad")
- #  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_BINARY_DIR}/openscad")
- #endif()
- 
--#if(EXISTS "${OPENSCAD_BINPATH}")
--#  message(STATUS "Found OpenSCAD binary: ${OPENSCAD_BINPATH}")
--#else()
--#  message(STATUS "Couldn't find the OpenSCAD binary: ${OPENSCAD_BINPATH}")
--#  message(FATAL_ERROR "Please build the OpenSCAD binary and place it here: ${OPENSCAD_BINPATH}" )
--#endif()
--
--if(WIN32)
--  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_BINARY_DIR}/openscad_nogui.exe")
-+if(EXISTS "${OPENSCAD_BINPATH}")
-+  message(STATUS "Found OpenSCAD binary: ${OPENSCAD_BINPATH}")
- else()
--  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_BINARY_DIR}/openscad_nogui")
-+  message(STATUS "Couldn't find the OpenSCAD binary: ${OPENSCAD_BINPATH}")
-+  message(FATAL_ERROR "Please build the OpenSCAD binary and place it here: ${OPENSCAD_BINPATH}" )
- endif()
- 
- #
+ if(WIN32)
+   set(OPENSCAD_BINPATH "${CMAKE_CURRENT_BINARY_DIR}/openscad_nogui.exe")

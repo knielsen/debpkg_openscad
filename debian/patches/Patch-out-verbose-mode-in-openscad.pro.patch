@@ -17,10 +17,10 @@ Forwarded: not-needed
  1 file changed, 1 deletion(-)
 
 diff --git a/openscad.pro b/openscad.pro
-index 7d09a75..5234dbb 100644
+index d7ca287..84556fc 100644
 --- a/openscad.pro
 +++ b/openscad.pro
-@@ -44,7 +44,6 @@ VERSIONDATE = 2015.04.21
+@@ -44,7 +44,6 @@ VERSIONDATE = 2015.11.16
  # If VERSION is not set, populate VERSION, VERSION_YEAR, VERSION_MONTH from system date
  include(version.pri)
  

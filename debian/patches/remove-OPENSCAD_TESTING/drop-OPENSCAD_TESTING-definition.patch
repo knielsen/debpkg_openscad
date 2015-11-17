@@ -32,7 +32,7 @@ index 1f1686d..56b994a 100644
  
  
 diff --git a/src/linearextrude.cc b/src/linearextrude.cc
-index cddbc31..9d70da1 100644
+index d202f07..25a6655 100644
 --- a/src/linearextrude.cc
 +++ b/src/linearextrude.cc
 @@ -142,10 +142,7 @@ std::string LinearExtrudeNode::toString() const
@@ -110,10 +110,10 @@ index 5c2617c..9cdd958 100644
  
  	return stream.str();
 diff --git a/src/value.cc b/src/value.cc
-index 897eed3..499d1e0 100644
+index a967390..4cdf58a 100644
 --- a/src/value.cc
 +++ b/src/value.cc
-@@ -201,33 +201,12 @@ public:
+@@ -229,33 +229,12 @@ public:
      if (op1 == 0) {
        return "0"; // Don't return -0 (exactly -0 and 0 equal 0)
      }
