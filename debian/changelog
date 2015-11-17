@@ -1,3 +1,17 @@
+openscad (2015.03-2+dfsg-1) unstable; urgency=medium
+
+  [ upstream ]
+
+  * New bugfix release
+
+  [ Christian M. Amsüss ]
+
+  * Fix Build-Conflicts against GLES
+  * Drop patches applied upstream, refreshed others
+  * Update copyright file
+
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 17 Nov 2015 11:28:09 +0100
+
 openscad (2015.03-1+dfsg-3) unstable; urgency=medium
 
   * Use libgl1-mesa-dri instead of the abandoned libgl1-mesa-swx11 (Closes:
