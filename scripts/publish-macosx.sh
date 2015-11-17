@@ -3,8 +3,8 @@
 # Usage:
 #   ./scripts/publish-macosx.sh [buildonly]
 #
-VERSION=2015.03-1
-VERSIONDATE=2015.04.21
+VERSION=2015.03-2
+VERSIONDATE=2015.11.16
 
 export NUMCPU=$(sysctl -n hw.ncpu)
 
@@ -58,7 +58,7 @@ if test -z "$VERSION"; then
   VERSION=$VERSIONDATE
   SNAPSHOT=snapshot
 fi
-SHORTVERSION=${VERSION##-}
+SHORTVERSION=${VERSION%%-*}
 
 # Turn off ccache, just for safety
 PATH=${PATH//\/opt\/local\/libexec\/ccache:}

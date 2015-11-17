@@ -571,7 +571,7 @@ include_directories(../src ../src/libtess2/Include)
 
 # Handle OpenSCAD version based on VERSION env. variable.
 # Use current timestamp if not specified (development builds)
-set(ENV{VERSION} "2015.03-1")
+set(ENV{VERSION} "2015.03-2")
 if ("$ENV{VERSION}" STREQUAL "")
   # Timestamp is only available in cmake >= 2.8.11  
   if("${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CMAKE_PATCH_VERSION}" VERSION_GREATER 2.8.10)
@@ -803,25 +803,18 @@ add_custom_target(locale_files ALL COMMAND ${CMAKE_SOURCE_DIR}/../scripts/transl
 #
 # GUI binary tests
 #
-#if(APPLE)
+#if(EXISTS "$ENV{OPENSCAD_BINARY}")
+#  set(OPENSCAD_BINPATH "$ENV{OPENSCAD_BINARY}")
+#elseif(APPLE)
 #  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../OpenSCAD.app/Contents/MacOS/OpenSCAD")
 #elseif (MINGW_CROSS_ENV_DIR) 
 #  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../mingw32/release/openscad.exe")
 #elseif(WIN32)
 #  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../Release/openscad.exe")
-#else()
+#elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR/../openscad}")
+#  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../bin/openscad")
+#elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR/../bin/openscad}")
 #  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_SOURCE_DIR}/../openscad")
-#endif()
-
-#if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/openscad")
-#  set(OPENSCAD_BINPATH "${CMAKE_CURRENT_BINARY_DIR}/openscad")
-#endif()
-
-#if(EXISTS "${OPENSCAD_BINPATH}")
-#  message(STATUS "Found OpenSCAD binary: ${OPENSCAD_BINPATH}")
-#else()
-#  message(STATUS "Couldn't find the OpenSCAD binary: ${OPENSCAD_BINPATH}")
-#  message(FATAL_ERROR "Please build the OpenSCAD binary and place it here: ${OPENSCAD_BINPATH}" )
 #endif()
 
 if(WIN32)
@@ -1086,6 +1079,7 @@ list(APPEND ECHO_FILES ${FUNCTION_FILES}
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/recursion-test-function.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/recursion-test-function2.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/recursion-test-module.scad
+            ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/recursion-test-vector.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/tail-recursion-tests.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/value-reassignment-tests.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/value-reassignment-tests2.scad
@@ -1105,6 +1099,7 @@ list(APPEND ECHO_FILES ${FUNCTION_FILES}
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/include-tests.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/include-recursive-test.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/misc/operators-tests.scad
+            ${CMAKE_SOURCE_DIR}/../testdata/scad/issues/issue1472.scad
             ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/empty-stl.scad)
 
 list(APPEND DUMPTEST_FILES ${FEATURES_2D_FILES} ${FEATURES_3D_FILES} ${DEPRECATED_3D_FILES})
@@ -1292,7 +1287,8 @@ list(APPEND BUGS_FILES ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/issue13.scad
                        ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/issue945e.scad
                        ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/issue1223.scad
                        ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/issue1223b.scad
-                       ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/issue1246.scad)
+                       ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/issue1246.scad
+                       ${CMAKE_SOURCE_DIR}/../testdata/scad/bugs/issue1455.scad)
 
 # We know that we cannot import weakly manifold files into CGAL, so to make tests easier
 # to manage, don't try. Once we improve import, we can reenable this
