@@ -1,8 +1,6 @@
 Patch-out-verbose-mode-in-openscad.pro.patch
-Allow-building-even-with-resource-absent-from-dfsg-p.patch
 patch-out-test-for-mcad.patch
 don-t-override-OPENSCADPATH.patch
-Add-hashbang-to-test_cmdline_tool.py.patch
 Report-Debian-versions-in-test_pretty_print.patch
 test_pretty_print-remove-a-pathname-normalization-st.patch
 Add-missing-X11-libraries-when-using-GLX.patch
@@ -14,7 +12,4 @@ remove-OPENSCAD_TESTING/use-qmake-in-travis-to-build-gui-free-openscad-binar.pat
 remove-OPENSCAD_TESTING/pack-OPENSCAD_NOGUI-in-qmake-nogui-config.patch
 remove-OPENSCAD_TESTING/fix-font-directory-discovery-in-export_import_pngtes.patch
 test_pretty_print-drop-file-name-munging.patch
-Add-keywords-to-the-desktop-file.patch
-man-page-Rephase-colorscheme-option-to-avoid-problem.patch
-Change-Allow-to-open-multiple-documents-to-Allow-ope.patch
 Fix-path-discovery-for-fonts.patch
