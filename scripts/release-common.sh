@@ -110,10 +110,10 @@ do
 done
 
 if test -z "$VERSIONDATE"; then
-    VERSIONDATE=2015.04.21
+    VERSIONDATE=2015.11.16
 fi
 if test -z "$VERSION"; then
-    VERSION=2015.03-1
+    VERSION=2015.03-2
 fi
 
 export VERSIONDATE
@@ -443,8 +443,8 @@ case $OS in
         cd $DEPLOYDIR/openscad-$VERSION
         NSISDEBUG=-V2
         # NSISDEBUG=      # leave blank for full log
-        echo $MAKENSIS $NSISDEBUG installer.nsi
-        $MAKENSIS $NSISDEBUG installer.nsi
+        echo $MAKENSIS $NSISDEBUG "-DVERSION=$VERSION" installer.nsi
+        $MAKENSIS $NSISDEBUG "-DVERSION=$VERSION" installer.nsi
         cp $DEPLOYDIR/openscad-$VERSION/openscad_setup.exe $INSTFILE
         cd $OPENSCADDIR
 
@@ -528,7 +528,7 @@ if [ $BUILD_TESTS ]; then
         # while copying.
         rm -f ./ostests.tar
        	for subdir in tests testdata libraries examples doc; do
-          tar prvf ./ostests.tar --exclude=.git* --exclude=*/mingw64/* --exclude=*/mingw32/* --exclude=*.cc.obj --exclude=*.a $subdir
+          tar prvf ./ostests.tar --exclude=.git* --exclude=*/mingw* --exclude=*.cc.obj --exclude=*.a $subdir
         done
         cd $DEPLOYDIR
         tar prvf $OPENSCADDIR/ostests.tar --exclude=.git* --exclude=*/mingw* --exclude=*.cc.obj --exclude=*.a $TESTBINDIR

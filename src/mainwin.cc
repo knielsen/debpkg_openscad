@@ -93,6 +93,16 @@
 #include <QClipboard>
 #include <QDesktopWidget>
 
+#if (QT_VERSION < QT_VERSION_CHECK(5, 1, 0))
+// Set dummy for Qt versions that do not have QSaveFile
+#define QT_FILE_SAVE_CLASS QFile
+#define QT_FILE_SAVE_COMMIT true
+#else
+#include <QSaveFile>
+#define QT_FILE_SAVE_CLASS QSaveFile
+#define QT_FILE_SAVE_COMMIT if (saveOk) { saveOk = file.commit(); } else { file.cancelWriting(); }
+#endif
+
 #include <fstream>
 
 #include <algorithm>
@@ -243,9 +253,11 @@ MainWindow::MainWindow(const QString &filename)
 	background_chain = NULL;
 	root_node = NULL;
 
-	tval = 0;
-	fps = 0;
-	fsteps = 1;
+	this->anim_step = 0;
+	this->anim_numsteps = 0;
+	this->anim_tval = 0.0;
+	this->anim_dumping = false;
+	this->anim_dump_start_step = 0;
 
 	const QString importStatement = "import(\"%1\");\n";
 	const QString surfaceStatement = "surface(\"%1\");\n";
@@ -279,8 +291,10 @@ MainWindow::MainWindow(const QString &filename)
 	waitAfterReloadTimer->setInterval(200);
 	connect(waitAfterReloadTimer, SIGNAL(timeout()), this, SLOT(waitAfterReload()));
 
-	connect(this->e_tval, SIGNAL(textChanged(QString)), this, SLOT(actionRenderPreview()));
-	connect(this->e_fps, SIGNAL(textChanged(QString)), this, SLOT(updatedFps()));
+	connect(this->e_tval, SIGNAL(textChanged(QString)), this, SLOT(updatedAnimTval()));
+	connect(this->e_fps, SIGNAL(textChanged(QString)), this, SLOT(updatedAnimFps()));
+	connect(this->e_fsteps, SIGNAL(textChanged(QString)), this, SLOT(updatedAnimSteps()));
+	connect(this->e_dump, SIGNAL(toggled(bool)), this, SLOT(updatedAnimDump(bool)));
 
 	animate_panel->hide();
 	find_panel->hide();
@@ -814,33 +828,68 @@ void MainWindow::updateRecentFiles()
 	}
 }
 
-void MainWindow::updatedFps()
+void MainWindow::updatedAnimTval()
+{
+	bool t_ok;
+	double t = this->e_tval->text().toDouble(&t_ok);
+	// Clamp t to 0-1
+	if (t_ok) {
+		this->anim_tval = t < 0 ? 0.0 : ((t > 1.0) ? 1.0 : t);
+	}
+	else {
+		this->anim_tval = 0.0;
+	}
+	actionRenderPreview();
+}
+
+void MainWindow::updatedAnimFps()
 {
 	bool fps_ok;
 	double fps = this->e_fps->text().toDouble(&fps_ok);
 	animate_timer->stop();
-	if (fps_ok && fps > 0) {
+	if (fps_ok && fps > 0 && this->anim_numsteps > 0) {
+		this->anim_step = int(this->anim_tval * this->anim_numsteps) % this->anim_numsteps;
 		animate_timer->setSingleShot(false);
-		animate_timer->setInterval(int(1000 / this->e_fps->text().toDouble()));
+		animate_timer->setInterval(int(1000 / fps));
 		animate_timer->start();
 	}
 }
 
+void MainWindow::updatedAnimSteps()
+{
+	bool steps_ok;
+	int numsteps = this->e_fsteps->text().toInt(&steps_ok);
+	if (steps_ok) {
+		this->anim_numsteps = numsteps;
+		updatedAnimFps(); // Make sure we start
+	}
+	else {
+		this->anim_numsteps = 0;
+	}
+	anim_dumping=false;
+}
+
+void MainWindow::updatedAnimDump(bool checked)
+{
+	if (!checked) this->anim_dumping = false;
+}
+
+// Only called from animate_timer
 void MainWindow::updateTVal()
 {
-	bool fps_ok;
-	double fps = this->e_fps->text().toDouble(&fps_ok);
-	if (fps_ok) {
-		if (fps <= 0) {
-			actionReloadRenderPreview();
-		} else {
-			double s = this->e_fsteps->text().toDouble();
-			double t = this->e_tval->text().toDouble() + 1/s;
-			QString txt;
-			txt.sprintf("%.5f", t >= 1.0 ? 0.0 : t);
-			this->e_tval->setText(txt);
-		}
+	if (this->anim_numsteps == 0) return;
+
+	if (this->anim_numsteps > 1) {
+		this->anim_step = (this->anim_step + 1) % this->anim_numsteps;
+		this->anim_tval = 1.0 * this->anim_step / this->anim_numsteps;
 	}
+	else if (this->anim_numsteps > 0) {
+		this->anim_step = 0;
+		this->anim_tval = 0.0;
+	}
+	QString txt;
+	txt.sprintf("%.5f", this->anim_tval);
+	this->e_tval->setText(txt);
 }
 
 void MainWindow::refreshDocument()
@@ -1321,6 +1370,16 @@ void MainWindow::saveBackup()
 	return writeBackup(this->tempFile);
 }
 
+void MainWindow::saveError(const QIODevice &file, const std::string &msg) {
+	const std::string messageFormat = msg + " %s (%s)";
+	const char *fileName = this->fileName.toLocal8Bit().constData();
+	PRINTB(messageFormat.c_str(), fileName % file.errorString().toLocal8Bit().constData());
+
+	const std::string dialogFormatStr = msg + "\n\"%1\"\n(%2)";
+	const QString dialogFormat(dialogFormatStr.c_str());
+	QMessageBox::warning(this, windowTitle(), dialogFormat.arg(this->fileName).arg(file.errorString()));
+}
+
 /*!
 	Save current document.
 	Should _always_ write to disk, since this is called by SaveAs - i.e. don't try to be
@@ -1330,26 +1389,37 @@ void MainWindow::actionSave()
 {
 	if (this->fileName.isEmpty()) {
 		actionSaveAs();
+		return;
+	}
+
+	setCurrentOutput();
+
+	// If available (>= Qt 5.1), use QSaveFile to ensure the file is not
+	// destroyed if the device is full. Unfortunately this is not working
+	// as advertised (at least in Qt 5.3) as it does not detect the device
+	// full properly and happily commits a 0 byte file.
+	// Checking the QTextStream status flag after flush() seems to catch
+	// this condition.
+	QT_FILE_SAVE_CLASS file(this->fileName);
+	if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+		saveError(file, _("Failed to open file for writing"));
 	}
 	else {
-		setCurrentOutput();
-		QFile file(this->fileName);
-		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
-			PRINTB("Failed to open file for writing: %s (%s)", 
-			this->fileName.toLocal8Bit().constData() % file.errorString().toLocal8Bit().constData());
-			QMessageBox::warning(this, windowTitle(), tr("Failed to open file for writing:\n %1 (%2)")
-					.arg(this->fileName).arg(file.errorString()));
-		}
-		else {
-			QTextStream writer(&file);
-			writer.setCodec("UTF-8");
-			writer << this->editor->toPlainText();
-			PRINTB("Saved design '%s'.", this->fileName.toLocal8Bit().constData());
+		QTextStream writer(&file);
+		writer.setCodec("UTF-8");
+		writer << this->editor->toPlainText();
+		writer.flush();
+		bool saveOk = writer.status() == QTextStream::Ok;
+		QT_FILE_SAVE_COMMIT;
+		if (saveOk) {
+			PRINTB(_("Saved design '%s'."), this->fileName.toLocal8Bit().constData());
 			this->editor->setContentModified(false);
+		} else {
+			saveError(file, _("Error saving design"));
 		}
-		clearCurrentOutput();
-		updateRecentFiles();
 	}
+	clearCurrentOutput();
+	updateRecentFiles();
 }
 
 void MainWindow::actionSaveAs()
@@ -1538,18 +1608,18 @@ bool MainWindow::eventFilter(QObject* obj, QEvent *event)
 
 void MainWindow::updateTemporalVariables()
 {
-	this->top_ctx.set_variable("$t", ValuePtr(this->e_tval->text().toDouble()));
+	this->top_ctx.set_variable("$t", ValuePtr(this->anim_tval));
 
 	Value::VectorType vpt;
-	vpt.push_back(Value(-qglview->cam.object_trans.x()));
-	vpt.push_back(Value(-qglview->cam.object_trans.y()));
-	vpt.push_back(Value(-qglview->cam.object_trans.z()));
-	this->top_ctx.set_variable("$vpt", Value(vpt));
+	vpt.push_back(ValuePtr(-qglview->cam.object_trans.x()));
+	vpt.push_back(ValuePtr(-qglview->cam.object_trans.y()));
+	vpt.push_back(ValuePtr(-qglview->cam.object_trans.z()));
+	this->top_ctx.set_variable("$vpt", ValuePtr(vpt));
 
 	Value::VectorType vpr;
-	vpr.push_back(Value(fmodf(360 - qglview->cam.object_rot.x() + 90, 360)));
-	vpr.push_back(Value(fmodf(360 - qglview->cam.object_rot.y(), 360)));
-	vpr.push_back(Value(fmodf(360 - qglview->cam.object_rot.z(), 360)));
+	vpr.push_back(ValuePtr(fmodf(360 - qglview->cam.object_rot.x() + 90, 360)));
+	vpr.push_back(ValuePtr(fmodf(360 - qglview->cam.object_rot.y(), 360)));
+	vpr.push_back(ValuePtr(fmodf(360 - qglview->cam.object_rot.z(), 360)));
 	top_ctx.set_variable("$vpr", ValuePtr(vpr));
 
 	top_ctx.set_variable("$vpd", ValuePtr(qglview->cam.zoomValue()));
@@ -1755,15 +1825,22 @@ void MainWindow::csgRender()
 #endif
 	}
 
-	if (viewActionAnimate->isChecked() && e_dump->isChecked()) {
-		// Force reading from front buffer. Some configurations will read from the back buffer here.
-		glReadBuffer(GL_FRONT);
-		QImage img = this->qglview->grabFrameBuffer();
-		QString filename;
-		double s = this->e_fsteps->text().toDouble();
-		double t = this->e_tval->text().toDouble();
-		filename.sprintf("frame%05d.png", int(round(s*t)));
-		img.save(filename, "PNG");
+	if (e_dump->isChecked() && animate_timer->isActive()) {
+		if (anim_dumping && anim_dump_start_step == anim_step) {
+			anim_dumping=false;
+			e_dump->setChecked(false);
+		} else {
+			if (!anim_dumping) {
+				anim_dumping = true;
+				anim_dump_start_step = anim_step;
+			}
+			// Force reading from front buffer. Some configurations will read from the back buffer here.
+			glReadBuffer(GL_FRONT);
+			QImage img = this->qglview->grabFrameBuffer();
+			QString filename;
+			filename.sprintf("frame%05d.png", this->anim_step);
+			img.save(filename, "PNG");
+		}
 	}
 
 	compileEnded();
@@ -2299,7 +2376,7 @@ void MainWindow::viewModeAnimate()
 	if (viewActionAnimate->isChecked()) {
 		animate_panel->show();
 		actionRenderPreview();
-		updatedFps();
+		updatedAnimFps();
 	} else {
 		animate_panel->hide();
 		animate_timer->stop();
