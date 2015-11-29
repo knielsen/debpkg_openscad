@@ -1,4 +1,3 @@
-Patch-out-verbose-mode-in-openscad.pro.patch
 patch-out-test-for-mcad.patch
 don-t-override-OPENSCADPATH.patch
 Report-Debian-versions-in-test_pretty_print.patch
