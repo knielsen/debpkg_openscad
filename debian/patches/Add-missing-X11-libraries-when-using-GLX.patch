@@ -2,6 +2,8 @@ From: Chow Loong Jin <hyperair@debian.org>
 Date: Sun, 7 Jun 2015 09:54:37 +0800
 Subject: Add missing X11 libraries when using GLX
 
+Forwarded: https://github.com/openscad/openscad/issues/1355
+
 ---
  tests/CMakeLists.txt | 3 +++
  1 file changed, 3 insertions(+)

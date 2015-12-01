@@ -8,7 +8,7 @@ paths.
 
 [1] https://github.com/openscad/openscad/issues/1362
 
-Forwarded: no
+Forwarded: https://github.com/openscad/openscad/commit/90a660d718f91af5944297ab4bed598a3c736ad8no
 ---
  tests/test_cmdline_tool.py | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
