@@ -1,0 +1,3 @@
+This is a series of patches cherry-picked from upstream post-2015.03-2.
+
+It aims to fix http://bugs.debian.org/806670.

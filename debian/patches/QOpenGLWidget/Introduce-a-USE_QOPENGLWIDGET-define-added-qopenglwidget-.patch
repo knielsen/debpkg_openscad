@@ -1,0 +1,97 @@
+From: Marius Kintel <marius@kintel.net>
+Date: Wed, 2 Dec 2015 13:24:18 -0500
+Subject: Introduce a USE_QOPENGLWIDGET define,
+ added qopenglwidget CONFIG to qmake
+
+---
+ openscad.pro   | 6 ++++++
+ src/QGLView.cc | 6 +++---
+ src/QGLView.h  | 8 ++++----
+ 3 files changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/openscad.pro b/openscad.pro
+index cbe99b2..dc200bc 100644
+--- a/openscad.pro
++++ b/openscad.pro
+@@ -137,6 +137,12 @@ mingw* {
+ CONFIG += qt
+ QT += opengl concurrent
+ 
++qopenglwidget {
++  !lessThan(QT_VERSION, 5.4) {
++    DEFINES += USE_QOPENGLWIDGET
++  }
++}
++
+ # see http://fedoraproject.org/wiki/UnderstandingDSOLinkChange
+ # and https://github.com/openscad/openscad/pull/119
+ # ( QT += opengl does not automatically link glu on some DSO systems. )
+diff --git a/src/QGLView.cc b/src/QGLView.cc
+index fd447a8..84d152f 100644
+--- a/src/QGLView.cc
++++ b/src/QGLView.cc
+@@ -51,7 +51,7 @@
+ #endif
+ 
+ QGLView::QGLView(QWidget *parent) :
+-#if QT_VERSION >= 0x050400
++#if QT_VERSION >= 0x050400 && defined(USE_QOPENGLWIDGET)
+ 	QOpenGLWidget(parent)
+ #else
+ 	QGLWidget(parent)
+@@ -60,7 +60,7 @@ QGLView::QGLView(QWidget *parent) :
+   init();
+ }
+ 
+-#if !(QT_VERSION >= 0x050400)
++#ifdef _WIN32
+ static bool running_under_wine = false;
+ #endif
+ 
+@@ -169,7 +169,7 @@ void QGLView::paintGL()
+     statusLabel->setText(QString::fromStdString(nc.statusText()));
+   }
+ 
+-#if !(QT_VERSION >= 0x050400)
++#ifdef _WIN32
+   if (running_under_wine) swapBuffers();
+ #endif
+ }
+diff --git a/src/QGLView.h b/src/QGLView.h
+index 887cd5d..6fada8c 100644
+--- a/src/QGLView.h
++++ b/src/QGLView.h
+@@ -3,7 +3,7 @@
+ #include "system-gl.h"
+ #include <QtGlobal>
+ 
+-#if QT_VERSION >= 0x050400
++#ifdef USE_QOPENGLWIDGET
+ #include <QOpenGLWidget>
+ #else
+ #include <QGLWidget>
+@@ -16,7 +16,7 @@
+ #include "renderer.h"
+ 
+ class QGLView :
+-#if QT_VERSION >= 0x050400
++#ifdef USE_QOPENGLWIDGET
+ 		public QOpenGLWidget,
+ #else
+ 		public QGLWidget,
+@@ -62,13 +62,13 @@ public:
+ public slots:
+ 	void ZoomIn(void);
+ 	void ZoomOut(void);
+-#if QT_VERSION >= 0x050400
++#ifdef USE_QOPENGLWIDGET
+ 	inline void updateGL() { update(); }
+ #endif
+ 
+ public:
+ 	QLabel *statusLabel;
+-#if QT_VERSION >= 0x050400
++#ifdef USE_QOPENGLWIDGET
+ 	inline QImage grabFrameBuffer() { return grabFramebuffer(); }
+ #endif
+ private:

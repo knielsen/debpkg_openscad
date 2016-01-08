@@ -1,0 +1,30 @@
+From: Giles Bathgate <giles.bathgate@blueprism.com>
+Date: Wed, 2 Dec 2015 19:47:59 +0000
+Subject: Ensure running_under_wine is not referenced in init() for
+ QOpenGLWidget.
+
+---
+ src/QGLView.cc | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/QGLView.cc b/src/QGLView.cc
+index 84d152f..024da9f 100644
+--- a/src/QGLView.cc
++++ b/src/QGLView.cc
+@@ -73,6 +73,8 @@ void QGLView::init()
+ 
+   setMouseTracking(true);
+ 
++
++#if !(QT_VERSION >= 0x050400)
+ // see paintGL() + issue160 + wine FAQ
+ #ifdef _WIN32
+ #include <windows.h>
+@@ -81,6 +83,7 @@ void QGLView::init()
+     if ( (void *)GetProcAddress(hntdll, "wine_get_version") )
+       running_under_wine = true;
+ #endif
++#endif
+ }
+ 
+ void QGLView::resetView()

@@ -1,0 +1,37 @@
+From: Giles Bathgate <giles.bathgate@blueprism.com>
+Date: Fri, 23 Oct 2015 23:15:14 +0100
+Subject: Remove un-used constructor.
+
+---
+ src/QGLView.cc | 5 -----
+ src/QGLView.h  | 1 -
+ 2 files changed, 6 deletions(-)
+
+diff --git a/src/QGLView.cc b/src/QGLView.cc
+index 0ce53a4..fa190b3 100644
+--- a/src/QGLView.cc
++++ b/src/QGLView.cc
+@@ -55,11 +55,6 @@ QGLView::QGLView(QWidget *parent) : QGLWidget(parent)
+   init();
+ }
+ 
+-QGLView::QGLView(const QGLFormat & format, QWidget *parent) : QGLWidget(format, parent)
+-{
+-  init();
+-}
+-
+ static bool running_under_wine = false;
+ 
+ void QGLView::init()
+diff --git a/src/QGLView.h b/src/QGLView.h
+index ca5fccb..7d8093a 100644
+--- a/src/QGLView.h
++++ b/src/QGLView.h
+@@ -21,7 +21,6 @@ class QGLView : public QGLWidget, public GLView
+ 
+ public:
+ 	QGLView(QWidget *parent = NULL);
+-	QGLView(const QGLFormat & format, QWidget *parent = NULL);
+ #ifdef ENABLE_OPENCSG
+ 	bool hasOpenCSGSupport() { return this->opencsg_support; }
+ #endif

@@ -12,3 +12,10 @@ remove-OPENSCAD_TESTING/pack-OPENSCAD_NOGUI-in-qmake-nogui-config.patch
 remove-OPENSCAD_TESTING/fix-font-directory-discovery-in-export_import_pngtes.patch
 test_pretty_print-drop-file-name-munging.patch
 Fix-path-discovery-for-fonts.patch
+QOpenGLWidget/Remove-un-used-constructor.patch
+QOpenGLWidget/Use-QOpenGLWidget-when-Qt-Version-5.4.patch
+QOpenGLWidget/Ensure-UpdateGL-is-available-as-a-slot.patch
+QOpenGLWidget/Introduce-a-USE_QOPENGLWIDGET-define-added-qopenglwidget-.patch
+QOpenGLWidget/Ensure-running_under_wine-is-not-referenced-in-init-for-Q.patch
+QOpenGLWidget/Improved-some-USE_QOPENGLWIDGET-defines.patch
+QOpenGLWidget/Show-correct-QOpenGLWidget-vs.-QGLWidget-in-Library-Info.patch
