@@ -1,4 +1,4 @@
-openscad (2015.03-2+dfsg-1) unstable; urgency=medium
+openscad (2015.03-2+dfsg-1) experimental; urgency=medium
 
   [ upstream ]
 
@@ -7,10 +7,13 @@ openscad (2015.03-2+dfsg-1) unstable; urgency=medium
   [ Christian M. Amsüss ]
 
   * Fix Build-Conflicts against GLES
-  * Drop patches applied upstream, refreshed others
+  * Pick and enable new OpenGL widget from upstream (Closes: #806670)
+  * Drop patches applied upstream, refresh and simplify others
+  * Drop debug-mode workaround (now handled by debhelper for qmake)
   * Update copyright file
+  * Notes on forwarded patches
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 17 Nov 2015 11:28:09 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Fri, 08 Jan 2016 11:46:03 +0100
 
 openscad (2015.03-1+dfsg-3) unstable; urgency=medium
 
