@@ -73,3 +73,8 @@ override_dh_install:
 
 override_dh_strip:
 	dh_strip --dbg-package openscad-dbg
+
+override_dh_auto_clean:
+	dh_auto_clean
+
+	dh_auto_clean -Dtests -Scmake
