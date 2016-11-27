@@ -1,8 +1,13 @@
-openscad (2015.03-2+dfsg-2) UNRELEASED; urgency=medium
+openscad (2015.03-2+dfsg-2) unstable; urgency=medium
 
   * Upload to unstable.
+  * Add patch for translation generation (Closes: #844881)
+  * Bump standards version (no changes needed)
+  * Use debhelper 10
+  * Drop obsolete lintian overrides
+  * Implement a proper clean debian/rules target
 
- -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 27 Nov 2016 09:30:18 +0100
+ -- Christian M. Amsüss <chrysn@fsfe.org>  Sun, 27 Nov 2016 17:37:27 +0100
 
 openscad (2015.03-2+dfsg-1) experimental; urgency=medium
 
