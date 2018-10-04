@@ -2,6 +2,7 @@
 
 # export DH_VERBOSE=1
 
+include /usr/share/dpkg/pkg-info.mk
 include /usr/share/dpkg/architecture.mk
 
 # workaround for virtual memory exhaustion, see #883986
@@ -10,7 +11,6 @@ ifneq (,$(filter $(DEB_HOST_ARCH), mips mipsel powerpcspe))
 endif
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
-UPSTREAMVERS = $(shell dpkg-parsechangelog | sed -n 's/^Version: \([^+~]*\).*$$/\1/p')
 
 export QT_SELECT = qt5
 
@@ -32,7 +32,7 @@ override_dh_auto_configure:
 		"QMAKE_LFLAGS_DEBUG=${LDFLAGS}" \
 		\
 		QMAKE_STRIP=: PREFIX=/usr \
-		VERSION=$(UPSTREAMVERS) CONFIG-=debug CONFIG+=qopenglwidget CONFIG+=experimental
+		VERSION=$(DEB_VERSION_UPSTREAM) CONFIG-=debug CONFIG+=qopenglwidget CONFIG+=experimental
 
 
 override_dh_auto_build:
