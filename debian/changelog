@@ -355,7 +355,7 @@ openscad (2011.06-1) UNRELEASED; urgency=low
 
 openscad (2011.04-1) UNRELEASED; urgency=low
 
-  * New upstream release 
+  * New upstream release
     - Added hull() for convex hulls (2D object only)
     - minkowski() now supports 2D objects
     - DXF output uses LWPOLYLINE instead of LINE
@@ -432,7 +432,7 @@ openscad (2010.05-1) UNRELEASED; urgency=low
 openscad (2010.02-2) UNRELEASED; urgency=low
 
   * Better build dependencies
-  * Added Vcs fields 
+  * Added Vcs fields
 
  -- Christian M. Amsüss <chrysn@fsfe.org>  Tue, 02 Mar 2010 09:35:09 +0100
 
