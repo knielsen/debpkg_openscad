@@ -50,7 +50,7 @@ Build-Depends:
 # http://bugs.debian.org/797816
 Build-Conflicts:
     libgles2-mesa-dev
-Standards-Version: 3.9.8
+Standards-Version: 4.2.1
 Section: graphics
 Homepage: http://openscad.org/
 Vcs-Browser: https://salsa.debian.org/chrysn-guest/openscad
