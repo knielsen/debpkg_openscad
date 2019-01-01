@@ -1,0 +1,21 @@
+From: John Paul Adrian Glaubitz <glaubitz@physik.fu-berlin.de>
+Date: Sat, 29 Dec 2018 01:57:00 +0100
+Subject: Strip -g -O2 from CGAL_CXX_FLAGS_INIT
+
+We need to strip -g -O2 from CGAL_CXX_FLAGS_INIT so we can
+build the tests on mips and mipsel with -g1 to reduce the
+debug info and therefore memory footprint.
+
+Index: openscad-2015.03-2+dfsg/tests/CMakeLists.txt
+===================================================================
+--- openscad-2015.03-2+dfsg.orig/tests/CMakeLists.txt
++++ openscad-2015.03-2+dfsg/tests/CMakeLists.txt
+@@ -478,6 +478,8 @@ if(${CMAKE_CXX_COMPILER} MATCHES ".*clan
+ 	string(REPLACE "--param=ssp-buffer-size=4" "" CGAL_CXX_FLAGS_INIT ${CGAL_CXX_FLAGS_INIT})
+ endif()
+ 
++string(REPLACE "-g -O2" "" CGAL_CXX_FLAGS_INIT ${CGAL_CXX_FLAGS_INIT})      
++
+ # GLib2
+ 
+ find_package(GLIB2 2.2.0 REQUIRED)

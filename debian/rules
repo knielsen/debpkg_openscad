@@ -2,6 +2,13 @@
 
 # export DH_VERBOSE=1
 
+include /usr/share/dpkg/architecture.mk
+
+# workaround for virtual memory exhaustion, see #883986
+ifneq (,$(filter $(DEB_HOST_ARCH), mips mipsel powerpcspe))
+    export DEB_CXXFLAGS_MAINT_APPEND = -g1
+endif
+
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 UPSTREAMVERS = $(shell dpkg-parsechangelog | sed -n 's/^Version: \([^+~]*\).*$$/\1/p')
 

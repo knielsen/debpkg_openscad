@@ -34,7 +34,6 @@ Build-Depends:
     xvfb,
     libgl1-mesa-dev,
     openscad-mcad,
-    ttf-marvosym,
     fonts-hosny-amiri
 # openscad is not gles compatible yet. this line makes builds abort before they
 # faile at compile time. libqt5opengl5 uses gles on arm{el,hf}, making openscad
@@ -97,7 +96,6 @@ Depends:
     ${shlibs:Depends},
     ${misc:Depends},
     openscad-mcad,
-    ttf-marvosym,
     fonts-hosny-amiri
 # the examples, which are shipped in openscad, are part of the test suite
 Recommends: openscad

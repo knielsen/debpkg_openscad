@@ -1,3 +1,25 @@
+openscad (2015.03-2+dfsg-2.2) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Drop ttf-marvosym from Depends of openscad-testing-data package
+  * Reduce generated debug info during build by passing -g1 to the
+    compiler on powerpcspe to avoid OOM issues
+
+ -- John Paul Adrian Glaubitz <glaubitz@physik.fu-berlin.de>  Sun, 30 Dec 2018 01:28:34 +0100
+
+openscad (2015.03-2+dfsg-2.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Add emacsen-startup file (Closes: #809634)
+  * Add Debian DEP-8 test control file (Closes: #885429)
+  * Drop ttf-marvosym from Build-Depends (Closes: #884509)
+  * New patch
+    * Build system: Strip -g -O2 from CGAL_CXX_FLAGS_INIT in testsuite
+  * Reduce generated debug info during build by passing -g1 to the
+    compiler on mips and mipsel to avoid OOM issues (Closes: #883986)
+
+ -- John Paul Adrian Glaubitz <glaubitz@physik.fu-berlin.de>  Sat, 29 Dec 2018 02:32:32 +0100
+
 openscad (2015.03-2+dfsg-2) unstable; urgency=medium
 
   * Upload to unstable.

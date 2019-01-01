@@ -1,0 +1,3 @@
+Test-Command: openscad-testrun --virtual --directory $AUTOPKGTEST_TMP/testrun
+Depends: openscad-testing, xvfb
+Restrictions: allow-stderr
