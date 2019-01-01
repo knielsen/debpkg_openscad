@@ -10,11 +10,13 @@ Build-Depends:
     libcgal-dev (>=3.6),
     libopencsg-dev (>=1.3.0),
     libqt5scintilla2-dev,
+    qtmultimedia5-dev,
     libfreetype6-dev,
     libfontconfig1-dev,
     libharfbuzz-dev,
     libeigen3-dev,
     libglib2.0-dev,
+    libzip-dev,
     bison (>= 2.4),
     flex (>=2.5.35),
 # workaround for https://github.com/openscad/openscad/issues/1543

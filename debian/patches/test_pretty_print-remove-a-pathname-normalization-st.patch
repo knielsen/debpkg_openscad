@@ -11,11 +11,9 @@ for a cleaner solution, absolute path removal should be upstremed.
  tests/test_pretty_print.py | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/tests/test_pretty_print.py b/tests/test_pretty_print.py
-index 27797a8..fc7b408 100644
 --- a/tests/test_pretty_print.py
 +++ b/tests/test_pretty_print.py
-@@ -199,7 +199,7 @@ def load_makefiles(builddir):
+@@ -205,7 +205,7 @@
      files = [file for file in files if 'esting' not in file and 'emporary' not in file]
      result = {}
      for fname in files:

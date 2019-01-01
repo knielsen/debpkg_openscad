@@ -10,16 +10,14 @@ for a cleaner solution, the library path should be respected
 unconditionally, removing the necessity for debian to specify a path at
 all.
 ---
- tests/CMakeLists.txt       | 2 +-
- tests/CTestCustom.template | 2 +-
+ tests/CMakeLists.txt       |    2 +-
+ tests/CTestCustom.template |    2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index 156db11..7365674 100644
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -603,7 +603,7 @@ endif()
- add_definitions(-DOPENSCAD_TESTING -DENABLE_EXPERIMENTAL)
+@@ -664,7 +664,7 @@
+ add_definitions(-DENABLE_EXPERIMENTAL -DOPENSCAD_NOGUI)
  
  # Search for MCAD in correct place
 -set(CTEST_ENVIRONMENT "${CTEST_ENVIRONMENT};OPENSCADPATH=${CMAKE_CURRENT_SOURCE_DIR}/../libraries")
@@ -27,8 +25,6 @@ index 156db11..7365674 100644
  
  # Platform specific settings
  
-diff --git a/tests/CTestCustom.template b/tests/CTestCustom.template
-index 208cd47..f754c27 100644
 --- a/tests/CTestCustom.template
 +++ b/tests/CTestCustom.template
 @@ -12,7 +12,7 @@

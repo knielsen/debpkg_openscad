@@ -8,11 +8,9 @@ forcibly joining the paths breaks the test suite when run out-of-tree
  tests/test_pretty_print.py | 5 ++---
  1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/tests/test_pretty_print.py b/tests/test_pretty_print.py
-index fc7b408..1046481 100644
 --- a/tests/test_pretty_print.py
 +++ b/tests/test_pretty_print.py
-@@ -373,9 +373,8 @@ def to_html(project_name, startdate, tests, enddate, sysinfo, sysid, imgcomparer
+@@ -380,9 +380,8 @@
              raise TypeError('Unknown test type %r' % test.type)
  
      for mf in sorted(makefiles.keys()):

@@ -4,14 +4,12 @@ Subject: patch out test for mcad
 
 Forwarded: not-needed
 ---
- tests/CMakeLists.txt | 6 +++---
+ tests/CMakeLists.txt |    6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index a7c27a0..156db11 100644
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -82,9 +82,9 @@ else()
+@@ -101,9 +101,9 @@
  endif()
  
  # MCAD

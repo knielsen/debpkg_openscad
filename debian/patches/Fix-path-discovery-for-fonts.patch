@@ -13,16 +13,14 @@ Forwarded: https://github.com/openscad/openscad/commit/90a660d718f91af5944297ab4
  tests/test_cmdline_tool.py | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/tests/test_cmdline_tool.py b/tests/test_cmdline_tool.py
-index 1d6fe9a..3cedb70 100755
 --- a/tests/test_cmdline_tool.py
 +++ b/tests/test_cmdline_tool.py
-@@ -231,7 +231,7 @@ def run_test(testname, cmd, args):
-     try:
+@@ -246,7 +246,7 @@
          cmdline = [cmd] + args + [outputname]
-         print 'run_test() cmdline:',cmdline
--        fontdir =  os.path.join(os.path.dirname(cmd), "..", "testdata")
-+        fontdir =  os.path.join(os.path.dirname(cmd), "testdata")
+         sys.stderr.flush()
+         print('run_test() cmdline:',cmdline)
+-        fontdir =  os.path.join(os.path.dirname(__file__), "..", "testdata/ttf");
++        fontdir =  os.path.join(os.path.dirname(__file__), "testdata/ttf");
          fontenv = os.environ.copy()
          fontenv["OPENSCAD_FONT_PATH"] = fontdir
-         print 'using font directory:', fontdir
+         print('using font directory:', fontdir)
