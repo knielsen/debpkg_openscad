@@ -18,16 +18,15 @@ export QT_SELECT = qt5
 	dh $@
 
 override_dh_auto_configure:
-	dh_auto_configure -- VERSION=$(UPSTREAMVERS) CONFIG-=debug CONFIG+=qopenglwidget
+	#dh_auto_configure -Sqmake -- VERSION=$(UPSTREAMVERS) CONFIG-=debug CONFIG+=qopenglwidget
+	qmake -makefile "QMAKE_CFLAGS_RELEASE=-g -O2 -fdebug-prefix-map=/kvm/src/openscad/deb/mybld/openscad_2019.01-1+dfsg.orig=. -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2" "QMAKE_CFLAGS_DEBUG=-g -O2 -fdebug-prefix-map=/kvm/src/openscad/deb/mybld/openscad_2019.01-1+dfsg.orig=. -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2" "QMAKE_CXXFLAGS_RELEASE=-g -O2 -fdebug-prefix-map=/kvm/src/openscad/deb/mybld/openscad_2019.01-1+dfsg.orig=. -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2" "QMAKE_CXXFLAGS_DEBUG=-g -O2 -fdebug-prefix-map=/kvm/src/openscad/deb/mybld/openscad_2019.01-1+dfsg.orig=. -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2" "QMAKE_LFLAGS_RELEASE=-Wl,-z,relro -Wl,-z,now" "QMAKE_LFLAGS_DEBUG=-Wl,-z,relro -Wl,-z,now" QMAKE_STRIP=: PREFIX=/usr VERSION=2019.01-1 CONFIG-=debug CONFIG\+=qopenglwidget
+
 
 override_dh_auto_build:
 	dh_auto_build
 
 	# not run in dh_auto_configure stage, as it requires the openscad binary to be already built
 	dh_auto_configure -Dtests
-
-	# is cgalcachetest only required in out-of-tree builds?
-	dh_auto_build -Dtests -Scmake -- csgtexttest cgalcachetest
 
 	# fix absolute paths in ctest scripts (relative paths will work during
 	# the build time tests, and are catered for by the openscad-testrun
@@ -64,7 +63,7 @@ override_dh_auto_install:
 	# paths are still required.
 	find testdata -name \*.scad  -exec perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s[\Q$$here\E/tests/../testdata][/usr/share/openscad/testdata]g' {} +
 
-	dh_auto_install --destdir=debian/openscad
+	dh_auto_install -Sqmake --destdir=debian/openscad
 
 	# don't ship mcad, neither the empty directory (when this is built from
 	# a normal git source checkout) nor the full library (when this is
