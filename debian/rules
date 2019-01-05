@@ -18,8 +18,21 @@ export QT_SELECT = qt5
 	dh $@
 
 override_dh_auto_configure:
-	#dh_auto_configure -Sqmake -- VERSION=$(UPSTREAMVERS) CONFIG-=debug CONFIG+=qopenglwidget
-	qmake -makefile "QMAKE_CFLAGS_RELEASE=-g -O2 -fdebug-prefix-map=/kvm/src/openscad/deb/mybld/openscad_2019.01-1+dfsg.orig=. -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2" "QMAKE_CFLAGS_DEBUG=-g -O2 -fdebug-prefix-map=/kvm/src/openscad/deb/mybld/openscad_2019.01-1+dfsg.orig=. -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2" "QMAKE_CXXFLAGS_RELEASE=-g -O2 -fdebug-prefix-map=/kvm/src/openscad/deb/mybld/openscad_2019.01-1+dfsg.orig=. -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2" "QMAKE_CXXFLAGS_DEBUG=-g -O2 -fdebug-prefix-map=/kvm/src/openscad/deb/mybld/openscad_2019.01-1+dfsg.orig=. -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2" "QMAKE_LFLAGS_RELEASE=-Wl,-z,relro -Wl,-z,now" "QMAKE_LFLAGS_DEBUG=-Wl,-z,relro -Wl,-z,now" QMAKE_STRIP=: PREFIX=/usr VERSION=2019.01-1 CONFIG-=debug CONFIG\+=qopenglwidget
+	# dh_auto_configure adds -nocache to qmake, which for some
+	# reason causes many include paths to be missing for OpenSCAD.
+	# So run qmake manually.
+	qmake -makefile \
+		"QMAKE_CFLAGS_RELEASE=${CFLAGS} ${CPPFLAGS}" \
+		"QMAKE_CFLAGS_DEBUG=${CFLAGS} ${CPPFLAGS}" \
+		\
+		"QMAKE_CXXFLAGS_RELEASE=${CXXFLAGS} ${CPPFLAGS}" \
+		"QMAKE_CXXFLAGS_DEBUG=${CXXFLAGS} ${CPPFLAGS}" \
+		\
+		"QMAKE_LFLAGS_RELEASE=${LDFLAGS}" \
+		"QMAKE_LFLAGS_DEBUG=${LDFLAGS}" \
+		\
+		QMAKE_STRIP=: PREFIX=/usr \
+		VERSION=$(UPSTREAMVERS) CONFIG-=debug CONFIG+=qopenglwidget
 
 
 override_dh_auto_build:
