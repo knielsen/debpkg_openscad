@@ -16,6 +16,7 @@ Build-Depends:
     libharfbuzz-dev,
     libeigen3-dev,
     libglib2.0-dev,
+    libxml2-dev,
     libzip-dev,
     bison (>= 2.4),
     flex (>=2.5.35),
