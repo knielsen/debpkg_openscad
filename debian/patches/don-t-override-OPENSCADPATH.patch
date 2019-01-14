@@ -3,7 +3,7 @@ Date: Fri, 7 Mar 2014 09:19:29 +0100
 Subject: don't override OPENSCADPATH
 
 the debian tests scripts already set an adaequate OPENSCADPATH; the
-overrides in the test scripts would set that wrongly again (beause
+overrides in the test scripts would set that wrongly again (because
 openscad and mcad are not built in the same tree in debian)
 
 for a cleaner solution, the library path should be respected
