@@ -113,7 +113,7 @@ Description: script file based graphical CAD environment (test suite data)
 Package: openscad-dbg
 Architecture: any
 Section: debug
-Priority: extra
+Priority: optional
 Depends:
     openscad (=${binary:Version}),
     ${shlibs:Depends},
