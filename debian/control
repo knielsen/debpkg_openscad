@@ -19,6 +19,7 @@ Build-Depends:
     libglib2.0-dev,
     libxml2-dev,
     libzip-dev,
+    lib3mf-dev,
     bison (>= 2.4),
     flex (>=2.5.35),
 # workaround for https://github.com/openscad/openscad/issues/1543
