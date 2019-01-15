@@ -32,7 +32,7 @@ override_dh_auto_configure:
 		"QMAKE_LFLAGS_DEBUG=${LDFLAGS}" \
 		\
 		QMAKE_STRIP=: PREFIX=/usr \
-		VERSION=$(UPSTREAMVERS) CONFIG-=debug CONFIG+=qopenglwidget
+		VERSION=$(UPSTREAMVERS) CONFIG-=debug CONFIG+=qopenglwidget CONFIG+=experimental
 
 
 override_dh_auto_build:
