@@ -1,7 +1,11 @@
-openscad (2019.01-1+dfsg-1) unstable; urgency=medium
+openscad (2019.01-1+dfsg-1.1) unstable; urgency=medium
 
   * Non-maintainer upload.
-  * New upstream release 2019-01-RC
+  * New upstream release 2019-01-RC.
+  * All files in upstream tarball are now distributable after clarifying
+    copyright.
+  * Remove obsolete Priority: extra
+  * Enable use of lib3mf and experimental features
 
  -- Kristian Nielsen <knielsen@knielsen-hq.org>  Wed, 02 Jan 2019 20:20:29 +0100
 
