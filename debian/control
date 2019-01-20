@@ -19,6 +19,7 @@ Build-Depends:
     libxml2-dev,
     libzip-dev,
     lib3mf-dev,
+    libspnav-dev,
     bison (>= 2.4),
     flex (>=2.5.35),
 # workaround for https://github.com/openscad/openscad/issues/1543
@@ -38,7 +39,9 @@ Build-Depends:
     xvfb,
     libgl1-mesa-dev,
     openscad-mcad,
-    fonts-hosny-amiri
+    fonts-hosny-amiri,
+# Needed for test suite
+    unzip
 # openscad is not gles compatible yet. this line makes builds abort before they
 # faile at compile time. libqt5opengl5 uses gles on arm{el,hf}, making openscad
 # currently unbuildable there. tracked upstream as
