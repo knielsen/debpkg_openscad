@@ -1,7 +1,6 @@
 Source: openscad
 Priority: optional
 Maintainer: Christian M. Amsüss <chrysn@fsfe.org>
-Uploaders: Kristian Nielsen <knielsen@knielsen-hq.org>
 # libcgal-qt5-dev is a workaround for http://bugs.debian.org/804539
 Build-Depends:
     debhelper (>= 10),
