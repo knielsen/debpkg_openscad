@@ -2,7 +2,7 @@
 # similar -- whatever `dh_auto_configure -Scmake -Dtests` chose.
 
 # compiled programs
-#obj-*/csgtexttest /usr/lib/openscad/testprograms/
+obj-*/csgtexttest /usr/lib/openscad/testprograms/
 
 # helper scripts
 tests/cgalstlsanitytest /usr/lib/openscad/testprograms/

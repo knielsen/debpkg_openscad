@@ -41,6 +41,8 @@ override_dh_auto_build:
 	# not run in dh_auto_configure stage, as it requires the openscad binary to be already built
 	dh_auto_configure -Dtests
 
+	dh_auto_build -Dtests -Scmake -- csgtexttest
+
 	# fix absolute paths in ctest scripts (relative paths will work during
 	# the build time tests, and are catered for by the openscad-testrun
 	# script).
