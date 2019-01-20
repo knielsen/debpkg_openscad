@@ -4,15 +4,8 @@ Source: http://www.openscad.org/
 Files-Excluded: src/SparkleAutoUpdater.*
                 scripts/examples-html/assets/js/rainbow.min.js
                 libraries/MCAD
-Comment: The SparkleAutoUpdater was just called "BSD licensed" by original
- author, is thus licensed in an unclear fashion, and is only required on Mac
- anyway.
- .
- The rainbow.min.js is an obfuscated (minified) file shipped with upstream, but
- not strictly required (FIXME: check this).
- .
- The MCAD library is free, included in upstream's tar ball, but not part of
- upstream's git tree, and packaged independently.
+Comment: The MCAD library is free, included in upstream's tar ball, but not
+ part of upstream's git tree, and packaged independently.
  .
  Until before 2015.03-2, upstream shipped the non-free flattr logo, which
  warranted the creation of a +dfsg package. The remaining non-free parts are
@@ -48,6 +41,11 @@ License: GPL-2+
 Files: scripts/*.nsh
 Copyright: 1995-2009 Vytautas, intersol, chefkoch, dselkirk@hotmail.com, eccles@users.sf.net
 License: zlib
+
+Files: scripts/examples-html/assets/js/rainbow.js
+       scripts/examples-html/assets/js/rainbow.min.js
+Copyright: 2013 Craig Campbell
+License: Apache-2.0
 
 Files: fonts/Liberation-2.00.1/*
 Copyright: 2010, Google Corporation
@@ -123,6 +121,10 @@ Comment: given no other indication, it is assumed that most of the file stems
  BRIAN PAUL BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
  AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Files: src/SparkleAutoUpdater.*
+Copyright: 2008 Remko Troncon, 2013 Marius Kintel
+License: MIT
 
 Files: contrib/scad-mode.el
 Copyright: 2010-2011 Len Trigg <lenbok@gmail.com>
@@ -632,3 +634,19 @@ License: pythonparts
  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
  OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+ .
+ http://www.apache.org/licenses/LICENSE-2.0
+ .
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ .
+ A copy of the Apache License can be found in
+ /usr/share/common-licenses/Apache-2.0.
