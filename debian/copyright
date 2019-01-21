@@ -1,9 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: openscad
 Source: http://www.openscad.org/
-Files-Excluded: src/SparkleAutoUpdater.*
-                scripts/examples-html/assets/js/rainbow.min.js
-                libraries/MCAD
+Files-Excluded: libraries/MCAD
 Comment: The MCAD library is free, included in upstream's tar ball, but not
  part of upstream's git tree, and packaged independently.
  .
