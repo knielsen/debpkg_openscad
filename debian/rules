@@ -32,7 +32,8 @@ override_dh_auto_configure:
 		"QMAKE_LFLAGS_DEBUG=${LDFLAGS}" \
 		\
 		QMAKE_STRIP=: PREFIX=/usr \
-		VERSION=$(DEB_VERSION_UPSTREAM) CONFIG-=debug CONFIG+=qopenglwidget CONFIG+=experimental
+		VERSION=$$(echo "$(DEB_VERSION_UPSTREAM)" | sed -e 's/-.*//' -e 's/~/-/') \
+		CONFIG-=debug CONFIG+=qopenglwidget CONFIG+=experimental
 
 
 override_dh_auto_build:
