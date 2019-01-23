@@ -7,6 +7,13 @@ openscad (2019.01~RC1-1+dfsg-1.2) unstable; urgency=medium
   * Remove obsolete Priority: extra
   * Enable use of lib3mf and experimental features
   * Enable input drivers
+  * Update package of overridden duplicate-font-file
+  * Fix CC license indication of examples
+  * Build process updates
+    - Use dpkg helper to parse upstream version
+  * Bump standards version
+    - Drop extra priority
+  * git repository moved to Salsa
 
  -- Kristian Nielsen <knielsen@knielsen-hq.org>  Wed, 23 Jan 2019 18:22:08 +0100
 
