@@ -3,12 +3,9 @@ Upstream-Name: openscad
 Source: http://www.openscad.org/
 Files-Excluded: libraries/MCAD
 Comment: The MCAD library is free, included in upstream's tar ball, but not
- part of upstream's git tree, and packaged independently.
- .
- Until before 2015.03-2, upstream shipped the non-free flattr logo, which
- warranted the creation of a +dfsg package. The remaining non-free parts are
- being tracked at https://github.com/openscad/openscad/issues/1491; it is
- expected that future versions can be debian-released with original tar balls.
+ part of upstream's git tree. In debian, the MCAD library is packaged
+ independently. MCAD is still left in the source taball to avoid the need
+ to repack.
 
 
 Files: *
@@ -146,6 +143,104 @@ License: CC0-1.0
  .
  A copy of the CC0 1.0 Universal license can be found in
  /usr/share/common-licenses/CC0-1.0.
+
+Files: libraries/MCAD/2Dshapes.scad libraries/MCAD/layouts.scad
+Copyright: 2012 Peter Uithoven
+License: LGPL-2.1
+
+Files: libraries/MCAD/3d_triangle.scad
+Copyright: 2011 Rene Baumann
+License: LGPL-2.1
+
+Files: libraries/MCAD/bearing.scad libraries/MCAD/materials.scad libraries/MCAD/stepper.scad libraries/MCAD/units.scad libraries/MCAD/utilities.scad
+Copyright: 2010 Hans Häggström
+License: CC-BY-SA-3.0 or LGPL-2 or LGPL-2.1
+
+Files: libraries/MCAD/bitmap/*
+Copyright: Tony Buser <tbuser@gmail.com>
+License: CC-BY-3.0 or LGPL-2.1
+
+Files: libraries/MCAD/bitmap/letter_necklace.scad libraries/MCAD/screw.scad libraries/MCAD/transformations.scad libraries/MCAD/unregular_shapes.scad
+Copyright: 2010-2011 Elmo Mäntynen <elmo.mantynen@iki.fi>
+License: LGPL-2.1
+
+Files: libraries/MCAD/boxes.scad
+Copyright: 2010 Marius Kintel
+License: BSD-2-clause or LGPL-2.1
+
+Files: libraries/MCAD/constants.scad libraries/MCAD/curves.scad libraries/MCAD/math.scad
+Copyright: 2010 Elmo Mäntynen <elmo.mantynen@iki.fi>
+License: MIT-MCAD or LGPL-2.1
+
+Files: libraries/MCAD/fonts.scad
+Copyright: Andrew Plumb <andrew@plumb.org>
+License: LGPL-2.1
+
+Files: libraries/MCAD/gears.scad
+Copyright: 2010 D1plo1d
+License: LGPL-2.1
+
+Files: libraries/MCAD/openscad_testing.py libraries/MCAD/openscad_utils.py libraries/MCAD/README.markdown libraries/MCAD/test_docs.py libraries/MCAD/test_mcad.py libraries/MCAD/TODO
+Copyright: Elmo Mäntynen <elmo.mantynen@iki.fi>
+License: LGPL-2.1
+Comment: Implied by having the same author who wrote the README saying this
+ whole project is LGPL-2.1
+
+Files: libraries/MCAD/gridbeam.scad
+Copyright: 2009-2013 Timothy Schmidt
+License: LGPL-2.1
+
+Files: libraries/MCAD/hardware.scad
+Copyright: 2011 whosawhatsis
+License: LGPL-2.1
+
+Files: libraries/MCAD/involute_gears.scad
+Copyright: 2010 Greg Frost
+License: CC or LGPL-2.1
+
+Files: libraries/MCAD/lego_compatibility.scad
+Copyright: jag, nefercheprure
+License: PD-nefercheprure or LGPL-2.1
+
+Files: libraries/MCAD/libtriangles.scad
+Copyright: 2013 Alex Davies
+License: LGPL-2.1
+
+Files: libraries/MCAD/metric_fastners.scad
+Copyright: 2010-2011 Giles Bathgate
+License: GPL-3 or LGPL-2.1
+
+Files: libraries/MCAD/motors.scad libraries/MCAD/nuts_and_bolts.scad
+Copyright: D1plo1d
+License: GPL-3 or LGPL-2.1
+
+Files: libraries/MCAD/multiply.scad
+Copyright: 2012 Elmo Mäntynen
+License: LGPL-2 or LGPL-2.1
+
+Files: libraries/MCAD/polyholes.scad
+Copyright: 2011 Nophead
+License: CC-BY-3.0-unported or LGPL-2.1
+
+Files: libraries/MCAD/regular_shapes.scad
+Copyright: 2010-2011 Giles Bathgate, Elmo Mäntynen
+License: GPL-3 or LGPL-2.1
+
+Files: libraries/MCAD/servos.scad libraries/MCAD/triangles.scad
+Copyright: 2010 Eero 'rambo' af Heurlin
+License: LGPL-2.1
+
+Files: libraries/MCAD/shapes.scad
+Copyright: 2009 Catarina Mota, 2010 Elmo Mäntynen
+License: LGPL-2.1
+
+Files: libraries/MCAD/teardrop.scad
+Copyright: 2010 whosawhatsis
+License: LGPL-3 or LGPL-2.1
+
+Files: libraries/MCAD/trochoids.scad
+Copyright: 2011 Matt Moses <mmoses152@gmail.com>
+License: PD-trochoids or LGPL-2.1
 
 Files: debian/*
 Copyright: © 2010-2013 Christian M. Amsüss <chrysn@fsfe.org>
@@ -653,3 +748,72 @@ License: Apache-2.0
  .
  A copy of the Apache License can be found in
  /usr/share/common-licenses/Apache-2.0.
+
+License: BSD-2-clause
+ 2-clause BSD License (http://opensource.org/licenses/BSD-2-Clause)
+
+License: CC
+ It is licensed under the Creative Commons - GNU LGPL 2.1 license.
+Comment:
+ The Creative Commons license is not specified any further, but given the
+ affected file is dual licensed with LGPL 2.1, this is not too big of an issue.
+
+License: CC-BY-3.0
+ See http://creativecommons.org/licenses/by/3.0/
+ .
+ No further explanation was given by the author.
+
+License: CC-BY-3.0-unported
+ This file is licensed under the terms of Creative Commons Attribution 3.0
+ Unported.
+
+License: CC-BY-SA-3.0
+ Dual licenced under Creative Commons Attribution-Share Alike 3.0 and LGPL-2 or later
+
+License: LGPL-2
+ A copy of the GNU Lesser General Public License can be found in
+ /usr/share/common-licenses/LGPL-2.
+Comment: No more detailed license text included as none was provide by
+ upstream.
+
+License: LGPL-2.1
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ A copy of the GNU Lesser General Public License can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
+License: LGPL-3
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU Lesser General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ GNU Lesser General Public License for more details.
+ .
+ A copy of the GNU Lesser General Public License can be found in
+ /usr/share/common-licenses/LGPL-3.
+
+License: MIT-MCAD
+ No further explanation was given by the author.
+Comment:
+ The lack of clarity is not an issue licensing-wise, because all files are
+ licensed under the LGPL-2.1 as well.
+
+License: PD-nefercheprure
+ This file is placed under the public domain
+
+License: PD-trochoids
+ This file is public domain.  Use it for any purpose, including commercial
+ applications.  Attribution would be nice, but is not required.  There is
+ no warranty of any kind, including its correctness, usefulness, or safety.
