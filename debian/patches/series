@@ -5,4 +5,3 @@ test_pretty_print-remove-a-pathname-normalization-st.patch
 test_pretty_print-drop-file-name-munging.patch
 Fix-path-discovery-for-fonts.patch
 adjust-cxxflags-from-cgal.patch
-temp_csgtexttest_fix_missing_libzip_libz.diff

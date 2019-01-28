@@ -33,7 +33,7 @@ override_dh_auto_configure:
 		\
 		QMAKE_STRIP=: PREFIX=/usr \
 		VERSION=$$(echo "$(DEB_VERSION_UPSTREAM)" | sed -e 's/-.*//' -e 's/~/-/') \
-		CONFIG-=debug CONFIG+=qopenglwidget CONFIG+=experimental
+		CONFIG-=debug CONFIG+=qopenglwidget
 
 
 override_dh_auto_build:
@@ -41,8 +41,6 @@ override_dh_auto_build:
 
 	# not run in dh_auto_configure stage, as it requires the openscad binary to be already built
 	dh_auto_configure -Dtests
-
-	dh_auto_build -Dtests -Scmake -- csgtexttest
 
 	# fix absolute paths in ctest scripts (relative paths will work during
 	# the build time tests, and are catered for by the openscad-testrun

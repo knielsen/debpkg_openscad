@@ -1,7 +1,7 @@
-openscad (2019.01~RC1-0.1) unstable; urgency=medium
+openscad (2019.01~RC2-0.1) unstable; urgency=medium
 
   * Non-maintainer upload.
-  * New upstream release 2019-01-RC1.
+  * New upstream release 2019-01-RC2.
   * All files in upstream tarball are now distributable after clarifying
     copyright.
   * Remove obsolete Priority: extra

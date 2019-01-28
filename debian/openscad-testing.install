@@ -1,9 +1,6 @@
 # when obj-* is placed as first component, this menas obj-x86_64-linux-gnu or
 # similar -- whatever `dh_auto_configure -Scmake -Dtests` chose.
 
-# compiled programs
-obj-*/csgtexttest /usr/lib/openscad/testprograms/
-
 # helper scripts
 tests/cgalstlsanitytest /usr/lib/openscad/testprograms/
 tests/virtualfb.sh /usr/lib/openscad/testprograms/
