@@ -57,7 +57,7 @@ Comment: The origin of this file is described in icons/license.txt as
  package) was used to specify the author and the wording of the license.
 
 
-Files: openscad.appdata.xml
+Files: openscad.appdata.xml.in
 Copyright: 2013 Miro Hrončok <miro@hroncok.cz>
 License: CC0
  See the complete license on http://creativecommons.org/publicdomain/zero/1.0/legalcode
@@ -69,7 +69,7 @@ Comment:
  <https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing>, which finally
  mentions the creativecommons.org URL in the license text section.
 
-Files: src/OGL_helper.h
+Files: src/ext/CGAL/OGL_helper.h
 Copyright: © 1997-2002 Max-Planck-Institute Saarbruecken (Germany)
 License: GPL-3+
 Comment: This used to be derived from the original QPL'd OGL_helper.h from the
@@ -82,7 +82,7 @@ Comment: This used to be derived from the original QPL'd OGL_helper.h from the
  and states in its current license section exactly what is here shown in this
  DEP5 file's License: section.
 
-Files: src/CGAL_Nef3_workaround.h
+Files: src/ext/CGAL/CGAL_Nef3_workaround.h
 Copyright: © 1997-2002,2005 Max-Planck-Institute Saarbruecken (Germany)
 License: GPL-3+
 
@@ -129,7 +129,7 @@ Files: contrib/OpenSCAD.xml
 Copyright: 2011 tjhowse <tjhowse@gmail.com>
 License: GPL-2+
 
-Files: src/lodepng.*
+Files: src/ext/lodepng/*
 Copyright: 2005-2012 Lode Vandevenne
 License: zlib
 
