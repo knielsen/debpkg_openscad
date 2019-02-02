@@ -1,0 +1,89 @@
+From: Kristian Nielsen <knielsen@knielsen-hq.org>
+Date: Sat, 02 Jan 2019 17:10:41 +0100
+Subject: Use #!/usr/bin/python3 shebang
+
+Following Debian Pyhthon policy, use #!/usr/bin/python3 in executable python
+scripts over #!/usr/bin/env python.
+
+Forwarded: not-needed
+
+--- a/scripts/git-archive-all.py
++++ b/scripts/git-archive-all.py
+@@ -1,4 +1,4 @@
+-#! /usr/bin/env python
++#! /usr/bin/python3
+ # coding=utf-8
+ 
+ from __future__ import print_function
+--- a/scripts/macosx-sanity-check.py
++++ b/scripts/macosx-sanity-check.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ 
+ #
+ # This is be used to verify that all the dependant libraries of a  Mac OS X executable 
+--- a/scripts/makereleasejson.py
++++ b/scripts/makereleasejson.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ 
+ # Used by github-release.sh
+ 
+--- a/tests/cgalstlsanitytest
++++ b/tests/cgalstlsanitytest
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ 
+ import re, sys, subprocess, os
+ from validatestl import validateSTL
+--- a/tests/export_import_pngtest.py
++++ b/tests/export_import_pngtest.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ 
+ # Export-import test
+ #
+--- a/tests/mingw_convert_ctest.py
++++ b/tests/mingw_convert_ctest.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ 
+ #
+ # Mingw_x_testfile - convert paths in CTestTestfile.cmake so they work 
+--- a/tests/shouldfail.py
++++ b/tests/shouldfail.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ 
+ # Test expected failure
+ #
+--- a/tests/test_cmdline_tool.py
++++ b/tests/test_cmdline_tool.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ #
+ # Regression test driver for cmd-line tools
+ #
+--- a/tests/test_pretty_print.py
++++ b/tests/test_pretty_print.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/python
++#!/usr/bin/python3
+ 
+ # test_pretty_print by don bright 2012. Copyright assigned to Marius Kintel and
+ # Clifford Wolf 2012. Released under the GPL 2, or later, as described in
+--- a/tests/validatestl.py
++++ b/tests/validatestl.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ 
+ #
+ # Simple tool to validate an STL.

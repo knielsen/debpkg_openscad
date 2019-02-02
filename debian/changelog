@@ -1,6 +1,8 @@
 openscad (2019.01~RC2-0.2) unstable; urgency=medium
 
+  * Non-maintainer upload.
   * Include missing license fulltexts in debian/copyright
+  * Depend on python3, not python
 
  -- Kristian Nielsen <knielsen@knielsen-hq.org>  Sat, 02 Feb 2019 13:02:42 +0100
 

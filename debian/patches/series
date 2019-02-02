@@ -5,3 +5,4 @@ test_pretty_print-remove-a-pathname-normalization-st.patch
 test_pretty_print-drop-file-name-munging.patch
 Fix-path-discovery-for-fonts.patch
 adjust-cxxflags-from-cgal.patch
+Use_python3.patch
