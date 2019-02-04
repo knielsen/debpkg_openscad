@@ -4,6 +4,10 @@ here. (Syntax: test name substring / substring list to match or generic
 description, R in parentheses indicates failure in openscad-testrun, B in
 parentheses indicates failure at build time).
 
+* Customizer and Svg tests(RB): These test experimental features which
+  are not enabled in the Debian-packaged openscad binary, so they
+  should be disabled.
+
 * tesselation (R): The test suite relies on a particular implementation of the
   Liberation Sans font; they ship it, but it is not included in the Debian
   package because it is prefered to rely on the system's fonts.
