@@ -1,19 +1,10 @@
-openscad (2019.01~RC2-0.2) unstable; urgency=medium
+openscad (2019.01~RC2-1) unstable; urgency=medium
 
-  * Non-maintainer upload.
-  * Include missing license fulltexts in debian/copyright
-  * Depend on python3, not python
-
- -- Kristian Nielsen <knielsen@knielsen-hq.org>  Sat, 02 Feb 2019 13:02:42 +0100
-
-openscad (2019.01~RC2-0.1) unstable; urgency=medium
-
-  * Non-maintainer upload.
   * New upstream release 2019-01-RC2.
+  * Add Kristian Nielsen as Uploader
   * All files in upstream tarball are now distributable after clarifying
     copyright.
-  * Remove obsolete Priority: extra
-  * Enable use of lib3mf and experimental features
+  * Enable use of lib3mf
   * Enable input drivers
   * Update package of overridden duplicate-font-file
   * Fix CC license indication of examples
@@ -22,8 +13,10 @@ openscad (2019.01~RC2-0.1) unstable; urgency=medium
   * Bump standards version
     - Drop extra priority
   * git repository moved to Salsa
+  * Include missing license fulltexts in debian/copyright
+  * Depend on python3, not python
 
- -- Kristian Nielsen <knielsen@knielsen-hq.org>  Wed, 23 Jan 2019 18:22:08 +0100
+ -- Kristian Nielsen <knielsen@knielsen-hq.org>  Mon, 04 Feb 2019 22:15:40 +0100
 
 openscad (2015.03-2+dfsg-2.2) unstable; urgency=medium
 
