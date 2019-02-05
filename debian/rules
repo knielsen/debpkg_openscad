@@ -15,23 +15,10 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export QT_SELECT = qt5
 
 %:
-	dh $@
+	dh $@ --buildsystem=qmake
 
 override_dh_auto_configure:
-	# dh_auto_configure adds -nocache to qmake, which for some
-	# reason causes many include paths to be missing for OpenSCAD.
-	# So run qmake manually.
-	qmake -makefile \
-		"QMAKE_CFLAGS_RELEASE=${CFLAGS} ${CPPFLAGS}" \
-		"QMAKE_CFLAGS_DEBUG=${CFLAGS} ${CPPFLAGS}" \
-		\
-		"QMAKE_CXXFLAGS_RELEASE=${CXXFLAGS} ${CPPFLAGS}" \
-		"QMAKE_CXXFLAGS_DEBUG=${CXXFLAGS} ${CPPFLAGS}" \
-		\
-		"QMAKE_LFLAGS_RELEASE=${LDFLAGS}" \
-		"QMAKE_LFLAGS_DEBUG=${LDFLAGS}" \
-		\
-		QMAKE_STRIP=: PREFIX=/usr \
+	dh_auto_configure \
 		VERSION=$$(echo "$(DEB_VERSION_UPSTREAM)" | sed -e 's/-.*//' -e 's/~/-/') \
 		CONFIG-=debug CONFIG+=qopenglwidget
 
@@ -40,7 +27,7 @@ override_dh_auto_build:
 	dh_auto_build
 
 	# not run in dh_auto_configure stage, as it requires the openscad binary to be already built
-	dh_auto_configure -Dtests
+	dh_auto_configure -Dtests --buildsystem=cmake
 
 	# fix absolute paths in ctest scripts (relative paths will work during
 	# the build time tests, and are catered for by the openscad-testrun
@@ -68,7 +55,7 @@ override_dh_auto_test:
 	# tests in software.
 	#
 	# as for the tests excluded with --exclude-regex, see README.testsuite.
-	DISPLAY= OPENSCADPATH=/usr/share/openscad/libraries dh_auto_test -Dtests -Scmake -- ARGS+="--exclude-regex ^customizertest\\|^svgpngtest\\|issue1165\\|issue1215\\|throwntogethertest_issue1089\\|openscad-cameyeortho_camera-tests\\|openscad-cameyeortho-viewall_camera-tests" || ( echo '---- content of ' obj-*/Testing/Temporary/*_report.html ' ----'; cat obj-*/Testing/Temporary/*_report.html; echo; echo '---- end content ----'; exit 0)
+	DISPLAY= OPENSCADPATH=/usr/share/openscad/libraries dh_auto_test -Dtests --buildsystem=cmake -- ARGS+="--exclude-regex ^customizertest\\|^svgpngtest\\|issue1165\\|issue1215\\|throwntogethertest_issue1089\\|openscad-cameyeortho_camera-tests\\|openscad-cameyeortho-viewall_camera-tests" || ( echo '---- content of ' obj-*/Testing/Temporary/*_report.html ' ----'; cat obj-*/Testing/Temporary/*_report.html; echo; echo '---- end content ----'; exit 0)
 
 override_dh_auto_install:
 	# fix absolute paths in generated scad files. this step logically
@@ -77,7 +64,7 @@ override_dh_auto_install:
 	# paths are still required.
 	find testdata -name \*.scad  -exec perl -i.bak -npe 'use Cwd; my $$here = getcwd(); s[\Q$$here\E/tests/../testdata][/usr/share/openscad/testdata]g' {} +
 
-	dh_auto_install -Sqmake --destdir=debian/openscad
+	dh_auto_install --destdir=debian/openscad
 
 	# don't ship mcad, neither the empty directory (when this is built from
 	# a normal git source checkout) nor the full library (when this is
@@ -97,4 +84,4 @@ override_dh_strip:
 override_dh_auto_clean:
 	dh_auto_clean
 
-	dh_auto_clean -Dtests -Scmake
+	dh_auto_clean -Dtests --buildsystem=cmake
