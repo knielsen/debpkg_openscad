@@ -1,20 +1,26 @@
 openscad (2019.01~RC2-1) unstable; urgency=medium
 
-  * New upstream release 2019-01-RC2.
+  * New upstream version
   * Add Kristian Nielsen as Uploader
-  * All files in upstream tarball are now distributable after clarifying
-    copyright.
-  * Enable use of lib3mf
-  * Enable input drivers
+  * Drop +dfsg suffix as all files in upstream tarball
+    are now distributable after clarifying copyright
+  * Add new build dependencies
+    - lib3mf-dev
+    - libqt5gamepad5-dev
+    - libspnav-dev
+    - libxml-dev
+    - libzip-dev
+    - qtmultimedia5-dev
+    - unzip
+  * Switch python build dependency to python3
   * Update package of overridden duplicate-font-file
   * Fix CC license indication of examples
   * Build process updates
     - Use dpkg helper to parse upstream version
-  * Bump standards version
+  * Bump standards version to 10
     - Drop extra priority
-  * git repository moved to Salsa
-  * Include missing license fulltexts in debian/copyright
-  * Depend on python3, not python
+  * Update Vcs-* fields in debian/control for Salsa
+  * Include missing fulltext licenses in debian/copyright
 
  -- Kristian Nielsen <knielsen@knielsen-hq.org>  Mon, 04 Feb 2019 22:15:40 +0100
 
